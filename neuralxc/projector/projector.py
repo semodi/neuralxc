@@ -39,8 +39,8 @@ class BaseProjector(ABC):
 
         Returns
         ------------
-        c, list of dicts
-        	Basis representation. 
+        c, dict of np.ndarrays
+        	Basis representation, dict keys correspond to atomic species.
         """
         pass
 
@@ -94,22 +94,43 @@ class DensityProjector(BaseProjector):
     @doc_inherit
     def get_basis_rep(self, rho, positions, species):
 
-        basis_rep = []
+        basis_rep = {}
         for pos, spec in zip(positions, species):
+            if not spec in basis_rep:
+                basis_rep[spec] = []
+
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            basis_rep.append(self.project(rho, box,basis['n'], basis['l'],
+            basis_rep[spec].append(self.project(rho, box, basis['n'], basis['l'],
                 basis['r_o'], self.W[spec]))
+
+        for spec in basis_rep:
+            basis_rep[spec] = np.concatenate(basis_rep[spec], axis = 0)
 
         return basis_rep
 
+
+    def get_basis_rep_dict(self, rho, positions, species):
+
+        basis_rep = {}
+        for pos, spec in zip(positions, species):
+            if not spec in basis_rep:
+                basis_rep[spec] = []
+
+            basis = self.basis[spec]
+            box = self.box_around(pos, basis['r_o'])
+
+            basis_rep[spec].append(self.project(rho, box, basis['n'], basis['l'],
+                basis['r_o'], self.W[spec], True))
+
+        return basis_rep
 
     @doc_inherit
     def get_V(self):
         raise NotImplementedError('Needs to be implemented')
 
-    def project(self, rho, box, n_rad, n_l, r_o, W = None):
+    def project(self, rho, box, n_rad, n_l, r_o, W = None, return_dict=False):
             '''
             Project the real space density rho onto a set of basis functions
 
@@ -159,18 +180,25 @@ class DensityProjector(BaseProjector):
 
             rads = self.radials(R, r_o, W)
 
-            coeff = {}
+            coeff = []
+            coeff_dict = {}
             if small_rho:
                 for n in range(n_rad):
                     for l in range(n_l):
                         for m in range(2*l+1):
-                            coeff['{},{},{}'.format(n,l,m-l)] = np.sum(angs[l][m]*rads[n]*rho)*V_cell
+                            coeff.append(np.sum(angs[l][m]*rads[n]*rho)*self.V_cell)
+                            coeff_dict['{},{},{}'.format(n,l,m-l)] = coeff[-1]
             else:
                 for n in range(n_rad):
                     for l in range(n_l):
                         for m in range(2*l+1):
-                            coeff['{},{},{}'.format(n,l,m-l)] = np.sum(angs[l][m]*rads[n]*rho[Xm, Ym, Zm])*self.V_cell
-            return coeff
+                            coeff.append(np.sum(angs[l][m]*rads[n]*rho[Xm, Ym, Zm])*self.V_cell)
+                            coeff_dict['{},{},{}'.format(n,l,m-l)] = coeff[-1]
+
+            if return_dict:
+                return coeff_dict
+            else:
+                return np.array(coeff).reshape(1,-1)
 
     def box_around(self, pos, radius):
         '''

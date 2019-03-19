@@ -16,6 +16,7 @@ test_dir = os.path.dirname(os.path.abspath(__file__))
 
 save_test_density_projector = False
 save_siesta_density_getter = False
+save_test_symmetrizer = False
 
 def test_doc_inherit():
 
@@ -57,10 +58,10 @@ def test_siesta_density_getter():
 
 
     if save_siesta_density_getter:
-        with open('h2o_dens.pckl','wb') as file:
+        with open(os.path.join(test_dir, 'h2o_dens.pckl'),'wb') as file:
             pickle.dump(results, file)
     else:
-        with open('h2o_dens.pckl','rb') as file:
+        with open(os.path.join(test_dir, 'h2o_dens.pckl'),'rb') as file:
             results_ref = pickle.load(file)
         for key in results:
             assert np.allclose(results_ref[key],results[key])
@@ -72,7 +73,7 @@ def test_density_projector():
 
     basis_set = {
                 'O': {'n' : 2, 'l' : 3, 'r_o': 1},
-                'H': {'n':2,'l':2,'r_o':1.5}
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
                 }
 
     density_projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
@@ -83,13 +84,88 @@ def test_density_projector():
                   )*xc.constants.Bohr
 
     basis_rep = density_projector.get_basis_rep(rho, positions, ['O','H','H'])
+    print(basis_rep)
     if save_test_density_projector:
-        with open('h2o_rep.pckl','wb') as file:
+        with open(os.path.join(test_dir, 'h2o_rep.pckl'),'wb') as file:
             pickle.dump(basis_rep, file)
     else:
-        with open('h2o_rep.pckl','rb') as file:
+        with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
             basis_rep_ref = pickle.load(file)
 
-        for this, ref in zip(basis_rep, basis_rep_ref):
-            for key in this:
-                assert np.allclose(this[key],ref[key])
+        for spec in basis_rep:
+            assert np.allclose(basis_rep[spec],basis_rep_ref[spec])
+
+
+@pytest.mark.parametrize("symmetrizer_type",['casimir'])
+def test_symmetrizer(symmetrizer_type):
+    with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
+        C = pickle.load(file)
+
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    symmetrize_instructions = {'basis': basis_set,
+                              'symmetrizer_type': symmetrizer_type}
+
+    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
+
+
+    D = symmetrizer.get_symmetrized(C)
+
+    if save_test_symmetrizer:
+        with open(os.path.join(test_dir, 'h2o_sym_{}.pckl'.format(symmetrizer_type)),'wb') as file:
+            pickle.dump(D, file)
+    else:
+        with open(os.path.join(test_dir, 'h2o_sym_{}.pckl'.format(symmetrizer_type)),'rb') as file:
+            D_ref = pickle.load(file)
+
+        for spec in D:
+            assert np.allclose(D[spec], D_ref[spec])
+
+
+@pytest.mark.parametrize("symmetrizer_type",['casimir'])
+def test_symmetrizer_rot_invariance(symmetrizer_type):
+    C_list = []
+    for i in range(3):
+        with open(os.path.join(test_dir, 'h2o_rot{}.pckl'.format(i)),'rb') as file:
+            C_list.append(pickle.load(file))
+
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    symmetrize_instructions = {'basis': basis_set,
+                              'symmetrizer_type': symmetrizer_type}
+
+    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
+
+    D_list = []
+    for C in C_list:
+        D_list.append(symmetrizer.get_symmetrized(C))
+
+    for D in D_list[1:]:
+        for spec in D:
+            assert np.allclose(D[spec], D_list[0][spec], rtol=1e-3, atol=1e-4)
+
+@pytest.mark.parametrize("symmetrizer_type",['casimir'])
+def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
+    with open(os.path.join(test_dir, 'rotated_synthetic.pckl'),'rb') as file:
+            C_list = pickle.load(file)
+
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    symmetrize_instructions = {'basis': basis_set,
+                              'symmetrizer_type': symmetrizer_type}
+
+    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
+
+    D_list = []
+    for C in C_list:
+        D_list.append(symmetrizer.get_symmetrized(C))
+
+    for D in D_list[1:]:
+        for spec in D:
+            assert np.allclose(D[spec], D_list[0][spec])

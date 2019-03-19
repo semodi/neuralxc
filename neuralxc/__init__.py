@@ -8,6 +8,7 @@ from .neuralxc import NeuralXC
 from . import projector
 from . import utils
 from . import constants
+from . import symmetrizer
 #from .projector import *
 #from .mlpipeline import *
 #from .symmetrizer import *
