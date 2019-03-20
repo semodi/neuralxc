@@ -5,7 +5,7 @@ from ..doc_inherit import doc_inherit
 from sympy.physics.quantum.cg import CG
 from sympy import N
 import numpy as np
-
+from ..formatter import expand
 class BaseSymmetrizer(ABC):
 
     def __init__(self):
@@ -69,20 +69,6 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         else:
             return self.get_symmetrized(X)
 
-    @staticmethod
-    def expand(*args):
-        """ Takes the common format in which datasets such as D and C are provided
-         (usually [{'species': np.ndarray}]) and loops over it
-         """
-        args = list(args)
-        for i, arg in enumerate(args):
-            if not isinstance(arg, list):
-                args[i] = [arg]
-
-        for idx, datasets in enumerate(zip(*args)):
-            for key in datasets[0]:
-                yield (idx, key , [data[key] for data in datasets])
-
     # @doc_inherit
     def get_symmetrized(self, C):
         """
@@ -102,7 +88,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
         results = [{}]*len(C)
 
-        for idx, key, data in self.expand(C):
+        for idx, key, data in expand(C):
             results[idx][key] = self._symmetrize_function(*data,
                                      basis[key]['l'],
                                      basis[key]['n'],
@@ -133,7 +119,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
         results = [{}]*len(C)
 
-        for idx, key, data in self.expand(dEdD, C):
+        for idx, key, data in expand(dEdD, C):
             print(idx, key, data)
             results[idx][key] = self._gradient_function(*data,
                                      basis[key]['l'],

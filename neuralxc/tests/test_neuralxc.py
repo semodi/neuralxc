@@ -235,3 +235,20 @@ def test_symmetrizer_gradient(symmetrizer_type):
     print(dEdC_chain['O'].round(10))
     for spec in dEdC:
         assert np.allclose(dEdC[spec],dEdC_chain[spec])
+
+def test_formatter():
+    with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
+        C = pickle.load(file)
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    formatter = xc.formatter.Formatter(basis_set)
+    C_dict = formatter.inverse_transform(C)
+    C_id = formatter.transform(C_dict)
+    for spec in C:
+        assert np.allclose(C_id[spec], C[spec])
+    formatter.fit(C_dict)
+    C_id = formatter.transform(C_dict)
+    for spec in C:
+        assert np.allclose(C_id[spec], C[spec])
