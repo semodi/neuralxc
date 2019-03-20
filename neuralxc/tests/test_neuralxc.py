@@ -11,7 +11,7 @@ import os
 from neuralxc.doc_inherit import doc_inherit
 from abc import ABC, abstractmethod
 import pickle
-
+import copy
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
 save_test_density_projector = False
@@ -20,7 +20,7 @@ save_test_symmetrizer = False
 
 def test_doc_inherit():
 
-    class Parent(ABC):
+    class ParentA(ABC):
 
 
         def __init__(self):
@@ -36,7 +36,15 @@ def test_doc_inherit():
             """
             pass
 
-    class Child(Parent):
+    class ParentB(ABC):
+        def __init__(self):
+            """
+            This is a documentation
+            """
+            pass
+
+
+    class Child(ParentB, ParentA):
 
         @doc_inherit
         def __init__(self):
@@ -169,3 +177,61 @@ def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     for D in D_list[1:]:
         for spec in D:
             assert np.allclose(D[spec], D_list[0][spec])
+
+@pytest.mark.parametrize("symmetrizer_type",['casimir'])
+def test_symmetrizer_gradient(symmetrizer_type):
+    """ Synthetic test to see if symmetrizer gradient respects chain rule of
+        differentiation
+    """
+    with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
+        C = pickle.load(file)
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    symmetrize_instructions = {'basis': basis_set,
+                              'symmetrizer_type': symmetrizer_type}
+
+    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
+
+    def dummy_E(D):
+        if 'O' in D:
+            return np.linalg.norm(D['O'])
+        else:
+            return 0
+
+
+    D = symmetrizer.get_symmetrized(C)
+
+    mod_incr = 0.00001
+
+    # Compute dEdC
+    dEdC = {spec : np.zeros_like(C[spec]) for spec in C}
+    for mod_spec in C:
+        for mod_idx in range(C[mod_spec].shape[-1]):
+            for im in [1,1j]:
+                Cp =  copy.deepcopy(C)
+                Cm =  copy.deepcopy(C)
+                Cp[mod_spec][:,mod_idx] += mod_incr*im
+                Cm[mod_spec][:,mod_idx] -= mod_incr*im
+                Dp = symmetrizer.get_symmetrized(Cp)
+                Dm = symmetrizer.get_symmetrized(Cm)
+                dEdC[mod_spec][:,mod_idx] += (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr)*im
+
+    # Compute dEdD -> dEdC_chain
+    dEdD = {spec : np.zeros_like(D[spec]) for spec in D}
+    for mod_spec in D:
+        for mod_idx in range(D[mod_spec].shape[-1]):
+            Dp =  copy.deepcopy(D)
+            Dm =  copy.deepcopy(D)
+            Dp[mod_spec][:,mod_idx] += mod_incr
+            Dm[mod_spec][:,mod_idx] -= mod_incr
+
+            dEdD[mod_spec][:,mod_idx] = (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr)
+
+    dEdC_chain = symmetrizer.get_gradient(dEdD, C)
+
+    print(dEdC['O'].round(10))
+    print(dEdC_chain['O'].round(10))
+    for spec in dEdC:
+        assert np.allclose(dEdC[spec],dEdC_chain[spec])

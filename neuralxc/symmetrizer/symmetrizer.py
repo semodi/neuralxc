@@ -69,8 +69,19 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         else:
             return self.get_symmetrized(X)
 
-    def get_gradient(self):
-        raise NotImplementedError('Ooops...')
+    @staticmethod
+    def expand(*args):
+        """ Takes the common format in which datasets such as D and C are provided
+         (usually [{'species': np.ndarray}]) and loops over it
+         """
+        args = list(args)
+        for i, arg in enumerate(args):
+            if not isinstance(arg, list):
+                args[i] = [arg]
+
+        for idx, datasets in enumerate(zip(*args)):
+            for key in datasets[0]:
+                yield (idx, key , [data[key] for data in datasets])
 
     # @doc_inherit
     def get_symmetrized(self, C):
@@ -87,31 +98,22 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         D, dict of numpy.ndarrays
             Symmetrized descriptors
         """
-        made_list = False
         basis = self._attrs['basis']
 
-        # If C is not a list, make it one so that same loop structure can be used.
-        # In the end remove this artificial list so that return type is same
-        # as input
+        results = [{}]*len(C)
+
+        for idx, key, data in self.expand(C):
+            results[idx][key] = self._symmetrize_function(*data,
+                                     basis[key]['l'],
+                                     basis[key]['n'],
+                                     self._cgs)
         if not isinstance(C, list):
-            C = [C]
-            made_list = True
-
-        results = []
-        for dataset in C:
-            results_dict = {}
-            for spec in dataset:
-                results_dict[spec] = self._symmetrize_function(dataset[spec], basis[spec]['l'],
-                                                                basis[spec]['n'], self._cgs)
-            results.append(results_dict)
-
-        if made_list:
             return results[0]
         else:
             return results
 
     # @doc_inherit
-    def get_gradient(self):
+    def get_gradient(self, dEdD, C):
         """Uses chain rule to obtain dE/dC from dE/dD (unsymmetrized from symmetrized)
 
         Parameters
@@ -119,11 +121,27 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         dEdD : dict of np.ndarrays or list of dict of np.ndarrays
         	dE/dD
 
+        C : dict of np.ndarrays or list of dict of np.ndarrays
+        	C
+
         Returns
         -------------
-        dEdc: dict of np.ndarrays
+        dEdC: dict of np.ndarrays
         """
-        raise NotImplementedError('Gradient not implemented yet')
+
+        basis = self._attrs['basis']
+
+        results = [{}]*len(C)
+
+        for idx, key, data in self.expand(dEdD, C):
+            print(idx, key, data)
+            results[idx][key] = self._gradient_function(*data,
+                                     basis[key]['l'],
+                                     basis[key]['n'])
+        if not isinstance(C, list):
+            return results[0]
+        else:
+            return results
 
 class CasimirSymmetrizer(Symmetrizer):
 
@@ -164,6 +182,42 @@ class CasimirSymmetrizer(Symmetrizer):
         casimirs = np.array(casimirs).T
 
         return casimirs.reshape(*c_shape[:-1], -1)
+
+    @staticmethod
+    def _gradient_function(dEdd, c, n_l, n):
+        """Implements chain rule to obtain dE/dC from dE/dD
+        (unsymmetrized from symmetrized)
+
+        Parameters
+        ------------------
+        dEdD : np.ndarray
+        	dE/dD
+
+        C: np.ndarray
+            Unsymmetrized basis representation
+
+        n_l: int
+            number of angular momenta (not equal to maximum ang. momentum!
+                example: if only s-orbitals n_l would be 1)
+
+        n: int
+            number of radial functions
+
+        Returns
+        -------------
+        dEdC: dict of np.ndarrays
+        """
+        dEdd = dEdd.reshape(-1,dEdd.shape[-1])
+        casimirs_mask = np.zeros_like(c)
+        idx = 0
+        cnt = 0
+        for n_ in range(0, n):
+            for l in range(n_l):
+                casimirs_mask[:,idx:idx+(2*l+1)] = dEdd[:,cnt:cnt+1]
+                idx += 2*l + 1
+                cnt += 1
+
+        return 2*c*casimirs_mask
 
 class BispectrumSymmetrizer(Symmetrizer):
 
