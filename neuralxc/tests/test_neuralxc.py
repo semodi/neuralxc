@@ -17,7 +17,7 @@ test_dir = os.path.dirname(os.path.abspath(__file__))
 save_test_density_projector = False
 save_siesta_density_getter = False
 save_test_symmetrizer = False
-
+save_grouped_transformer = False
 def test_doc_inherit():
 
     class ParentA(ABC):
@@ -252,3 +252,40 @@ def test_formatter():
     C_id = formatter.transform(C_dict)
     for spec in C:
         assert np.allclose(C_id[spec], C[spec])
+
+@pytest.mark.parametrize(['transformer','filepath'],
+                         [[xc.ml.transformer.GroupedPCA(n_components=1), 'pca1.pckl'],
+                          [xc.ml.transformer.GroupedVarianceThreshold(0.005),'var09.pckl']])
+def test_grouped_transformers(transformer, filepath):
+    with open(os.path.join(test_dir, 'h2o_rot2.pckl'),'rb') as file:
+        C = pickle.load(file)
+
+
+    C = {'H' : C['H'].real}
+
+    transformed = transformer.fit_transform(C)
+    if save_grouped_transformer:
+        with open(filepath, 'wb') as file:
+            pickle.dump(transformed, file)
+    else:
+        with open(filepath, 'rb') as file:
+            ref = pickle.load(file)
+        assert np.allclose(transformed['H'], ref['H'])
+
+def test_species_grouper():
+    with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
+        C = pickle.load(file)
+
+    # print(C)
+    C = [{spec: C[spec].reshape(1,-1,C[spec].shape[-1]) for spec in C}]
+    basis_set = {
+                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                }
+    species_grouper = xc.formatter.SpeciesGrouper(basis_set, ['OHH'])
+    re_grouped = species_grouper.transform(species_grouper.inverse_transform(C,np.array([[0]])))[0]
+    print(re_grouped)
+    re_grouped = re_grouped[0]
+    C = C[0]
+    for spec in C:
+        assert np.allclose(C[spec],re_grouped[spec])
