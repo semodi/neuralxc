@@ -127,8 +127,60 @@ class DensityProjector(BaseProjector):
         return basis_rep
 
     @doc_inherit
-    def get_V(self):
-        raise NotImplementedError('Needs to be implemented')
+    def get_V(self, dEdC, positions, species):
+
+        if isinstance(dEdC, list):
+            dEdC = dEdC[0]
+
+        V = np.zeros(self.grid, dtype= complex)
+        spec_idx = {spec : -1 for spec in species}
+        for pos, spec in zip(positions, species):
+            spec_idx[spec] += 1
+            if dEdC[spec].ndim==3:
+                assert dEdC[spec].shape[0] == 1
+                dEdC[spec] = dEdC[spec][0]
+
+            coeffs = dEdC[spec][spec_idx[spec]]
+            basis = self.basis[spec]
+            box = self.box_around(pos, basis['r_o'])
+
+            V[box['mesh']] += self.build(coeffs, box, basis['n'], basis['l'],
+                basis['r_o'], self.W[spec])
+
+        return V
+
+    def build(self, coeffs, box, n_rad, n_l, r_o, W = None):
+
+
+        R, Theta, Phi = box['radial']
+        Xm, Ym, Zm = box['mesh']
+
+        # Automatically detect whether entire charge density or only surrounding
+        # box was provided
+
+        #Build angular part of basis functions
+        angs = []
+        for l in range(n_l):
+            angs.append([])
+            for m in range(-l,l+1):
+                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                angs[l].append(sph_harm(m, l, Phi, Theta))
+
+        #Build radial part of b.f.
+        if not isinstance(W, np.ndarray):
+            W = self.get_W(r_o, n_rad) # Matrix to orthogonalize radial basis
+
+        rads = self.radials(R, r_o, W)
+
+        v = np.zeros_like(Xm, dtype= complex)
+        idx = 0
+
+        for n in range(n_rad):
+            for l in range(n_l):
+                for m in range(2*l+1):
+                    v += coeffs[idx] * angs[l][m] * rads[n]
+                    idx += 1
+        return v
 
     def project(self, rho, box, n_rad, n_l, r_o, W = None, return_dict=False):
             '''

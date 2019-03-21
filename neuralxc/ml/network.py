@@ -51,13 +51,17 @@ class NXCPipeline(Pipeline):
 
 class NetworkEstimator(BaseEstimator):
 
-    def __init__(self, n_nodes, n_layers, b, alpha=0.01, max_steps = 20001, test_size = 0.2) :
+    def __init__(self, n_nodes, n_layers, b, alpha=0.01,
+        max_steps = 20001, test_size = 0.2, valid_size = 0.2,
+        random_seed = None) :
         self._n_nodes = n_nodes
         self._n_layers = n_layers
         self._b = b
         self.alpha = alpha
         self.max_steps = max_steps
         self._test_size = test_size
+        self._valid_size = valid_size
+        self._random_seed = random_seed
 
     def get_params(self, *args, **kwargs):
         return {'n_nodes' : self._n_nodes,
@@ -65,7 +69,9 @@ class NetworkEstimator(BaseEstimator):
                 'b': self._b,
                 'alpha': self.alpha,
                 'max_steps': self.max_steps,
-                'test_size' : self._test_size}
+                'test_size' : self._test_size,
+                'valid_size': self._valid_size,
+                'random_seed': self._random_seed}
 
     def fit(self,X ,y = None, *args, **kwargs):
 
@@ -90,7 +96,9 @@ class NetworkEstimator(BaseEstimator):
                         tar, test_size = self._test_size)
             subnets.append(nets)
         self._network = Energy_Network(subnets, scale_again = True)
-        self._network.train(step_size=self.alpha, max_steps=self.max_steps ,b_=self._b)
+        self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
+            b_=self._b, train_valid_split=1-self._valid_size,
+            random_seed=self._random_seed)
 
 
     def get_gradient(self, X, *args, **kwargs):
@@ -344,7 +352,8 @@ class Energy_Network():
               optimizer=None,
               adaptive_rate=False,
               multiplier = 1.0,
-              train_valid_split = 0.8):
+              train_valid_split = 0.8,
+              random_seed = None):
 
         """ Train the master neural network
 
@@ -388,7 +397,8 @@ class Energy_Network():
                 sess = self.sess
 
 
-
+            if not random_seed is None:
+                tf.random.set_random_seed(random_seed)
             # Get number of distinct subnet species
             species = {}
             for net in self.subnets:
@@ -1002,7 +1012,6 @@ def fc_nn_g(network, i, mean = 0, std = 1):
     n_copies = network.n_copies
     mean = mean/network.n_copies
     std = std/network.n_copies
-
 
     n = len(layers)
 

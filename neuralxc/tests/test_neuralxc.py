@@ -18,6 +18,8 @@ save_test_density_projector = False
 save_siesta_density_getter = False
 save_test_symmetrizer = False
 save_grouped_transformer = False
+
+@pytest.mark.fast
 def test_doc_inherit():
 
     class ParentA(ABC):
@@ -56,6 +58,7 @@ def test_doc_inherit():
     child = Child()
     help(child.test_function)
 
+@pytest.mark.fast
 def test_siesta_density_getter():
 
     density_getter = xc.utils.SiestaDensityGetter(binary = True)
@@ -74,6 +77,7 @@ def test_siesta_density_getter():
         for key in results:
             assert np.allclose(results_ref[key],results[key])
 
+@pytest.mark.fast
 def test_density_projector():
 
     density_getter = xc.utils.SiestaDensityGetter(binary = True)
@@ -104,6 +108,7 @@ def test_density_projector():
             assert np.allclose(basis_rep[spec],basis_rep_ref[spec])
 
 
+@pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",['casimir'])
 def test_symmetrizer(symmetrizer_type):
     with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
@@ -132,6 +137,7 @@ def test_symmetrizer(symmetrizer_type):
             assert np.allclose(D[spec], D_ref[spec])
 
 
+@pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",['casimir'])
 def test_symmetrizer_rot_invariance(symmetrizer_type):
     C_list = []
@@ -156,6 +162,7 @@ def test_symmetrizer_rot_invariance(symmetrizer_type):
         for spec in D:
             assert np.allclose(D[spec], D_list[0][spec], rtol=1e-3, atol=1e-4)
 
+@pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",['casimir'])
 def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     with open(os.path.join(test_dir, 'rotated_synthetic.pckl'),'rb') as file:
@@ -178,6 +185,7 @@ def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
         for spec in D:
             assert np.allclose(D[spec], D_list[0][spec])
 
+@pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",['casimir'])
 def test_symmetrizer_gradient(symmetrizer_type):
     """ Synthetic test to see if symmetrizer gradient respects chain rule of
@@ -237,6 +245,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
     for spec in dEdC:
         assert np.allclose(dEdC[spec],dEdC_chain[spec])
 
+@pytest.mark.fast
 def test_formatter():
     with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
         C = pickle.load(file)
@@ -254,6 +263,7 @@ def test_formatter():
     for spec in C:
         assert np.allclose(C_id[spec], C[spec])
 
+@pytest.mark.fast
 @pytest.mark.parametrize(['transformer','filepath'],
                          [[xc.ml.transformer.GroupedPCA(n_components=1), 'pca1.pckl'],
                           [xc.ml.transformer.GroupedVarianceThreshold(0.005),'var09.pckl']])
@@ -291,8 +301,9 @@ def test_species_grouper():
     for spec in C:
         assert np.allclose(C[spec],re_grouped[spec])
 
-
-def test_pipeline_gradient():
+@pytest.mark.slow
+@pytest.mark.parametrize('random_seed',[41,84])
+def test_pipeline_gradient(random_seed):
     data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'),'rb'))
     basis_set = {
                 'C': {'n' : 6, 'l' : 4, 'r_o': 1},
@@ -307,7 +318,8 @@ def test_pipeline_gradient():
     var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-5)
 
     estimator = xc.ml.NetworkEstimator(1, 4, [1e-5,1e-5,1e-5,0],
-                            alpha=0.001, max_steps = 4001, test_size = 0.0)
+                            alpha=0.001, max_steps = 4001, test_size = 0.0,
+                            valid_size = 0.0, random_seed=random_seed)
 
     pipeline_list = [('spec_group',  spec_group),
                      ('symmetrizer', symmetrizer),
