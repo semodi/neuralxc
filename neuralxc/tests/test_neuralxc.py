@@ -229,7 +229,8 @@ def test_symmetrizer_gradient(symmetrizer_type):
 
             dEdD[mod_spec][:,mod_idx] = (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr)
 
-    dEdC_chain = symmetrizer.get_gradient(dEdD, C)
+    symmetrizer.get_symmetrized(C)
+    dEdC_chain = symmetrizer.get_gradient(dEdD)
 
     print(dEdC['O'].round(10))
     print(dEdC_chain['O'].round(10))
@@ -289,3 +290,54 @@ def test_species_grouper():
     C = C[0]
     for spec in C:
         assert np.allclose(C[spec],re_grouped[spec])
+
+
+def test_pipeline_gradient():
+    data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'),'rb'))
+    basis_set = {
+                'C': {'n' : 6, 'l' : 4, 'r_o': 1},
+                'H': {'n' : 6, 'l' : 4, 'r_o': 1.5}
+                }
+    all_species = ['CCCCCCHHHHHH']
+    symmetrizer_instructions = {'basis': basis_set,
+                     'symmetrizer_type': 'casimir'}
+
+    spec_group = xc.formatter.SpeciesGrouper(basis_set, all_species)
+    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrizer_instructions)
+    var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-5)
+
+    estimator = xc.ml.NetworkEstimator(1, 4, [1e-5,1e-5,1e-5,0],
+                            alpha=0.001, max_steps = 4001, test_size = 0.0)
+
+    pipeline_list = [('spec_group',  spec_group),
+                     ('symmetrizer', symmetrizer),
+                     ('var_selector', var_selector)]
+
+    pca = xc.ml.transformer.GroupedPCA(n_components= 0.99, svd_solver='full')
+    pipeline_list.append(('pca', pca))
+
+    pipeline_list.append(('estimator', estimator))
+
+    ml_pipeline = xc.ml.NXCPipeline(pipeline_list)
+    ml_pipeline.fit(data)
+
+    #Subset of data for which to calculate gradient
+    x = data[0:1]
+    grad_analytic = ml_pipeline.get_gradient(x)
+
+    incr = 0.01
+    grad_fd = np.zeros_like(grad_analytic, dtype = complex)
+    for ix in range(1, 20): #IMPORTANT: don't alter ix = 0 (system index)
+        for im in [1,1j]:
+            xp = np.array(x)
+            xp[:,ix] += incr*im
+            xm = np.array(x)
+            xm[:,ix] -= incr*im
+            Ep = ml_pipeline.predict(xp)[0]
+            Em = ml_pipeline.predict(xm)[0]
+            grad_fd[:,ix] += (Ep-Em)/(2*incr)*im
+
+    print(grad_analytic[0,1:20])
+    print(grad_fd[0,1:20])
+    assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-2,
+                        atol = 1e-3)

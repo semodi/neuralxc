@@ -5,6 +5,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from ..formatter import atomic_shape, system_shape
 from abc import ABC, abstractmethod
+import numpy as np
 
 class GroupedTransformer(ABC):
 
@@ -61,6 +62,36 @@ class GroupedTransformer(ABC):
             return super().fit(atomic_shape(X))
 
 
+    def get_gradient(self, X,y=None, **fit_params):
+        was_tuple = False
+        if isinstance(X,tuple):
+            y = X[1]
+            X = X[0]
+            was_tuple = True
+
+        made_list = False
+        if not isinstance(X, list):
+            X = [X]
+            made_list = True
+
+        results = []
+        for x in X:
+            if isinstance(x, dict):
+                results_dict = {}
+                for spec in x:
+                    results_dict[spec] = self._spec_dict[spec].get_gradient(x[spec])
+                results.append(results_dict)
+            else:
+                results.append(system_shape(self._gradient_function(atomic_shape(x)),
+                    x.shape[-2]))
+
+        if made_list:
+            results = results[0]
+        if was_tuple:
+            return results, y
+        else:
+            return results
+
     def fit_transform(self, X, y=None, **fit_params):
         return self.fit(X).transform(X)
 
@@ -74,8 +105,16 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
         self._initkwargs = dict(threshold=threshold)
         super().__init__(**self._initkwargs)
 
-    def get_gradient(self):
-        pass
+    def _gradient_function(self, X):
+        X_shape = X.shape
+        print('Var shape ', X.shape)
+        if not X.ndim == 2:
+            X = X.reshape(-1,X.shape[-1])
+
+        support = self.get_support()
+        X_grad = np.zeros([len(X),len(support)])
+        X_grad[:, support] = X
+        return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])
 
 class GroupedPCA(GroupedTransformer, PCA):
 
@@ -91,5 +130,10 @@ class GroupedPCA(GroupedTransformer, PCA):
         self._initargs = []
         super().__init__(**self._initkwargs)
 
-    def get_gradient(self):
-        pass
+    def _gradient_function(self, X):
+        X_shape = X.shape
+        print('PCA shape', X.shape)
+        if not X.ndim == 2:
+            X = X.reshape(-1,X.shape[-1])
+        X_grad =  X.dot(self.components_)
+        return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])

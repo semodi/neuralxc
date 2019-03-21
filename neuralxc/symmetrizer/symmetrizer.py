@@ -84,6 +84,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         D, dict of numpy.ndarrays
             Symmetrized descriptors
         """
+        self.C = C
         basis = self._attrs['basis']
 
         results = [{}]*len(C)
@@ -99,7 +100,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
             return results
 
     # @doc_inherit
-    def get_gradient(self, dEdD, C):
+    def get_gradient(self, dEdD):
         """Uses chain rule to obtain dE/dC from dE/dD (unsymmetrized from symmetrized)
 
         Parameters
@@ -114,19 +115,22 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         -------------
         dEdC: dict of np.ndarrays
         """
-
+        C = self.C
+        if C is None:
+            assert False
         basis = self._attrs['basis']
 
         results = [{}]*len(C)
 
         for idx, key, data in expand(dEdD, C):
-            print(idx, key, data)
             results[idx][key] = self._gradient_function(*data,
                                      basis[key]['l'],
                                      basis[key]['n'])
         if not isinstance(C, list):
+            self.C = None
             return results[0]
         else:
+            self.C = None
             return results
 
 class CasimirSymmetrizer(Symmetrizer):
@@ -193,7 +197,11 @@ class CasimirSymmetrizer(Symmetrizer):
         -------------
         dEdC: dict of np.ndarrays
         """
+        dEdd_shape = dEdd.shape
+        print('Symmetrizer shape dEdd', dEdd.shape)
+        print('Symmetrizer shape C', c.shape)
         dEdd = dEdd.reshape(-1,dEdd.shape[-1])
+        c = c.reshape(-1, c.shape[-1])
         casimirs_mask = np.zeros_like(c)
         idx = 0
         cnt = 0
@@ -203,7 +211,8 @@ class CasimirSymmetrizer(Symmetrizer):
                 idx += 2*l + 1
                 cnt += 1
 
-        return 2*c*casimirs_mask
+        grad = 2*c*casimirs_mask
+        return grad.reshape(*dEdd_shape[:-1], grad.shape[-1])
 
 class BispectrumSymmetrizer(Symmetrizer):
 
@@ -263,7 +272,6 @@ class BispectrumSymmetrizer(Symmetrizer):
             cgs = cg_matrix(n_l)
 
         for n in range(0, n):
-            print('n = {}'.format(n))
             for l1 in range(n_l):
                 for l2 in range(n_l):
                     for l in range(abs(l2-l1),min(l1+l2+1, n_l)):

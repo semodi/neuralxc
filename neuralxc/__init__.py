@@ -4,7 +4,7 @@ Implementation of a machine learned density functional
 """
 
 # Add imports here
-from .neuralxc import NeuralXC
+from .neuralxc import NeuralXC, get_V
 from . import projector
 from . import utils
 from . import constants

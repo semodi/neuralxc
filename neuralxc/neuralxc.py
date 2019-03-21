@@ -6,6 +6,11 @@ Handles the primary interface that can be accessed by the electronic structure c
 and all other relevant classes
 """
 
+import numpy as np
+# To test siesta integration:
+def get_V(rho):
+    result = np.linalg.norm(rho)
+    return result
 
 class NeuralXC():
 

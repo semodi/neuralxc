@@ -139,6 +139,14 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
         return features, targets
 
+    def get_gradient(self, X):
+        # Required by NXCPipeline
+        if isinstance(X, list):
+            targets = [np.zeros(len(x)) for x in X]
+        else:
+            targets = [np.zeros(len(X))]
+        return self.inverse_transform(X,targets)
+
     def inverse_transform(self, features, targets):
         """ Transform from grouped to ungrouped representation
         """
