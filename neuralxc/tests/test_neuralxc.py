@@ -265,8 +265,10 @@ def test_formatter():
 
 @pytest.mark.fast
 @pytest.mark.parametrize(['transformer','filepath'],
-                         [[xc.ml.transformer.GroupedPCA(n_components=1), 'pca1.pckl'],
-                          [xc.ml.transformer.GroupedVarianceThreshold(0.005),'var09.pckl']])
+                         [[xc.ml.transformer.GroupedPCA(n_components=1),
+                          os.path.join(test_dir, 'pca1.pckl')],
+                          [xc.ml.transformer.GroupedVarianceThreshold(0.005),
+                          os.path.join(test_dir, 'var09.pckl')]])
 def test_grouped_transformers(transformer, filepath):
     with open(os.path.join(test_dir, 'h2o_rot2.pckl'),'rb') as file:
         C = pickle.load(file)
