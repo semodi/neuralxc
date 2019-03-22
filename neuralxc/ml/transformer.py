@@ -108,7 +108,6 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
 
     def _gradient_function(self, X):
         X_shape = X.shape
-        print('Var shape ', X.shape)
         if not X.ndim == 2:
             X = X.reshape(-1,X.shape[-1])
 
@@ -133,11 +132,26 @@ class GroupedPCA(GroupedTransformer, PCA):
 
     def _gradient_function(self, X):
         X_shape = X.shape
-        print('PCA shape', X.shape)
         if not X.ndim == 2:
             X = X.reshape(-1,X.shape[-1])
         X_grad =  X.dot(self.components_)
         return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])
+
+class GroupedStandardScaler(GroupedTransformer, StandardScaler):
+
+    def __init__(self, threshold=0.0):
+
+        self._before_fit = identity # lambdas can't be pickled
+        self._initargs = []
+        self._initkwargs = {}
+        super().__init__()
+
+    def _gradient_function(self, X):
+        X_shape = X.shape
+        if not X.ndim == 2:
+            X = X.reshape(-1,X.shape[-1])
+        X = X/np.sqrt(self.var_).reshape(1,-1)
+        return X.reshape(*X_shape[:-1], X.shape[-1])
 
 def identity(x):
     return x

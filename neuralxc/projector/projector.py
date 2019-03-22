@@ -144,7 +144,7 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            V[box['mesh']] += self.build(coeffs, box, basis['n'], basis['l'],
+            V[tuple(box['mesh'])] += self.build(coeffs, box, basis['n'], basis['l'],
                 basis['r_o'], self.W[spec])
 
         return V

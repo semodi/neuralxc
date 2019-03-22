@@ -24,6 +24,18 @@ Dataset = namedtuple("Dataset", "data species")
 
 class NXCPipeline(Pipeline):
 
+    def __init__(self, steps, basis_instructions, symmetrize_instructions):
+
+        self._basis_instructions = basis_instructions
+        self._symmetrize_instructions = symmetrize_instructions
+        super().__init__(steps)
+
+    def get_symmetrize_instructions(self):
+        return self._symmetrize_instructions
+
+    def get_basis_instructions(self):
+        return self._basis_instructions
+
     def _validate_steps(self):
         super()._validate_steps
         names, estimators = zip(*self.steps)
@@ -49,6 +61,11 @@ class NXCPipeline(Pipeline):
                 Xt = transform.get_gradient(Xt)
 
         return Xt
+
+    def start_at(self, step):
+        return NXCPipeline(self.steps[step:],
+        basis_instructions = self._basis_instructions,
+        symmetrize_instructions = self._symmetrize_instructions)
 
     def save(self, path, override = False):
 
@@ -105,7 +122,9 @@ class NetworkEstimator(BaseEstimator):
 
         if not isinstance(X, list):
             X = [X]
-            y = [y]
+
+        if not isinstance(y, np.ndarray) and not y:
+            y = [np.zeros(len(list(x.values())[0])) for x in X]
 
         subnets = []
         for feat, tar in zip(X,y):
@@ -119,7 +138,7 @@ class NetworkEstimator(BaseEstimator):
                         tar, test_size = self._test_size)
             subnets.append(nets)
 
-        self._network = Energy_Network(subnets, scale_again = True)
+        self._network = Energy_Network(subnets, scale_again = False)
         if not self.path is None:
             self._network.restore_model(self.path)
 
@@ -593,24 +612,20 @@ class Energy_Network():
                 if isinstance(s,list):
                     for s2 in s:
                         if s2.species == ds.species:
-                            snet.scaler = s2.scaler
                             snet.layers = s2.layers
                             snet.targets = s2.targets
                             snet.activations = s2.activations
-                            print("Sharing scaler with species " + s2.species)
                             found = True
                             break
                 else:
                     if s.species == ds.species:
-                        snet.scaler = s.scaler
                         snet.layers = s.layers
                         snet.targets = s.targets
                         snet.activations = s.activations
-                        print("Sharing scaler with species " + s.species)
                         break
 
         snet = self.species_nets[species]
-        snet.add_dataset(ds, targets, test_size=0.0)
+        snet.add_dataset(ds, targets, test_size=0.0, scale = False)
         if not self.model_loaded:
             raise Exception('Model not loaded!')
         else:
@@ -629,7 +644,7 @@ class Energy_Network():
                 if return_gradient:
                     grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
                      train_valid_split=1.0))[0]
-                    grad = grad/np.sqrt(snet.scaler.var_).reshape(1,-1)
+                    # grad = grad/np.sqrt(snet.scaler.var_).reshape(1,-1)
                     energies = (energies, grad)
 
                 return energies
@@ -902,7 +917,7 @@ class Subnet():
             self = pickle.load(file)
 
     def add_dataset(self, dataset, targets,
-        test_size = 0.2, target_filter = None, scale = True):
+        test_size = 0.2, target_filter = None, scale = False):
         """ Adds dataset to the subnetwork.
 
             Parameters
