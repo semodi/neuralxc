@@ -142,9 +142,9 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def get_gradient(self, X):
         # Required by NXCPipeline
         if isinstance(X, list):
-            targets = [np.zeros(len(x)) for x in X]
+            targets = [np.zeros(len(list(x.values())[0])) for x in X]
         else:
-            targets = [np.zeros(len(X))]
+            targets = [np.zeros(len(list(X.values())[0]))]
         return self.inverse_transform(X,targets)
 
     def inverse_transform(self, features, targets):
@@ -153,7 +153,6 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         total_length = np.sum([len(tar) for tar in targets])
         max_vec_len = np.max([np.sum([feat[spec].shape[1]*feat[spec].shape[2] for spec in feat])\
                        for feat in features])
-
 
 
         X = np.zeros([total_length, max_vec_len + 1], dtype = complex)

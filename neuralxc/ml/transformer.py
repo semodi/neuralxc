@@ -100,7 +100,8 @@ class GroupedTransformer(ABC):
 class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
 
     def __init__(self, threshold=0.0):
-        self._before_fit = lambda x: x
+
+        self._before_fit = identity # lambdas can't be pickled
         self._initargs = []
         self._initkwargs = dict(threshold=threshold)
         super().__init__(**self._initkwargs)
@@ -137,3 +138,6 @@ class GroupedPCA(GroupedTransformer, PCA):
             X = X.reshape(-1,X.shape[-1])
         X_grad =  X.dot(self.components_)
         return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])
+
+def identity(x):
+    return x

@@ -18,6 +18,8 @@ import json
 from ase.io import read
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.pipeline import Pipeline
+import pickle
+import shutil
 Dataset = namedtuple("Dataset", "data species")
 
 class NXCPipeline(Pipeline):
@@ -48,6 +50,27 @@ class NXCPipeline(Pipeline):
 
         return Xt
 
+    def save(self, path, override = False):
+
+        if os.path.isdir(path):
+            if not override:
+                raise Exception('Model already exists, set override = True')
+            else:
+                shutil.rmtree(path)
+                os.mkdir(path)
+        else:
+            os.mkdir(path)
+
+        network = self.steps[-1][-1]._network
+        self.steps[-1][-1]._network = None
+        pickle.dump(self, open(os.path.join(path,'pipeline.pckl'),'wb'))
+        network.save_model(os.path.join(path,'network'))
+        self.steps[-1][-1]._network = network
+
+def load_pipeline(path):
+    pipeline = pickle.load(open(os.path.join(path,'pipeline.pckl'),'rb'))
+    pipeline.steps[-1][-1].path = os.path.join(path,'network')
+    return pipeline
 
 class NetworkEstimator(BaseEstimator):
 
@@ -62,6 +85,8 @@ class NetworkEstimator(BaseEstimator):
         self._test_size = test_size
         self._valid_size = valid_size
         self._random_seed = random_seed
+        self.path = None
+        self._network = None
 
     def get_params(self, *args, **kwargs):
         return {'n_nodes' : self._n_nodes,
@@ -73,9 +98,7 @@ class NetworkEstimator(BaseEstimator):
                 'valid_size': self._valid_size,
                 'random_seed': self._random_seed}
 
-    def fit(self,X ,y = None, *args, **kwargs):
-
-
+    def build_network(self, X, y=None):
         if isinstance(X, tuple):
             y = X[1]
             X = X[0]
@@ -95,13 +118,25 @@ class NetworkEstimator(BaseEstimator):
                     nets[-1].add_dataset(Dataset(feat[spec][:,j:j+1], spec.lower()),
                         tar, test_size = self._test_size)
             subnets.append(nets)
+
         self._network = Energy_Network(subnets, scale_again = True)
+        if not self.path is None:
+            self._network.restore_model(self.path)
+
+    def fit(self,X ,y = None, *args, **kwargs):
+
+        #TODO: Currently does not allow to continue training
+        self.build_network(X, y)
+
         self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
             b_=self._b, train_valid_split=1-self._valid_size,
             random_seed=self._random_seed)
 
 
     def get_gradient(self, X, *args, **kwargs):
+
+        if self._network is None:
+            self.build_network(X)
 
         made_list = False
 
@@ -132,6 +167,9 @@ class NetworkEstimator(BaseEstimator):
 
 
     def predict(self, X, *args, **kwargs):
+
+        if self._network is None:
+            self.build_network(X)
 
         made_list = False
         if isinstance(X, tuple):
@@ -416,14 +454,18 @@ class Energy_Network():
 
             # Build all the required tensors
             b = {}
-            if build_graph:
-                self.construct_network()
-                for s in species:
-                    b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
-            else:
-                for s in species:
-                    b[s] = self.graph.get_tensor_by_name('{}/b:0'.format(s))
+            # if build_graph:
+            #     self.construct_network()
+            #     for s in species:
+            #         b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
+            # else:
+            #     for s in species:
+            #         b[s] = self.graph.get_tensor_by_name('{}/b:0'.format(s))
+            #
 
+            self.construct_network()
+            for s in species:
+                b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
             cost_list = self.get_cost()
             train_feed_dict, valid_feed_dict = self.get_feed('train',
              train_valid_split=train_valid_split)
@@ -640,6 +682,26 @@ class Energy_Network():
                     else:
                         return_list.append(sess.run(logits,feed_dict=feed_dict))
                 return return_list
+
+    def save_species_model(self, path, species):
+
+        if path[-5:] == '.ckpt':
+            path = path[:-5]
+
+        snet = self.species_nets[species]
+        path = path + '_' + species
+        with self.graph.as_default():
+                if species in self.species_nets_names:
+                    logits = self.graph.get_tensor_by_name(self.species_nets_names[species])
+                    gradients = self.graph.get_tensor_by_name(self.species_gradients_names[species])
+                else:
+                    logits, x, _ = snet.get_logits(1)
+                    gradients = tf.gradients(logits, x)[0].values
+                    self.species_nets_names[species] = logits.name
+                    self.species_gradients_names[species] = gradients.name
+                sess = self.sess
+                saver = tf.train.Saver()
+                saver.save(sess,save_path = path + '.ckpt')
 
     def save_model(self, path):
         """ Save trained model to path
