@@ -198,8 +198,6 @@ class CasimirSymmetrizer(Symmetrizer):
         dEdC: dict of np.ndarrays
         """
         dEdd_shape = dEdd.shape
-        print('Symmetrizer shape dEdd', dEdd.shape)
-        print('Symmetrizer shape C', c.shape)
         dEdd = dEdd.reshape(-1,dEdd.shape[-1])
         c = c.reshape(-1, c.shape[-1])
         casimirs_mask = np.zeros_like(c)
