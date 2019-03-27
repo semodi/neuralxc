@@ -7,6 +7,7 @@ from functools import reduce
 import time
 import math
 from ..doc_inherit import doc_inherit
+from .spher_grad import rlylm
 
 class BaseProjector(ABC):
 
@@ -127,14 +128,15 @@ class DensityProjector(BaseProjector):
         return basis_rep
 
     @doc_inherit
-    def get_V(self, dEdC, positions, species):
+    def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
 
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
 
         V = np.zeros(self.grid, dtype= complex)
         spec_idx = {spec : -1 for spec in species}
-        for pos, spec in zip(positions, species):
+        force_corrections = np.zeros([len(species),3])
+        for i, (pos, spec) in enumerate(zip(positions, species)):
             spec_idx[spec] += 1
             if dEdC[spec].ndim==3:
                 assert dEdC[spec].shape[0] == 1
@@ -147,7 +149,85 @@ class DensityProjector(BaseProjector):
             V[tuple(box['mesh'])] += self.build(coeffs, box, basis['n'], basis['l'],
                 basis['r_o'], self.W[spec])
 
-        return V
+            if calc_forces:
+                if not isinstance(rho, np.ndarray):
+                    raise ValueError('Must provide rho as np.ndarray')
+                force_corrections[i] = self.delbasis(rho, coeffs, box, basis['n'], basis['l'],
+                    basis['r_o'], self.W[spec])
+
+        if calc_forces:
+            return V.real, force_corrections.real
+        else:
+            return V.real
+
+    def delbasis(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
+
+        R, Theta, Phi = box['radial']
+        Xm, Ym, Zm = box['mesh']
+        X, Y, Z = box['real']
+        # Automatically detect whether entire charge density or only surrounding
+        # box was provided
+
+        #Build angular part of basis functions
+        angs = []
+        for l in range(n_l):
+            angs.append([])
+            for m in range(-l,l+1):
+                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                angs[l].append(sph_harm(m, l, Phi, Theta))
+
+
+
+        # Derivatives of spherical harmonic
+        M = M_make_complex(n_l)
+        dangs = []
+        for l in range(n_l**2):
+            dangs.append(np.zeros([len(X.flatten()),3]))
+
+        for ir, r in enumerate(zip(X.flatten(),Y.flatten(),Z.flatten())):
+            vecspher = rlylm(n_l - 1, r) # shape: (3, n_l*n_l)
+            for il, vs in enumerate(vecspher.T):
+                dangs[il][ir] = vs
+
+        dangs = np.einsum('ij,jkl -> ikl', M, np.array(dangs))
+
+        dangs = dangs.reshape(len(dangs),*X.shape,3)
+        #Build radial part of b.f.
+        if not isinstance(W, np.ndarray):
+            W = self.get_W(r_o, n_rad) # Matrix to orthogonalize radial basis
+
+        drads = self.dradials(R, r_o, W)
+        rads = self.radials(R, r_o, W)
+        radsr = np.array(rads)
+        # radsr[R==0] = 0
+        radsr = radsr/R
+
+        rhat = [X/R, Y/R, Z/R]
+
+        rho = rho[tuple(box['mesh'])]
+        force = np.zeros(3, dtype = complex)
+
+        for n in range(n_rad):
+            idx = 0
+            for l in range(n_l):
+                for m in range(2*l+1):
+                    for ix in range(3):
+                        # print(angs[l][m].shape)
+                        # print(drads[n].shape)
+                        # print(radsr[n].shape)
+                        # print(rhat[ix].shape)
+                        # print(rads[n].shape)
+                        # print(dangs[idx,:,:,:,ix].shape)
+                        # print(R.shape)
+                        force[ix] += coeffs[idx] *\
+                         np.sum( rho *
+                         (\
+                         (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
+                         (rads[n]/(R**l)*dangs[idx,:,:,:,ix])\
+                         ))
+                    idx += 1
+        return force
+
 
     def build(self, coeffs, box, n_rad, n_l, r_o, W = None):
 
@@ -165,6 +245,7 @@ class DensityProjector(BaseProjector):
             for m in range(-l,l+1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                 angs[l].append(sph_harm(m, l, Phi, Theta))
+
 
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
@@ -297,6 +378,14 @@ class DensityProjector(BaseProjector):
 
         return {'mesh':[Xm, Ym, Zm],'real': [X,Y,Z],'radial':[R, Theta, Phi]}
 
+    @staticmethod
+    def dg(r, r_o, a):
+
+        def dg_(r, r_o, a):
+            return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)
+        N = np.sqrt(720*r_o**(11+2*a)*math.factorial(2*a+4)/math.factorial(2*a+11))
+        return dg_(r, r_o,a)/N
+
 
     @staticmethod
     def g(r, r_o, a):
@@ -326,6 +415,35 @@ class DensityProjector(BaseProjector):
         return g_(r, r_o,a)/N
 
 
+
+    def dradials(cls, r, r_o, W):
+        '''
+        Get orthonormal radial basis functions
+
+        Parameters
+        -------
+
+            r: float
+                radius
+            r_o: float
+                outer radial cutoff
+            W: np.ndarray
+                orthogonalization matrix
+
+        Returns
+        -------
+
+            np.ndarray
+                radial functions
+        '''
+
+        result = np.zeros([len(W)] + list(r.shape))
+        for k in range(0,len(W)):
+            rad = cls.dg(r, r_o, k+1)
+            for j in range(0, len(W)):
+                result[j] += W[j,k] * rad
+        result[:,r > r_o] = 0
+        return result
 
     @classmethod
     def radials(cls, r, r_o, W):
@@ -449,3 +567,70 @@ def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
         return X,Y,Z
     else:
         return Xm,Ym,Zm
+
+def M_make_complex(n_l):
+    """Take real tensors provided as a np.ndarray and convert them into
+    complex tensors represented as a dictionary
+
+    Parameters
+    -------
+        tensor_array: np.ndarray
+            real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
+        n_l: int,
+            maximum angular momentum
+
+    Returns
+    -------
+    """
+    M = np.zeros([n_l**2,n_l**2], dtype =complex)
+    tensor = {}
+    cnt = 0
+    for l in range(n_l):
+        for m in range(-l,l+1):
+            tensor['{},{}'.format(l,m)] = cnt
+            cnt += 1
+
+    idx = 0
+    for l in range(n_l):
+        for m in range(-l,0):
+            M[idx, tensor['{},{}'.format(l,-m)]] = 1/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,m)]] = -1j/np.sqrt(2)
+            idx +=1
+        M[idx, tensor['{},{}'.format(l,0)]] = 1
+        idx += 1
+        for m in range(1,l+1):
+            M[idx, tensor['{},{}'.format(l,m)]] = (-1)**m*1/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,-m)]] = (-1)**m*1j/np.sqrt(2)
+            idx +=1
+    return M
+
+def make_complex(tensor_array, n_l):
+    """Take real tensors provided as a np.ndarray and convert them into
+    complex tensors represented as a dictionary
+
+    Parameters
+    -------
+        tensor_array: np.ndarray
+            real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
+        n_l: int,
+            maximum angular momentum
+
+    Returns
+    -------
+    """
+    tensor = {}
+    cnt = 0
+    for l in range(n_l):
+        for m in range(-l,l+1):
+            tensor['{},{}'.format(l,m)] = tensor_array[cnt]
+            cnt += 1
+
+    tensor_complex = []
+    for l in range(n_l):
+        for m in range(-l,0):
+            tensor_complex.append(1/np.sqrt(2)*(tensor['{},{}'.format(l,-m)]-1j*tensor['{},{}'.format(l,m)]))
+        tensor_complex.append((tensor['{},{}'.format(l,0)]) + 0j)
+        for m in range(1,l+1):
+            tensor_complex.append((-1)**m/np.sqrt(2)*(tensor['{},{}'.format(l,m)]+1j*tensor['{},{}'.format(l,-m)]))
+
+    return np.array(tensor_complex)

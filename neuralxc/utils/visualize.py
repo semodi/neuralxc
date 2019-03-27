@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_density_cut(rho, rmax=0, plane=2, height = 0):
+def plot_density_cut(rho, rmax=0, plane=2, height = 0, *args, **kwargs):
     """Take a quick look at the loaded data in a particular plane
 
         Parameters
@@ -15,7 +15,7 @@ def plot_density_cut(rho, rmax=0, plane=2, height = 0):
 
     fig = plt.figure()
     CS = plt.imshow(
-        RHO, cmap=plt.cm.jet, origin='lower')
+        RHO, *args, cmap=plt.cm.jet, origin='lower', **kwargs)
     plt.colorbar()
     # plt.show()
     return fig

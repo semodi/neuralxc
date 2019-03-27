@@ -12,6 +12,14 @@ from neuralxc.doc_inherit import doc_inherit
 from abc import ABC, abstractmethod
 import pickle
 import copy
+import matplotlib.pyplot as plt
+from neuralxc.constants import Bohr, Hartree
+try:
+    import ase
+    ase_found = True
+except ModuleNotFoundError:
+    ase_found = False
+
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
 save_test_density_projector = False
@@ -332,7 +340,8 @@ def test_pipeline_gradient(random_seed):
 
     pipeline_list.append(('estimator', estimator))
 
-    ml_pipeline = xc.ml.NXCPipeline(pipeline_list)
+    ml_pipeline = xc.ml.NXCPipeline(pipeline_list, basis_instructions = basis_set,
+                                    symmetrize_instructions = symmetrizer_instructions)
     ml_pipeline.fit(data)
 
     #Subset of data for which to calculate gradient
@@ -355,3 +364,51 @@ def test_pipeline_gradient(random_seed):
     print(grad_fd[0,1:20])
     assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-2,
                         atol = 1e-3)
+
+@pytest.mark.skipif(not ase_found, reason='requires ase')
+@pytest.mark.realspace
+def test_neuralxc_benzene():
+
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
+    benzene_traj = ase.io.read(os.path.join(test_dir,'benzene_test','benzene.xyz'),'0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir,
+                                'benzene_test','benzene.RHOXC'))
+
+    positions = benzene_traj.get_positions()/Bohr
+    species = benzene_traj.get_chemical_symbols()
+    V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
+    V = V/Hartree
+    forces = forces/Hartree
+
+    colors= {'C':'black', 'H':'blue'}
+    for f, p, s in zip(forces, positions, species):
+        plt.plot(*zip(p[:2],p[:2] + f[:2]/10),c=colors[s] )
+        plt.plot(*(p[:2] + f[:2]/10),c=colors[s], ls ='', marker = 'o' )
+    plt.show()
+    print(forces)
+
+@pytest.mark.fast
+@pytest.mark.complex
+@pytest.mark.parametrize('n_l',[2,4,6,8])
+def test_make_complex(n_l):
+
+    test_tensor =  np.random.rand(10,n_l**2)
+    test_tensor[:,0] = 0
+    test_tensor[:,2] = 0
+    cplx_by_method = np.zeros_like(test_tensor, dtype = complex)
+    for i, t in enumerate(test_tensor):
+        cplx_by_method[i] = xc.projector.make_complex(t,n_l)
+
+    cplx_by_M = np.zeros_like(test_tensor, dtype = complex)
+
+    M = xc.projector.M_make_complex(n_l)
+    for i, t in enumerate(test_tensor):
+        cplx_by_M[i] = M.dot(t)
+
+    cplx_by_M2 = np.einsum('kj,ij -> ik', M, test_tensor)
+    assert(np.allclose(cplx_by_M, cplx_by_method))
+    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_M[:,0]))
+    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_method[:,0]))
+    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_method[:,2]))
+    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_M[:,2]))

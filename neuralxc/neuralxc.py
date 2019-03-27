@@ -105,12 +105,17 @@ class SiestaNXC(NXCAdapter):
 
 class NeuralXC():
 
-    def __init__(self, path):
+    def __init__(self, path = None, pipeline = None):
 
         print('Instantiate NeuralXC')
-        print('Load pipeline from ' + path)
         try:
-            self._pipeline = load_pipeline(path)
+            if isinstance(path, str):
+                print('Load pipeline from ' + path)
+                self._pipeline = load_pipeline(path)
+            elif not (pipeline is None):
+                self._pipeline = pipeline
+            else:
+                raise Exception('Either provide path to pipeline or pipeline')
         except Exception as e:
             print(e)
             raise e
@@ -151,7 +156,7 @@ class NeuralXC():
         dEdC = symmetrizer.get_gradient(self._pipeline.get_gradient(D))
         E = self._pipeline.predict(D)[0]
 
-        return E, projector.get_V(dEdC, positions, species)
+        return E, projector.get_V(dEdC, positions, species, calc_forces, rho)
 
 if __name__ == "__main__":
     # Do something if this file is invoked on its own
