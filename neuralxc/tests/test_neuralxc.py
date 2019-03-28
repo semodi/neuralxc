@@ -387,28 +387,3 @@ def test_neuralxc_benzene():
         plt.plot(*(p[:2] + f[:2]/10),c=colors[s], ls ='', marker = 'o' )
     plt.show()
     print(forces)
-
-@pytest.mark.fast
-@pytest.mark.complex
-@pytest.mark.parametrize('n_l',[2,4,6,8])
-def test_make_complex(n_l):
-
-    test_tensor =  np.random.rand(10,n_l**2)
-    test_tensor[:,0] = 0
-    test_tensor[:,2] = 0
-    cplx_by_method = np.zeros_like(test_tensor, dtype = complex)
-    for i, t in enumerate(test_tensor):
-        cplx_by_method[i] = xc.projector.make_complex(t,n_l)
-
-    cplx_by_M = np.zeros_like(test_tensor, dtype = complex)
-
-    M = xc.projector.M_make_complex(n_l)
-    for i, t in enumerate(test_tensor):
-        cplx_by_M[i] = M.dot(t)
-
-    cplx_by_M2 = np.einsum('kj,ij -> ik', M, test_tensor)
-    assert(np.allclose(cplx_by_M, cplx_by_method))
-    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_M[:,0]))
-    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_method[:,0]))
-    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_method[:,2]))
-    assert(np.allclose(np.zeros(len(test_tensor)),cplx_by_M[:,2]))

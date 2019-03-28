@@ -138,7 +138,7 @@ class NetworkEstimator(BaseEstimator):
                         tar, test_size = self._test_size)
             subnets.append(nets)
 
-        self._network = Energy_Network(subnets, scale_again = False)
+        self._network = Energy_Network(subnets)
         if not self.path is None:
             self._network.restore_model(self.path)
 
@@ -256,7 +256,7 @@ class Energy_Network():
                 each subnetwork belongs to a single atom inside the system
                 and computes the atomic contributio to the total energy
     """
-    def __init__(self, subnets, scale_again = True):
+    def __init__(self, subnets):
 
 
         if not isinstance(subnets, list):
@@ -279,8 +279,6 @@ class Energy_Network():
         self.species_nets = {}
         self.species_nets_names = {}
         self.species_gradients_names = {}
-        if scale_again:
-            scale_together(subnets)
 
     # ========= Network operations ============ #
 
@@ -625,7 +623,7 @@ class Energy_Network():
                         break
 
         snet = self.species_nets[species]
-        snet.add_dataset(ds, targets, test_size=0.0, scale = False)
+        snet.add_dataset(ds, targets, test_size=0.0)
         if not self.model_loaded:
             raise Exception('Model not loaded!')
         else:
@@ -644,79 +642,9 @@ class Energy_Network():
                 if return_gradient:
                     grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
                      train_valid_split=1.0))[0]
-                    # grad = grad/np.sqrt(snet.scaler.var_).reshape(1,-1)
                     energies = (energies, grad)
 
                 return energies
-
-    def get_weights(self, species, subnet):
-        W = []
-        b = []
-        with self.graph.as_default():
-            with tf.variable_scope("", reuse=True):
-                for l, layer in enumerate(subnet.layers + ['']):
-                    W.append(self.sess.run(tf.get_variable("{}/W{}".format(species, l + 1))))
-                    b.append(self.sess.run(tf.get_variable("{}/b{}".format(species, l + 1))))
-        return W, b
-    def get_energies(self, summarize = True, which = 'train'):
-        """ Uses trained model on training or test sets
-
-        Parameters
-        -----------
-        which: str
-            {'train','test'} which set logits are computed for
-
-        Returns
-        --------
-         list of numpy.ndarray
-            resulting energies grouped by independent subnet datasets
-        """
-
-        if not self.model_loaded:
-            raise Exception('Model not loaded!')
-        else:
-            with self.graph.as_default():
-
-                logits_list = self.construct_network()
-
-                sess = self.sess
-                feed_dict, _ = self.get_feed(train_valid_split = 1.0, which = which)
-
-                return_list = []
-
-                for logits in logits_list:
-                    if isinstance(logits,list):
-                        result = 0
-                        for logits in logits:
-                            if summarize:
-                                result += sess.run(logits,feed_dict=feed_dict)
-                            else:
-                                return_list.append(sess.run(logits,feed_dict=feed_dict))
-                        if summarize:
-                            return_list.append(result)
-                    else:
-                        return_list.append(sess.run(logits,feed_dict=feed_dict))
-                return return_list
-
-    def save_species_model(self, path, species):
-
-        if path[-5:] == '.ckpt':
-            path = path[:-5]
-
-        snet = self.species_nets[species]
-        path = path + '_' + species
-        with self.graph.as_default():
-                if species in self.species_nets_names:
-                    logits = self.graph.get_tensor_by_name(self.species_nets_names[species])
-                    gradients = self.graph.get_tensor_by_name(self.species_gradients_names[species])
-                else:
-                    logits, x, _ = snet.get_logits(1)
-                    gradients = tf.gradients(logits, x)[0].values
-                    self.species_nets_names[species] = logits.name
-                    self.species_gradients_names[species] = gradients.name
-                sess = self.sess
-                saver = tf.train.Saver()
-                saver.save(sess,save_path = path + '.ckpt')
 
     def save_model(self, path):
         """ Save trained model to path
@@ -750,46 +678,6 @@ class Energy_Network():
             self.graph = g
             self.initialized = True
 
-    def save_all(self, net_dir, override = False):
-        """ Saves the model including all subnets and datasets
-        using pickle to directory net_dir, if directory exists only
-        save if override = True
-        """
-        try:
-            os.mkdir(net_dir)
-        except FileExistsError:
-            if override:
-                print('Overriding...')
-                import shutil
-                shutil.rmtree(net_dir)
-                os.mkdir(net_dir)
-            else:
-                print('Directory/Network already exists. Network not saved...')
-                return None
-
-        # Pickle does not seem to be compatible with tensorflow so just
-        # save subnetworks with it
-        with open(os.path.join(net_dir,'subnets'),'wb') as file:
-            pickle.dump(self.subnets,file)
-
-        to_save = {'mask': self.masks}
-
-        self.save_model(os.path.join(net_dir,'model'))
-
-        pickle.dump(to_save, open(os.path.join(net_dir,'supp'), 'wb'))
-
-
-    def load_all(self, net_dir):
-        """ Loads the model in net_dir including all subnets and datasets
-        using pickle
-        """
-
-        with open(os.path.join(net_dir,'subnets'),'rb') as file:
-            self.subnets = pickle.load(file)
-
-        self.restore_model(os.path.join(net_dir,'model'))
-        self.masks = pickle.load(open(os.path.join(net_dir,'supp'), 'rb'))['mask']
-
 class Subnet():
     """ Subnetwork that is associated with one Atom
     """
@@ -801,7 +689,6 @@ class Subnet():
         self.n_copies = 0
         self.rad_param = None
         self.ang_param = None
-        self.scaler = None
         self.X_train = None
         self.X_test = None
         self.y_train = None
@@ -917,7 +804,7 @@ class Subnet():
             self = pickle.load(file)
 
     def add_dataset(self, dataset, targets,
-        test_size = 0.2, target_filter = None, scale = False):
+        test_size = 0.2, target_filter = None):
         """ Adds dataset to the subnetwork.
 
             Parameters
@@ -957,21 +844,6 @@ class Subnet():
             X_test = np.array(X_train)
             y_test = np.array(y_train)
 
-        if scale:
-            if self.scaler == None:
-                scaler = StandardScaler()
-                # scaler = MinMaxScaler(feature_range=(-2,2))
-                scaler.fit(X_train.reshape(-1, X_train.shape[2]))
-            else:
-                scaler = self.scaler
-
-            X_train = scaler.transform(X_train.reshape(-1,
-                X_train.shape[2])).reshape(X_train.shape)
-            X_test = scaler.transform(X_test.reshape(-1,
-                X_test.shape[2])).reshape(X_test.shape)
-
-            self.scaler = scaler
-
         self.X_train = X_train.swapaxes(0,1)
         self.X_test = X_test.swapaxes(0,1)
         self.features = X_train.shape[2]
@@ -985,76 +857,6 @@ class Subnet():
 
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
-
-
-def load_energy_model(path):
-    """ Load energy MLCF
-
-        Parameters
-        ---------
-            path: str
-                directory in which energy MLCF is stored
-
-        Returns
-        -------
-            Energy_Network
-    """
-    network = Energy_Network([])
-    network.load_all(path)
-    return network
-
-def fc_nn(network):
-    """Builds a fully connected neural network
-
-    Parameters
-    -----------------
-        network: Subnet
-
-    Returns
-    --------
-        logits: tensorflow tensor
-            output layer of neural network
-        x: tensorflow placeholder
-            input layer
-        y:  tensorflow placeholder
-            placeholder for target values
-        """
-
-
-    features = network.features
-    layers = network.layers
-    targets = network.targets
-    activations = network.activations
-    namescope = network.name
-
-    n = len(layers)
-
-    W = []
-    b = []
-    hidden = []
-
-    x = tf.placeholder(tf.float32,[None,features])
-    y_ = tf.placeholder(tf.float32,[None,targets])
-
-
-
-    W.append(tf.get_variable(initializer = tf.truncated_normal_initializer(),shape = [features,layers[0]],name='W1'))
-    b.append(tf.get_variable(initializer = tf.constant_initializer(0),shape = [layers[0]],name='b1'))
-    hidden.append(activations[0](tf.matmul(x,W[0])+b[0]))
-
-    for l in range(1,n):
-        W.append(tf.get_variable(initializer = tf.truncated_normal_initializer(),shape = [layers[l-1],layers[l]],name='W' + str(l+1)))
-        b.append(tf.get_variable(initializer = tf.constant_initializer(0),shape = [layers[l]],name='b' + str(l+1)))
-        hidden.append(activations[l](tf.matmul(hidden[l-1],W[l])+b[l]))
-
-    W.append(tf.get_variable(initializer = tf.truncated_normal_initializer, shape= [layers[n-1],targets],name='W' + str(n+1)))
-    b.append(tf.get_variable(initializer = tf.constant_initializer(0), shape = [targets],name='b' + str(n+1)))
-
-
-    logits = tf.matmul(hidden[n-1],W[n])+b[n]
-
-    return logits,x,y_
-
 
 def fc_nn_g(network, i, mean = 0, std = 1):
     """Builds a fully connected neural network that consists of network.n_copies
@@ -1149,41 +951,3 @@ def reshape_group(x, n):
     x = x.T.reshape(n,n1,n0).swapaxes(1,2)
 
     return x
-
-def scale_together(all_subnets):
-    """ Scale data in given subnets by combining the data ranges
-        (Should always be performed if subnets share weights)
-    """
-    print('scale_together')
-    subnet_dict = {}
-
-    def add_to_dict(sn):
-        if not sn.species in subnet_dict:
-            subnet_dict[sn.species] = []
-        subnet_dict[sn.species].append(sn)
-
-    for sn1 in all_subnets:
-        if isinstance(sn1, list):
-            for sn1 in sn1:
-                add_to_dict(sn1)
-        else:
-            add_to_dict(sn1)
-    for species in subnet_dict:
-        subnets = subnet_dict[species]
-        for s in subnets:
-            if not s.species == subnets[0].species:
-                raise Exception('Subnets do not contain the same species. Proceeding...')
-
-        if not isinstance(subnets ,list):
-            Exception('Input must be a list of subnets')
-
-        all_data = np.concatenate([s.scaler.inverse_transform(s.X_train.reshape(-1, s.features)) for s in subnets])
-        # new_scaler = MinMaxScaler(feature_range = (-2,2))
-        new_scaler = StandardScaler()
-        new_scaler.fit(all_data)
-        for i,s in enumerate(subnets):
-            subnets[i].X_train = s.scaler.inverse_transform(s.X_train.reshape(-1,s.features)).reshape(s.X_train.shape)
-            subnets[i].X_test = s.scaler.inverse_transform(s.X_test.reshape(-1,s.features)).reshape(s.X_test.shape)
-            subnets[i].scaler = new_scaler
-            subnets[i].X_train = s.scaler.transform(subnets[i].X_train.reshape(-1,s.features)).reshape(s.X_train.shape)
-            subnets[i].X_test = s.scaler.transform(subnets[i].X_test.reshape(-1,s.features)).reshape(s.X_test.shape)

@@ -212,89 +212,89 @@ class CasimirSymmetrizer(Symmetrizer):
         grad = 2*c*casimirs_mask
         return grad.reshape(*dEdd_shape[:-1], grad.shape[-1])
 
-class BispectrumSymmetrizer(Symmetrizer):
-
-    def __init__(self, attrs):
-        print('WARNING! This class has not been thoroughly tested yet')
-        super().__init__(attrs)
-
-        # Create array with Clebsch-Gordon coefficients
-        basis = attrs['basis']
-
-        n_l_max = 0
-        for spec in basis:
-            n_l_max = max(n_l_max, basis[spec]['l'])
-
-        self._cgs = cg_matrix(n_l_max)
-
-    @staticmethod
-    def _symmetrize_function(c, n_l, n, cgs=None):
-        """ Returns the bispectrum of the tensors stored in c
-
-        Parameters:
-        -----------
-
-        c: np.ndarray of floats/complex
-            Stores the tensor elements in the order (n,l,m)
-
-        n_l: int
-            number of angular momenta (not equal to maximum ang. momentum!
-                example: if only s-orbitals n_l would be 1)
-
-        n: int
-            number of radial functions
-
-        cgs: np.ndarray, optional
-            Clebsch-Gordan coefficients, if not provided, calculated on-the-fly
-
-        Returns
-        -------
-        np.ndarray
-            Bispectrum
-        """
-        casimirs = CasimirSymmetrizer._symmetrize_function(c,n_l,n)
-
-        c_shape = c.shape
-
-        c = c.reshape(-1,c_shape[-1])
-        c = c.reshape(len(c),n,-1)
-        bispectrum = []
-        idx = 0
-
-        start = {}
-        for l in range(0, n_l):
-            start[l] = idx
-            idx += 2*l + 1
-
-        if not isinstance(cgs, np.ndarray):
-            cgs = cg_matrix(n_l)
-
-        for n in range(0, n):
-            for l1 in range(n_l):
-                for l2 in range(n_l):
-                    for l in range(abs(l2-l1),min(l1+l2+1, n_l)):
-                        b = 0
-                        if np.linalg.norm(cgs[l1,:,l2,:,l,:]) < 1e-15:
-                            continue
-
-                        for m in range(-l,l+1):
-                            for m1 in range(-l1,l1+1):
-                                for m2 in range(-l2,l2+1):
-                                    b +=\
-                                     np.conj(c[:,n,start[l] + m + l])*\
-                                     c[:,n,start[l1] + m1 + l1]*\
-                                     c[:,n,start[l2] + m2 + l2]*\
-                                     cgs[l1,m1,l2,m2,l,m]
-                                     # cgs[l1,l2,l,m1,m2,m]
-                        if np.any(abs(b.imag) > 1e-5):
-                            raise Exception('Not real')
-                        bispectrum.append(b.real.round(5))
-
-        bispectrum = np.array(bispectrum).T
-
-        bispectrum =  bispectrum.reshape(*c_shape[:-1], -1)
-        bispectrum = np.concatenate([casimirs, bispectrum], axis = -1)
-        return bispectrum
+# class BispectrumSymmetrizer(Symmetrizer):
+#
+#     def __init__(self, attrs):
+#         print('WARNING! This class has not been thoroughly tested yet')
+#         super().__init__(attrs)
+#
+#         # Create array with Clebsch-Gordon coefficients
+#         basis = attrs['basis']
+#
+#         n_l_max = 0
+#         for spec in basis:
+#             n_l_max = max(n_l_max, basis[spec]['l'])
+#
+#         self._cgs = cg_matrix(n_l_max)
+#
+#     @staticmethod
+#     def _symmetrize_function(c, n_l, n, cgs=None):
+#         """ Returns the bispectrum of the tensors stored in c
+#
+#         Parameters:
+#         -----------
+#
+#         c: np.ndarray of floats/complex
+#             Stores the tensor elements in the order (n,l,m)
+#
+#         n_l: int
+#             number of angular momenta (not equal to maximum ang. momentum!
+#                 example: if only s-orbitals n_l would be 1)
+#
+#         n: int
+#             number of radial functions
+#
+#         cgs: np.ndarray, optional
+#             Clebsch-Gordan coefficients, if not provided, calculated on-the-fly
+#
+#         Returns
+#         -------
+#         np.ndarray
+#             Bispectrum
+#         """
+#         casimirs = CasimirSymmetrizer._symmetrize_function(c,n_l,n)
+#
+#         c_shape = c.shape
+#
+#         c = c.reshape(-1,c_shape[-1])
+#         c = c.reshape(len(c),n,-1)
+#         bispectrum = []
+#         idx = 0
+#
+#         start = {}
+#         for l in range(0, n_l):
+#             start[l] = idx
+#             idx += 2*l + 1
+#
+#         if not isinstance(cgs, np.ndarray):
+#             cgs = cg_matrix(n_l)
+#
+#         for n in range(0, n):
+#             for l1 in range(n_l):
+#                 for l2 in range(n_l):
+#                     for l in range(abs(l2-l1),min(l1+l2+1, n_l)):
+#                         b = 0
+#                         if np.linalg.norm(cgs[l1,:,l2,:,l,:]) < 1e-15:
+#                             continue
+#
+#                         for m in range(-l,l+1):
+#                             for m1 in range(-l1,l1+1):
+#                                 for m2 in range(-l2,l2+1):
+#                                     b +=\
+#                                      np.conj(c[:,n,start[l] + m + l])*\
+#                                      c[:,n,start[l1] + m1 + l1]*\
+#                                      c[:,n,start[l2] + m2 + l2]*\
+#                                      cgs[l1,m1,l2,m2,l,m]
+#                                      # cgs[l1,l2,l,m1,m2,m]
+#                         if np.any(abs(b.imag) > 1e-5):
+#                             raise Exception('Not real')
+#                         bispectrum.append(b.real.round(5))
+#
+#         bispectrum = np.array(bispectrum).T
+#
+#         bispectrum =  bispectrum.reshape(*c_shape[:-1], -1)
+#         bispectrum = np.concatenate([casimirs, bispectrum], axis = -1)
+#         return bispectrum
 
 def symmetrizer_factory(symmetrize_instructions):
     """
@@ -312,9 +312,10 @@ def symmetrizer_factory(symmetrize_instructions):
 
     """
     sym_ins = symmetrize_instructions
-    symmetrizer_dict = dict(casimir = CasimirSymmetrizer,
-                        bispectrum = BispectrumSymmetrizer)
+    # symmetrizer_dict = dict(casimir = CasimirSymmetrizer,
+                        # bispectrum = BispectrumSymmetrizer)
 
+    symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
     # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
     if not 'symmetrizer_type' in sym_ins:
         raise Exception('symmetrize_instructions must contain symmetrizer_type key')
@@ -322,21 +323,21 @@ def symmetrizer_factory(symmetrize_instructions):
     return symmetrizer_dict[sym_ins['symmetrizer_type'].lower()](sym_ins)
 
 
-def cg_matrix(n_l):
-    """ Returns the Clebsch-Gordan coefficients for maximum angular momentum n_l-1
-    """
-    lmax = n_l - 1
-    cgs = np.zeros([n_l, 2*lmax+1, n_l, 2*lmax+1, n_l, 2*lmax+1], dtype=complex)
-
-    for l in range(n_l):
-        for l1 in range(n_l):
-            for l2 in range(n_l):
-                for m in range(-n_l, n_l+1):
-                    for m1 in range(-n_l,n_l+1):
-                        for m2 in range(-n_l,n_l+1):
-                            # cgs[l1,l2,l,m1,m2,m] = N(CG(l1,l2,l,m1,m2,m).doit())
-                            cgs[l1,m1,l2,m2,l,m] = N(CG(l1,m1,l2,m2,l,m).doit())
-    return cgs
+# def cg_matrix(n_l):
+#     """ Returns the Clebsch-Gordan coefficients for maximum angular momentum n_l-1
+#     """
+#     lmax = n_l - 1
+#     cgs = np.zeros([n_l, 2*lmax+1, n_l, 2*lmax+1, n_l, 2*lmax+1], dtype=complex)
+#
+#     for l in range(n_l):
+#         for l1 in range(n_l):
+#             for l2 in range(n_l):
+#                 for m in range(-n_l, n_l+1):
+#                     for m1 in range(-n_l,n_l+1):
+#                         for m2 in range(-n_l,n_l+1):
+#                             # cgs[l1,l2,l,m1,m2,m] = N(CG(l1,l2,l,m1,m2,m).doit())
+#                             cgs[l1,m1,l2,m2,l,m] = N(CG(l1,m1,l2,m2,l,m).doit())
+#     return cgs
 
 # def to_casimirs_mixn(c, n_l, n):
 #     """ Returns the casimir invariants with mixed radial channels

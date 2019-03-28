@@ -160,6 +160,10 @@ class DensityProjector(BaseProjector):
         else:
             return V.real
 
+    @staticmethod
+    def angulars(l, m, theta, phi):
+        return sph_harm(m,l,phi,theta)
+
     def delbasis(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
 
         R, Theta, Phi = box['radial']
@@ -174,9 +178,7 @@ class DensityProjector(BaseProjector):
             angs.append([])
             for m in range(-l,l+1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(sph_harm(m, l, Phi, Theta))
-
-
+                angs[l].append(self.angulars(m, l, Phi, Theta))
 
         # Derivatives of spherical harmonic
         M = M_make_complex(n_l)
@@ -212,13 +214,6 @@ class DensityProjector(BaseProjector):
             for l in range(n_l):
                 for m in range(2*l+1):
                     for ix in range(3):
-                        # print(angs[l][m].shape)
-                        # print(drads[n].shape)
-                        # print(radsr[n].shape)
-                        # print(rhat[ix].shape)
-                        # print(rads[n].shape)
-                        # print(dangs[idx,:,:,:,ix].shape)
-                        # print(R.shape)
                         force[ix] += coeffs[idx] *\
                          np.sum( rho *
                          (\
@@ -244,7 +239,7 @@ class DensityProjector(BaseProjector):
             angs.append([])
             for m in range(-l,l+1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(sph_harm(m, l, Phi, Theta))
+                angs[l].append(self.angulars(m, l, Phi, Theta))
 
 
         #Build radial part of b.f.
@@ -603,34 +598,3 @@ def M_make_complex(n_l):
             M[idx, tensor['{},{}'.format(l,-m)]] = (-1)**m*1j/np.sqrt(2)
             idx +=1
     return M
-
-def make_complex(tensor_array, n_l):
-    """Take real tensors provided as a np.ndarray and convert them into
-    complex tensors represented as a dictionary
-
-    Parameters
-    -------
-        tensor_array: np.ndarray
-            real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
-        n_l: int,
-            maximum angular momentum
-
-    Returns
-    -------
-    """
-    tensor = {}
-    cnt = 0
-    for l in range(n_l):
-        for m in range(-l,l+1):
-            tensor['{},{}'.format(l,m)] = tensor_array[cnt]
-            cnt += 1
-
-    tensor_complex = []
-    for l in range(n_l):
-        for m in range(-l,0):
-            tensor_complex.append(1/np.sqrt(2)*(tensor['{},{}'.format(l,-m)]-1j*tensor['{},{}'.format(l,m)]))
-        tensor_complex.append((tensor['{},{}'.format(l,0)]) + 0j)
-        for m in range(1,l+1):
-            tensor_complex.append((-1)**m/np.sqrt(2)*(tensor['{},{}'.format(l,m)]+1j*tensor['{},{}'.format(l,-m)]))
-
-    return np.array(tensor_complex)
