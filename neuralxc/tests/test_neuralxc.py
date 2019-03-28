@@ -367,6 +367,7 @@ def test_pipeline_gradient(random_seed):
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.realspace
+@pytest.mark.fast
 def test_neuralxc_benzene():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
@@ -379,11 +380,10 @@ def test_neuralxc_benzene():
     species = benzene_traj.get_chemical_symbols()
     V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
     V = V/Hartree
-    forces = forces/Hartree
+    forces = forces/Hartree*Bohr
 
     colors= {'C':'black', 'H':'blue'}
     for f, p, s in zip(forces, positions, species):
-        plt.plot(*zip(p[:2],p[:2] + f[:2]/10),c=colors[s] )
-        plt.plot(*(p[:2] + f[:2]/10),c=colors[s], ls ='', marker = 'o' )
+        plt.plot(*zip(p[:2],p[:2] + f[:2]*10),c=colors[s] )
+        plt.plot(*(p[:2] + f[:2]*10),c=colors[s], ls ='', marker = 'o' )
     plt.show()
-    print(forces)

@@ -7,7 +7,7 @@ from functools import reduce
 import time
 import math
 from ..doc_inherit import doc_inherit
-from .spher_grad import rlylm
+from .spher_grad import grlylm
 
 class BaseProjector(ABC):
 
@@ -178,7 +178,7 @@ class DensityProjector(BaseProjector):
             angs.append([])
             for m in range(-l,l+1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(self.angulars(m, l, Phi, Theta))
+                angs[l].append(self.angulars(l, m, Theta, Phi))
 
         # Derivatives of spherical harmonic
         M = M_make_complex(n_l)
@@ -187,7 +187,7 @@ class DensityProjector(BaseProjector):
             dangs.append(np.zeros([len(X.flatten()),3]))
 
         for ir, r in enumerate(zip(X.flatten(),Y.flatten(),Z.flatten())):
-            vecspher = rlylm(n_l - 1, r) # shape: (3, n_l*n_l)
+            vecspher = grlylm(n_l - 1, r) # shape: (3, n_l*n_l)
             for il, vs in enumerate(vecspher.T):
                 dangs[il][ir] = vs
 
@@ -209,18 +209,22 @@ class DensityProjector(BaseProjector):
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3, dtype = complex)
 
-        for n in range(n_rad):
-            idx = 0
-            for l in range(n_l):
-                for m in range(2*l+1):
-                    for ix in range(3):
-                        force[ix] += coeffs[idx] *\
-                         np.sum( rho *
+        for ix in range(3):
+            v = np.zeros_like(rho, dtype = complex)
+            idx_coeff = 0
+            for n in range(n_rad):
+                idx_l = 0
+                for l in range(n_l):
+                    for m in range(2*l+1):
+                         v += coeffs[idx_coeff] *\
                          (\
                          (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
-                         (rads[n]/(R**l)*dangs[idx,:,:,:,ix])\
-                         ))
-                    idx += 1
+                         (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])\
+                         )
+                         idx_l += 1
+                         idx_coeff += 1
+            assert np.allclose(v.imag, np.zeros_like(v))
+            force[ix] = np.sum(rho*v.real)* self.V_cell
         return force
 
 
@@ -239,7 +243,7 @@ class DensityProjector(BaseProjector):
             angs.append([])
             for m in range(-l,l+1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(self.angulars(m, l, Phi, Theta))
+                angs[l].append(self.angulars(l, m, Theta, Phi))
 
 
         #Build radial part of b.f.
@@ -588,13 +592,13 @@ def M_make_complex(n_l):
     idx = 0
     for l in range(n_l):
         for m in range(-l,0):
-            M[idx, tensor['{},{}'.format(l,-m)]] = 1/np.sqrt(2)
-            M[idx, tensor['{},{}'.format(l,m)]] = -1j/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,-m)]] = (-1)**m*1/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,m)]] = -(-1)**m*1j/np.sqrt(2)
             idx +=1
         M[idx, tensor['{},{}'.format(l,0)]] = 1
         idx += 1
         for m in range(1,l+1):
-            M[idx, tensor['{},{}'.format(l,m)]] = (-1)**m*1/np.sqrt(2)
-            M[idx, tensor['{},{}'.format(l,-m)]] = (-1)**m*1j/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,m)]] = 1/np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l,-m)]] = 1j/np.sqrt(2)
             idx +=1
     return M

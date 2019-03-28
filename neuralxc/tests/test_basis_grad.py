@@ -20,7 +20,7 @@ try:
 except ModuleNotFoundError:
     ase_found = False
 
-from neuralxc.projector.spher_grad import rlylm
+from neuralxc.projector.spher_grad import rlylm, grlylm
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -60,6 +60,7 @@ def test_drad(r_o, n):
         assert np.allclose(exact, fd, atol = incr)
 
 @pytest.mark.fast
+@pytest.mark.spher
 def test_dspher():
 
     def to_spher(p):
@@ -80,24 +81,82 @@ def test_dspher():
 
     projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
 
-    coords = np.random.rand(5,3)
-    incr = 0.000001
-    inc_idx = 0
-    l = 2
-    m = 0
+    coords = np.random.rand(10,3)
+    lmax = 10
+    M = xc.projector.M_make_complex(lmax + 1)
 
-    pick = sum([1 for l_ in range(l+1) for m_ in range(-l_,m)])
+    for c in coords:
+        r, theta, phi = to_spher(c)
+
+        ang_scipy = np.array([r**l*projector.angulars(l,m,theta, phi) \
+                     for l in range(lmax + 1) \
+                     for m in range(-l,l+1)])
+
+        ang_soler = rlylm(lmax, c)
+        ang_soler = M.dot(ang_soler)
+        # print(ang_scipy)
+        # print(ang_soler)
+        assert np.allclose(ang_scipy, ang_soler)
+
+    incr = 0.0000001
+    inc_idx = 0
     for c in coords:
         dr = np.zeros(3)
         dr[inc_idx] += incr
         rp, thetap, phip = to_spher(c + dr)
         rm, thetam, phim = to_spher(c - dr)
-        angp = rp**l*projector.angulars(l,m,thetap, phip)
-        angm = rm**l*projector.angulars(l,m,thetam, phim)
+        angp = np.array([rp**l*projector.angulars(l,m,thetap, phip) \
+                     for l in range(lmax + 1) \
+                     for m in range(-l,l+1)])
+
+        angm = np.array([rm**l*projector.angulars(l,m,thetam, phim) \
+                     for l in range(lmax + 1) \
+                     for m in range(-l,l+1)])
+
+        ang_solerp = rlylm(lmax, c + dr)
+        ang_solerm = rlylm(lmax, c - dr)
+        dang_fd_soler = (ang_solerp - ang_solerm)/(2*incr)
         dang_fd = (angp-angm)/(2*incr)
 
-        dang_exact = rlylm(l, c)[inc_idx,pick]
+        dang_exact = grlylm(lmax, c)[inc_idx]
+        dang_exact = M.dot(dang_exact)
+        dang_fd_soler = M.dot(dang_fd_soler)
+        assert np.allclose(dang_fd, dang_exact, atol=incr)
+        assert np.allclose(dang_fd_soler, dang_exact, atol=incr)
 
-        print(dang_exact)
-        print(dang_fd)
-        assert False
+
+@pytest.mark.skipif(not ase_found, reason='requires ase')
+@pytest.mark.force
+@pytest.mark.fast
+def test_force_correction():
+
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
+    benzene_traj = ase.io.read(os.path.join(test_dir,'benzene_test','benzene.xyz'),'0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir,
+                                'benzene_test','benzene.RHOXC'))
+
+    positions = benzene_traj.get_positions()/Bohr
+
+    for incr_atom in [0]:
+        incr = 0.001
+        incr_idx = 1
+        pp = np.array(positions)
+        pm = np.array(pp)
+        pp[incr_atom, incr_idx] += incr
+        pm[incr_atom, incr_idx] -= incr
+
+        species = benzene_traj.get_chemical_symbols()
+        V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
+        V = V/Hartree
+        forces = forces/Hartree*Bohr
+        Vp = benzene_nxc.get_V(rho, unitcell, grid, pp, species)[1]
+        Vm = benzene_nxc.get_V(rho, unitcell, grid, pm, species)[1]
+        dv = (unitcell[0,0]/grid[0])**3
+
+        fp = dv*np.sum(Vp*rho)/Hartree*Bohr
+        fm = dv*np.sum(Vm*rho)/Hartree*Bohr
+
+        print((fp-fm)/(2*incr))
+        print(forces[incr_atom,incr_idx])
+    assert False
