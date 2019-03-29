@@ -11,7 +11,7 @@ from .ml.network import load_pipeline
 from .projector import DensityProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
-from .constants import Hartree
+from .constants import Rydberg
 from abc import ABC, abstractmethod
 
 
@@ -96,8 +96,8 @@ class SiestaNXC(NXCAdapter):
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
         Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid, positions, elements)
-        Enxc = Enxc/Hartree
-        Vnxc = Vnxc.real.T.reshape(-1,1)/Hartree
+        Enxc = Enxc/Rydberg
+        Vnxc = Vnxc.real.T.reshape(-1,1)/Rydberg
         V[:, :] = Vnxc + V
         print('Enxc = {}'.format(Enxc))
         return Enxc
