@@ -22,10 +22,26 @@ import pickle
 import shutil
 Dataset = namedtuple("Dataset", "data species")
 
+#TODO: Pipeline should save energy units 
 class NXCPipeline(Pipeline):
 
     def __init__(self, steps, basis_instructions, symmetrize_instructions):
+        """ Class that extends the scikit-learn Pipeline by adding get_gradient
+        and save methods. The save method is necessary if the final estimator
+        is a tensorflow neural network as those cannot be pickled.
 
+        Parameters
+        -----------
+
+        steps: list
+            List of Transformers with final step being an Estimator
+        basis_instructions: dict
+            Dictionary containing instructions for the projector.
+            Example {'C':{'n' : 4, 'l' : 2, 'r_o' : 3}}
+        symmetrize_instructions: dict
+            Instructions for symmetrizer.
+            Example {symmetrizer_type: 'casimir'}
+        """
         self._basis_instructions = basis_instructions
         self._symmetrize_instructions = symmetrize_instructions
         super().__init__(steps)
@@ -37,6 +53,10 @@ class NXCPipeline(Pipeline):
         return self._basis_instructions
 
     def _validate_steps(self):
+        """ In addition to sklearn.Pipleine validation check that
+        every Transformer and the final estimator implements a 'get_gradient'
+        method
+        """
         super()._validate_steps
         names, estimators = zip(*self.steps)
 
@@ -62,13 +82,32 @@ class NXCPipeline(Pipeline):
 
         return Xt
 
-    def start_at(self, step):
-        return NXCPipeline(self.steps[step:],
+    def start_at(self, step_idx):
+        """ Return a new NXCPipeline containing a subset of steps of the
+        original NXCPipeline
+
+        Parameters
+        ----------
+        step_idx: int
+            Use all steps following and including step with index step_idx
+        """
+
+        return NXCPipeline(self.steps[step_idx:],
         basis_instructions = self._basis_instructions,
         symmetrize_instructions = self._symmetrize_instructions)
 
     def save(self, path, override = False):
+        """ Save entire pipeline to disk.
 
+        Parameters
+        ----------
+        path: string
+            Directory in which to store pipeline
+        override: bool
+            If directory already exists, only save and override if this
+            is set to True
+
+        """
         if os.path.isdir(path):
             if not override:
                 raise Exception('Model already exists, set override = True')
@@ -85,6 +124,8 @@ class NXCPipeline(Pipeline):
         self.steps[-1][-1]._network = network
 
 def load_pipeline(path):
+    """ Load a NXCPipeline from the directory specified in path
+    """
     pipeline = pickle.load(open(os.path.join(path,'pipeline.pckl'),'rb'))
     pipeline.steps[-1][-1].path = os.path.join(path,'network')
     return pipeline
@@ -94,6 +135,9 @@ class NetworkEstimator(BaseEstimator):
     def __init__(self, n_nodes, n_layers, b, alpha=0.01,
         max_steps = 20001, test_size = 0.2, valid_size = 0.2,
         random_seed = None) :
+        """ Estimator wrapper for the tensorflow based Network class which
+        implements a Behler-Parinello type neural network
+        """
         self._n_nodes = n_nodes
         self._n_layers = n_layers
         self._b = b
@@ -405,7 +449,6 @@ class Energy_Network():
               b_=0,
               verbose=True,
               optimizer=None,
-              adaptive_rate=False,
               multiplier = 1.0,
               train_valid_split = 0.8,
               random_seed = None):
@@ -418,17 +461,21 @@ class Energy_Network():
                     step size for gradient descent
                 max_steps: int
                     number of training epochs
-                b: float
-                    regularization parameter
+                b_: list of float
+                    regularization parameter per species
                 verbose: boolean
                     print cost for intermediate training epochs
-                optimizer: tf.nn.GradientDescentOptimizer,tf.nn.AdamOptimizer, ...
-                adaptive_rate: boolean
-                    wether to adjust step_size if cost increases
-                                not recommended for AdamOptimizer
+                optimizer: tensorflow optimizer
+                    default: tf.nn.AdamOptimizer
                 multiplier: list of float
                     multiplier that allow to give datasets more
                     weight than others
+                train_valid_split, float
+                    ratio used to split dataset into training and validation
+                    data. Should be set to 1 if external routine for
+                    cross-validation is used
+                random_seed: int
+                    set seed for random initiliazation of weights in network
 
             Returns
             --------
@@ -471,14 +518,6 @@ class Energy_Network():
 
             # Build all the required tensors
             b = {}
-            # if build_graph:
-            #     self.construct_network()
-            #     for s in species:
-            #         b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
-            # else:
-            #     for s in species:
-            #         b[s] = self.graph.get_tensor_by_name('{}/b:0'.format(s))
-            #
 
             self.construct_network()
             for s in species:
@@ -542,16 +581,6 @@ class Energy_Network():
 
                 sess.run(train_step,feed_dict=train_feed_dict)
 
-                if _%int(max_steps/100) == 0 and adaptive_rate == True:
-                    new_cost = sess.run(tf.sqrt(cost),
-                        feed_dict=train_feed_dict)
-
-                    if new_cost > old_cost:
-                        step_size /= 2
-                        print('Step size decreased to {}'.format(step_size))
-                        train_step = tf.train.GradientDescentOptimizer(step_size).minimize(cost)
-                    old_cost = new_cost
-
                 if _%int(max_steps/10) == 0 and verbose:
                     print('Step: ' + str(_))
                     print('Training set loss:')
@@ -567,7 +596,7 @@ class Energy_Network():
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
 
-    def predict(self, features, species, use_masks = False, return_gradient = False):
+    def predict(self, features, species, return_gradient = False):
         """ Get predicted energies
 
         Parameters
@@ -576,8 +605,6 @@ class Energy_Network():
             input features
         species: str
             predict atomic contribution to energy for this species
-        use_masks: bool
-             whether masks should be applied to the provided features
         return_gradient: bool
             instead of returning energies, return gradient of network
             w.r.t. input features
@@ -593,8 +620,6 @@ class Energy_Network():
             features = features.reshape(-1,1,features.shape[1])
         else:
             raise Exception('features.ndim != 2')
-        if use_masks:
-            features = features[:,:,self.masks[species]]
 
         ds = Dataset(features, species)
         targets = np.zeros(features.shape[0])

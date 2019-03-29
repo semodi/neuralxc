@@ -1,3 +1,10 @@
+""" Implements custom transformer for the special kind of grouped datasets
+that neuralxc is working with.
+
+A typical dataset looks like this:
+[{'spec1': features,'spec2' : features}, {'spec1': features, 'spec3': features}]
+where the outer list runs over independent systems.
+"""
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import VarianceThreshold
@@ -8,10 +15,11 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 class GroupedTransformer(ABC):
-
-    @abstractmethod
-    def get_gradient(self):
-        pass
+    """ Abstract base class, grouped transformer extend the functionality
+    of sklearn Transformers to neuralxc specific grouped data. Further, they
+    implement a get_gradient method.
+    """
+    #TODO: make _get_gradient abstractmethod and _before_fit an abstractparameter
 
     def transform(self, X,y=None, **fit_params):
         was_tuple = False
@@ -96,11 +104,13 @@ class GroupedTransformer(ABC):
         return self.fit(X).transform(X)
 
 # TODO: The better solution might be to have a factory, pass an instance of the object
-# and copy this instance
+# and copy this instance. Abstract factory?
 class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
 
     def __init__(self, threshold=0.0):
-
+        """ GroupedTransformer version of sklearn VarianceThreshold.
+            See their documentation for more information
+        """
         self._before_fit = identity # lambdas can't be pickled
         self._initargs = []
         self._initkwargs = dict(threshold=threshold)
@@ -120,7 +130,9 @@ class GroupedPCA(GroupedTransformer, PCA):
 
     def __init__(self, n_components=None, copy=True, whiten=False, svd_solver='auto',
                  tol=0.0, iterated_power='auto', random_state=None):
-
+        """ GroupedTransformer version of sklearn principal component analysis.
+            See their documentation for more information
+        """
         self._initkwargs = dict(n_components=n_components, copy=copy,
                  whiten=whiten, svd_solver=svd_solver,
                  tol=tol, iterated_power=iterated_power,
@@ -140,7 +152,9 @@ class GroupedPCA(GroupedTransformer, PCA):
 class GroupedStandardScaler(GroupedTransformer, StandardScaler):
 
     def __init__(self, threshold=0.0):
-
+        """ GroupedTransformer version of sklearn StandardScaler.
+            See their documentation for more information
+        """
         self._before_fit = identity # lambdas can't be pickled
         self._initargs = []
         self._initkwargs = {}

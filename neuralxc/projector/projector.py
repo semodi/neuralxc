@@ -68,6 +68,7 @@ class BaseProjector(ABC):
 
 class DensityProjector(BaseProjector):
 
+    #TODO: Make some functions private
     @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
         # Initialize the matrix used to orthonormalize radial basis
@@ -113,7 +114,9 @@ class DensityProjector(BaseProjector):
 
 
     def get_basis_rep_dict(self, rho, positions, species):
-
+        """ Same as get_basis_rep but return feature as a dict with keys
+        corresponding to quantum numbers, like: {'n,l,m' : feature}
+        """
         basis_rep = {}
         for pos, spec in zip(positions, species):
             if not spec in basis_rep:
@@ -129,7 +132,6 @@ class DensityProjector(BaseProjector):
 
     @doc_inherit
     def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
-
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
 
@@ -162,10 +164,54 @@ class DensityProjector(BaseProjector):
 
     @staticmethod
     def angulars(l, m, theta, phi):
+        """ Angular functions (uses physics convention for angles)
+
+        Parameters
+        ----------
+        l: int
+            angular momentum quantum number
+        m: int
+            angular momentum projection
+
+        theta: float or np.ndarray
+            longitudinal angle
+        phi: float or np.ndarray
+            azimuthal angle
+
+        Returns
+        -------
+        float or np.ndarray
+            Value of angular function at provided point(s)
+        """
         return sph_harm(m,l,phi,theta)
 
     def delbasis(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
+        """ Calculate the contribution to the forces that arises from the
+        dependence of the (nxc-)basis set on the atomic positions
 
+        Parameters
+        ----------
+            rho: np.ndarray
+                electron charge density on grid
+            coeffs: list of floats
+                coefficients dEdC for orbitals belonging to this atom
+            box: dict
+                 contains the mesh in spherical and euclidean coordinates,
+                 can be obtained with get_box_around()
+            n_rad: int
+                 number of radial functions
+            n_l: int
+                 number of spherical harmonics
+            r_o: float
+                 outer radial cutoff in Angstrom
+            W: np.ndarray
+                 matrix used to orthonormalize radial basis functions
+
+        Returns
+        -------
+            force: np.ndarray
+                force correction
+        """
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
         X, Y, Z = box['real']
@@ -229,7 +275,30 @@ class DensityProjector(BaseProjector):
 
 
     def build(self, coeffs, box, n_rad, n_l, r_o, W = None):
+        """ Build the contribution from this atom to the potential V in a
+        provided bounding box
 
+        Parameters
+        ----------
+            coeffs: list of floats
+                coefficients dEdC for orbitals belonging to this atom
+            box: dict
+                 contains the mesh in spherical and euclidean coordinates,
+                 can be obtained with get_box_around()
+            n_rad: int
+                 number of radial functions
+            n_l: int
+                 number of spherical harmonics
+            r_o: float
+                 outer radial cutoff in Angstrom
+            W: np.ndarray
+                 matrix used to orthonormalize radial basis functions
+
+        Returns
+        -------
+            V: np.ndarray
+                contribution to total potential by this atom in 'box'
+        """
 
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
@@ -379,6 +448,25 @@ class DensityProjector(BaseProjector):
 
     @staticmethod
     def dg(r, r_o, a):
+        """
+        Derivative of non-orthogonalized radial functions
+
+        Parameters
+        -------
+
+            r: float
+                radius
+            r_o: float
+                outer radial cutoff
+            a: int
+                exponent (equiv. to radial index n)
+
+        Returns
+        ------
+
+            float
+                derivative of radial function at radius r
+        """
 
         def dg_(r, r_o, a):
             return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)
@@ -414,24 +502,21 @@ class DensityProjector(BaseProjector):
         return g_(r, r_o,a)/N
 
 
-
+    @classmethod
     def dradials(cls, r, r_o, W):
         '''
-        Get orthonormal radial basis functions
+        Get derivative of orthonormal radial basis functions
 
         Parameters
         -------
-
             r: float
                 radius
             r_o: float
                 outer radial cutoff
             W: np.ndarray
                 orthogonalization matrix
-
         Returns
         -------
-
             np.ndarray
                 radial functions
         '''
@@ -568,18 +653,19 @@ def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
         return Xm,Ym,Zm
 
 def M_make_complex(n_l):
-    """Take real tensors provided as a np.ndarray and convert them into
-    complex tensors represented as a dictionary
+    """Get a matrix to convert real into complex tensors
 
     Parameters
     -------
-        tensor_array: np.ndarray
-            real tensor (ordering: radial ang.momentum projection like: s1 ppp1 ddddd1 s2 etc.)
+
         n_l: int,
             maximum angular momentum
 
     Returns
     -------
+
+        M : np.ndarray,
+            conversion matrix
     """
     M = np.zeros([n_l**2,n_l**2], dtype =complex)
     tensor = {}
