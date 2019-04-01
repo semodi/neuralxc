@@ -159,7 +159,7 @@ class DensityProjector(BaseProjector):
                     basis['r_o'], self.W[spec])
 
         if calc_forces:
-            return V.real, force_corrections.real
+            return V.real, force_corrections
         else:
             return V.real
 
@@ -255,7 +255,7 @@ class DensityProjector(BaseProjector):
         rhat = [X/R, Y/R, Z/R]
 
         rho = rho[tuple(box['mesh'])]
-        force = np.zeros(3, dtype = complex)
+        force = np.zeros(3)
 
         for ix in range(3):
             v = np.zeros_like(rho, dtype = complex)

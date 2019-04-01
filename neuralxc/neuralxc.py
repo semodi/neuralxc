@@ -11,7 +11,7 @@ from .ml.network import load_pipeline
 from .projector import DensityProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
-from .constants import Rydberg
+from .constants import Rydberg, Bohr
 from abc import ABC, abstractmethod
 
 
@@ -61,7 +61,7 @@ class SiestaNXC(NXCAdapter):
 
     element_dict = {8: 'O', 1: 'H', 6: 'C'}
 
-    def get_V(self, rho, unitcell, grid, positions, elements, V):
+    def get_V(self, rho, unitcell, grid, positions, elements, V, calc_forces=False):
 
         """Parameters
         ------------------
@@ -95,13 +95,27 @@ class SiestaNXC(NXCAdapter):
         unitcell = unitcell.T
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
-        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid, positions, elements)
+        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid,
+                            positions, elements, calc_forces = calc_forces)
+        if calc_forces:
+            self.force_correction = Vnxc[1].T/Rydberg
+            Vnxc = Vnxc[0]
+
         Enxc = Enxc/Rydberg
         Vnxc = Vnxc.real.T.reshape(-1,1)/Rydberg
         V[:, :] = Vnxc + V
         print('Enxc = {}'.format(Enxc))
         return Enxc
 
+    def correct_forces(self, forces):
+        try:
+            if hasattr(self, 'force_correction'):
+                forces[:] = forces + self.force_correction
+            else:
+                raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
+        except Exception as e:
+            print(e)
+            raise(e)
 
 class NeuralXC():
 
@@ -155,8 +169,9 @@ class NeuralXC():
         D = symmetrizer.get_symmetrized(C)
         dEdC = symmetrizer.get_gradient(self._pipeline.get_gradient(D))
         E = self._pipeline.predict(D)[0]
+        V = projector.get_V(dEdC, positions, species, calc_forces, rho)
+        return E, V
 
-        return E, projector.get_V(dEdC, positions, species, calc_forces, rho)
 
 if __name__ == "__main__":
     # Do something if this file is invoked on its own
