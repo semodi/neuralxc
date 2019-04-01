@@ -154,7 +154,8 @@ class DensityProjector(BaseProjector):
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.delbasis(rho, coeffs, box, basis['n'], basis['l'],
+                force_corrections[i] = self.get_force_correction(rho, coeffs,
+                    box, basis['n'], basis['l'],
                     basis['r_o'], self.W[spec])
 
         if calc_forces:
@@ -185,7 +186,8 @@ class DensityProjector(BaseProjector):
         """
         return sph_harm(m,l,phi,theta)
 
-    def delbasis(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
+
+    def get_force_correction(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
         """ Calculate the contribution to the forces that arises from the
         dependence of the (nxc-)basis set on the atomic positions
 
