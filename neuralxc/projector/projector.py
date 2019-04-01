@@ -275,7 +275,6 @@ class DensityProjector(BaseProjector):
             force[ix] = np.sum(rho*v.real)* self.V_cell
         return force
 
-
     def build(self, coeffs, box, n_rad, n_l, r_o, W = None):
         """ Build the contribution from this atom to the potential V in a
         provided bounding box
