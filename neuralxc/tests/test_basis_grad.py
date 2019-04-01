@@ -192,7 +192,7 @@ def test_dspher():
         dangs = np.einsum('ij,jkl -> ikl', M, np.array(dangs))
         dangs = dangs.reshape(len(dangs),*X.shape,3)[pick,:,:,:,inc_idx]
         assert np.allclose(dangs, dang_fd, atol = incr)
-        
+
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.force
 @pytest.mark.fast
@@ -219,10 +219,10 @@ def test_force_correction():
         forces = forces
         Vp = benzene_nxc.get_V(rho, unitcell, grid, pp, species)[1]
         Vm = benzene_nxc.get_V(rho, unitcell, grid, pm, species)[1]
-        fig = xc.utils.visualize.plot_density_cut(Vp-Vm, rmax = [40]*3)
-        fig.savefig('./vpvm.pdf')
-        fig = xc.utils.visualize.plot_density_cut(Vp, rmax = [40]*3)
-        fig.savefig('./vp.pdf')
+        # fig = xc.utils.visualize.plot_density_cut(Vp-Vm, rmax = [40]*3)
+        # fig.savefig('./vpvm.pdf')
+        # fig = xc.utils.visualize.plot_density_cut(Vp, rmax = [40]*3)
+        # fig.savefig('./vp.pdf')
 
         dv = (unitcell[0,0]/grid[0])**3
         fp = dv*np.sum(Vp*rho)
