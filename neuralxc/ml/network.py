@@ -500,7 +500,7 @@ class Energy_Network():
 
 
             if not random_seed is None:
-                tf.random.set_random_seed(random_seed)
+                tf.set_random_seed(random_seed)
             # Get number of distinct subnet species
             species = {}
             for net in self.subnets:
