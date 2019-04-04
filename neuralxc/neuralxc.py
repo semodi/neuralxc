@@ -103,8 +103,9 @@ class SiestaNXC(NXCAdapter):
 
         Enxc = Enxc/Rydberg
         Vnxc = Vnxc.real.T.reshape(-1,1)/Rydberg
+        # print('Not correcting V!')
         V[:, :] = Vnxc + V
-        print('Enxc = {}'.format(Enxc))
+        print('Enxc = {} eV'.format(Enxc*Rydberg))
         return Enxc
 
     def correct_forces(self, forces):

@@ -9,7 +9,7 @@ import math
 from ..doc_inherit import doc_inherit
 from .spher_grad import grlylm
 
-class BaseProjector(ABC):
+class BaseProjector(metaclass = ABCRegistry):
 
     @abstractmethod
     def __init__(self, unitcell, grid, basis_instructions):
@@ -68,6 +68,8 @@ class BaseProjector(ABC):
 
 class DensityProjector(BaseProjector):
 
+    _registry_name = 'default
+    '
     #TODO: Make some functions private
     @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):

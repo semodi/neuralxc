@@ -6,10 +6,14 @@ from sympy.physics.quantum.cg import CG
 from sympy import N
 import numpy as np
 from ..formatter import expand
-class BaseSymmetrizer(ABC):
+from ..base import ABCRegistry
+
+class BaseSymmetrizer(metaclass = ABCRegistry):
 
     def __init__(self):
         pass
+
+    _registry_name = 'base'
 
     @abstractmethod
     def get_symmetrized(self, C):
@@ -45,6 +49,7 @@ class BaseSymmetrizer(ABC):
 
 class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
+    _registry_name = 'symmetrizer'
     def __init__(self, symmetrize_instructions):
         """ Symmetrizer
         Parameters
@@ -135,6 +140,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
 class CasimirSymmetrizer(Symmetrizer):
 
+    _registry_name = 'casimir'
 
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
@@ -315,12 +321,17 @@ def symmetrizer_factory(symmetrize_instructions):
     # symmetrizer_dict = dict(casimir = CasimirSymmetrizer,
                         # bispectrum = BispectrumSymmetrizer)
 
-    symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
+    registry = BaseSymmetrizer.get_registry()
     # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
     if not 'symmetrizer_type' in sym_ins:
         raise Exception('symmetrize_instructions must contain symmetrizer_type key')
 
-    return symmetrizer_dict[sym_ins['symmetrizer_type'].lower()](sym_ins)
+    symtype = sym_ins['symmetrizer_type']
+
+    if not symtype in registry:
+        raise Excpetion('Symmetrizer: {} not registered'.format(symtype))
+
+    return registry[symtype](sym_ins)
 
 
 # def cg_matrix(n_l):
