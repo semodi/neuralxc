@@ -68,8 +68,7 @@ class BaseProjector(metaclass = ABCRegistry):
 
 class DensityProjector(BaseProjector):
 
-    _registry_name = 'default
-    '
+    _registry_name = 'default'
     #TODO: Make some functions private
     @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
