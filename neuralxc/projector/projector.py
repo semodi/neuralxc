@@ -8,9 +8,10 @@ import time
 import math
 from ..doc_inherit import doc_inherit
 from .spher_grad import grlylm
-
+from ..base import ABCRegistry
 class BaseProjector(metaclass = ABCRegistry):
 
+    _registry_name = 'base'
     @abstractmethod
     def __init__(self, unitcell, grid, basis_instructions):
         """
