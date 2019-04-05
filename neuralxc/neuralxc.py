@@ -13,43 +13,52 @@ from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
 from .constants import Rydberg, Bohr
 from abc import ABC, abstractmethod
+# from mpi4py import MPI
 
+def prints_error(method):
+    """ Decorator:forpy only prints stdout, no error messages,
+    therefore print each error message to stdout instead
+    """
+    def wrapper_print_error(*args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            raise(e)
+
+    return wrapper_print_error
 
 def verify_type(obj):
     print('Type of object is:')
     print(obj)
     print(hasattr(obj, 'get_V' ))
 
+@prints_error
 def get_nxc_adapter(kind, path):
     """ Adapter factory for NeuralXC
     """
-    try:
-        kind = kind.lower()
-        adapter_dict = {'siesta': SiestaNXC}
-        if not kind in adapter_dict:
-            print('Selected Adapter not available')
-            raise ValueError('Selected Adapter not available')
-        else:
-            adapter = adapter_dict[kind](path)
-    except Exception as e:
-        print(e)
-        raise(e)
+    kind = kind.lower()
+    adapter_dict = {'siesta': SiestaNXC}
+    if not kind in adapter_dict:
+        print('Selected Adapter not available')
+        raise ValueError('Selected Adapter not available')
+    else:
+        adapter = adapter_dict[kind](path)
     return adapter
 
+@prints_error
 def get_V(nxc, *args):
     """ Covenience function. Syntactically it might be easier (e.g. from
     Fortran) to function on module level than as a class member
     """
-    try:
-        res = nxc.get_V(*args)
-    except Exception as e:
-        print(e)
-        raise(e)
+    res = nxc.get_V(*args)
 
 
 class NXCAdapter(ABC):
 
+    @prints_error
     def __init__(self, path):
+        # from mpi4py import MPI
         path = ''.join(path.split())
         self._adaptee = NeuralXC(path)
 
@@ -61,6 +70,7 @@ class SiestaNXC(NXCAdapter):
 
     element_dict = {8: 'O', 1: 'H', 6: 'C'}
 
+    @prints_error
     def get_V(self, rho, unitcell, grid, positions, elements, V, calc_forces=False):
 
         """Parameters
@@ -95,6 +105,7 @@ class SiestaNXC(NXCAdapter):
         unitcell = unitcell.T
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
+        np.save('rho.npy',rho_reshaped)
         Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid,
                             positions, elements, calc_forces = calc_forces)
         if calc_forces:
@@ -107,7 +118,7 @@ class SiestaNXC(NXCAdapter):
         V[:, :] = Vnxc + V
         print('Enxc = {} eV'.format(Enxc*Rydberg))
         return Enxc
-
+    @prints_error
     def correct_forces(self, forces):
         try:
             if hasattr(self, 'force_correction'):
