@@ -49,7 +49,7 @@ class BaseSymmetrizer(metaclass = ABCRegistry):
 
 class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
-    _registry_name = 'symmetrizer'
+    _registry_name = 'default'
     def __init__(self, symmetrize_instructions):
         """ Symmetrizer
         Parameters

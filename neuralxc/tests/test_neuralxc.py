@@ -193,66 +193,6 @@ def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
         for spec in D:
             assert np.allclose(D[spec], D_list[0][spec])
 
-@pytest.mark.fast
-@pytest.mark.symmetrizer_gradient
-@pytest.mark.parametrize("symmetrizer_type",['casimir'])
-def test_symmetrizer_gradient(symmetrizer_type):
-    """ Synthetic test to see if symmetrizer gradient respects chain rule of
-        differentiation
-    """
-    with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
-        C = pickle.load(file)
-    basis_set = {
-                'O': {'n' : 2, 'l' : 3, 'r_o': 1},
-                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
-                }
-    symmetrize_instructions = {'basis': basis_set,
-                              'symmetrizer_type': symmetrizer_type}
-
-    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
-
-    def dummy_E(D):
-        if 'O' in D:
-            return np.linalg.norm(D['O'])
-        else:
-            return 0
-
-
-    D = symmetrizer.get_symmetrized(C)
-
-    mod_incr = 0.00001
-
-    # Compute dEdC
-    dEdC = {spec : np.zeros_like(C[spec]) for spec in C}
-    for mod_spec in C:
-        for mod_idx in range(C[mod_spec].shape[-1]):
-            for im in [1,1j]:
-                Cp =  copy.deepcopy(C)
-                Cm =  copy.deepcopy(C)
-                Cp[mod_spec][:,mod_idx] += mod_incr*im
-                Cm[mod_spec][:,mod_idx] -= mod_incr*im
-                Dp = symmetrizer.get_symmetrized(Cp)
-                Dm = symmetrizer.get_symmetrized(Cm)
-                dEdC[mod_spec][:,mod_idx] += (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr*im)
-
-    # Compute dEdD -> dEdC_chain
-    dEdD = {spec : np.zeros_like(D[spec]) for spec in D}
-    for mod_spec in D:
-        for mod_idx in range(D[mod_spec].shape[-1]):
-            Dp =  copy.deepcopy(D)
-            Dm =  copy.deepcopy(D)
-            Dp[mod_spec][:,mod_idx] += mod_incr
-            Dm[mod_spec][:,mod_idx] -= mod_incr
-
-            dEdD[mod_spec][:,mod_idx] = (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr)
-
-    symmetrizer.get_symmetrized(C)
-    dEdC_chain = symmetrizer.get_gradient(dEdD)
-
-    print(dEdC['O'].round(10))
-    print(dEdC_chain['O'].round(10))
-    for spec in dEdC:
-        assert np.allclose(dEdC[spec],dEdC_chain[spec])
 
 @pytest.mark.fast
 def test_formatter():
@@ -310,61 +250,7 @@ def test_species_grouper():
     for spec in C:
         assert np.allclose(C[spec],re_grouped[spec])
 
-@pytest.mark.slow
-@pytest.mark.parametrize('random_seed',[41, 42, 45])
-def test_pipeline_gradient(random_seed):
-    data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'),'rb'))
-    basis_set = {
-                'C': {'n' : 6, 'l' : 4, 'r_o': 1},
-                'H': {'n' : 6, 'l' : 4, 'r_o': 1.5}
-                }
-    all_species = ['CCCCCCHHHHHH']
-    symmetrizer_instructions = {'basis': basis_set,
-                     'symmetrizer_type': 'casimir'}
 
-    spec_group = xc.formatter.SpeciesGrouper(basis_set, all_species)
-    symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrizer_instructions)
-    var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-5)
-
-    estimator = xc.ml.NetworkEstimator(1, 4, [1e-5,1e-5,1e-5,0],
-                            alpha=0.01, max_steps = 201, test_size = 0.0,
-                            valid_size = 0.0, random_seed=random_seed)
-
-    pipeline_list = [('spec_group',  spec_group),
-                     ('symmetrizer', symmetrizer),
-                     ('var_selector', var_selector)]
-
-    pca = xc.ml.transformer.GroupedPCA(n_components= 0.99, svd_solver='full')
-    pipeline_list.append(('pca', pca))
-
-    pipeline_list.append(('estimator', estimator))
-
-    ml_pipeline = xc.ml.NXCPipeline(pipeline_list, basis_instructions = basis_set,
-                                    symmetrize_instructions = symmetrizer_instructions)
-    ml_pipeline.fit(data)
-
-    #Subset of data for which to calculate gradient
-    x = data[0:1]
-    grad_analytic = ml_pipeline.get_gradient(x)
-
-    incr = 0.01
-    grad_fd = np.zeros_like(grad_analytic, dtype = complex)
-    for ix in range(1, 20): #IMPORTANT: don't alter ix = 0 (system index)
-        for im in [1,1j]:
-            xp = np.array(x)
-            xp[:,ix] += incr*im
-            xm = np.array(x)
-            xm[:,ix] -= incr*im
-            Ep = ml_pipeline.predict(xp)[0]
-            Em = ml_pipeline.predict(xm)[0]
-            grad_fd[:,ix] += (Ep-Em)/(2*incr*im)
-
-    print(grad_analytic[0,1:20])
-    print(grad_fd[0,1:20])
-    # assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-2,
-    #                     atol = 1e-3)
-    assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-4,
-                        atol = 1e-5)
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.realspace
 @pytest.mark.fast
@@ -382,8 +268,62 @@ def test_neuralxc_benzene():
     V = V/Hartree
     forces = forces/Hartree*Bohr
 
-    # colors= {'C':'black', 'H':'blue'}
-    # for f, p, s in zip(forces, positions, species):
-        # plt.plot(*zip(p[:2],p[:2] + f[:2]*10),c=colors[s] )
-        # plt.plot(*(p[:2] + f[:2]*10),c=colors[s], ls ='', marker = 'o' )
-    # plt.show()
+    
+@pytest.mark.skipif(not ase_found, reason='requires ase')
+@pytest.mark.force
+@pytest.mark.fast
+def test_force_correction():
+
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
+    benzene_traj = ase.io.read(os.path.join(test_dir,'benzene_test','benzene.xyz'),'0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir,
+                                'benzene_test','benzene.RHOXC'))
+
+    positions = benzene_traj.get_positions()/Bohr
+    species = benzene_traj.get_chemical_symbols()
+
+    def get_V_shifted(self, rho, unitcell, grid, positions, positions_shifted, species, calc_forces= False):
+        """ only defined to calculate basis set contribution to forces with numerical derivatives.
+        For finite difference, the descriptors should be calculated using the original positions,
+        whereas V will then be built with displaced atoms
+        """
+        projector = xc.projector.DensityProjector(unitcell, grid,
+            self._pipeline.get_basis_instructions())
+
+        symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
+        symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
+
+        symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_dict)
+
+        C = projector.get_basis_rep(rho, positions, species)
+
+        D = symmetrizer.get_symmetrized(C)
+        dEdC = symmetrizer.get_gradient(self._pipeline.get_gradient(D))
+        E = self._pipeline.predict(D)[0]
+
+        return E, projector.get_V(dEdC, positions_shifted, species, calc_forces, rho)
+
+    V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
+
+    assert np.allclose(np.sum(forces, axis = 0), np.zeros(3), atol = 1e-6)
+    for incr_atom in [0,1,2,3]:
+        for incr_dx in range(3):
+            incr = 0.00001
+            incr_idx = 1
+            pp = np.array(positions)
+            pm = np.array(pp)
+            pp[incr_atom, incr_idx] += incr
+            pm[incr_atom, incr_idx] -= incr
+
+            Vp = get_V_shifted(benzene_nxc, rho, unitcell, grid, positions, pp, species)[1]
+            Vm = get_V_shifted(benzene_nxc, rho, unitcell, grid, positions,pm, species)[1]
+
+            dv = (unitcell[0,0]/grid[0])**3
+            fp = dv*np.sum(Vp*rho)
+            fm = dv*np.sum(Vm*rho)
+
+            forces_fd = (fp-fm)/(2*incr)
+            print(forces_fd)
+            print(forces[incr_atom,incr_idx])
+            assert np.allclose(-forces_fd, forces[incr_atom, incr_idx],atol = incr)
