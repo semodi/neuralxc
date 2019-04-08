@@ -473,7 +473,9 @@ class DensityProjector(BaseProjector):
 
         def dg_(r, r_o, a):
             return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)
-        N = np.sqrt(720*r_o**(11+2*a)*math.factorial(2*a+4)/math.factorial(2*a+11))
+
+        N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
+                                           (2*a+6)*(2*a+5)))
         return dg_(r, r_o,a)/N
 
 
@@ -501,7 +503,9 @@ class DensityProjector(BaseProjector):
 
         def g_(r, r_o, a):
             return (r)**(2)*(r_o-r)**(a+2)
-        N = np.sqrt(720*r_o**(11+2*a)*math.factorial(2*a+4)/math.factorial(2*a+11))
+        # Write out factorial fraction to avoid overflow
+        N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
+                                           (2*a+6)*(2*a+5)))
         return g_(r, r_o,a)/N
 
 
