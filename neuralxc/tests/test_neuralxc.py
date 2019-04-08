@@ -194,6 +194,7 @@ def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
             assert np.allclose(D[spec], D_list[0][spec])
 
 @pytest.mark.fast
+@pytest.mark.symmetrizer_gradient
 @pytest.mark.parametrize("symmetrizer_type",['casimir'])
 def test_symmetrizer_gradient(symmetrizer_type):
     """ Synthetic test to see if symmetrizer gradient respects chain rule of
@@ -232,7 +233,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
                 Cm[mod_spec][:,mod_idx] -= mod_incr*im
                 Dp = symmetrizer.get_symmetrized(Cp)
                 Dm = symmetrizer.get_symmetrized(Cm)
-                dEdC[mod_spec][:,mod_idx] += (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr)*im
+                dEdC[mod_spec][:,mod_idx] += (dummy_E(Dp) - dummy_E(Dm))/(2*mod_incr*im)
 
     # Compute dEdD -> dEdC_chain
     dEdD = {spec : np.zeros_like(D[spec]) for spec in D}
@@ -310,7 +311,7 @@ def test_species_grouper():
         assert np.allclose(C[spec],re_grouped[spec])
 
 @pytest.mark.slow
-@pytest.mark.parametrize('random_seed',[41,84])
+@pytest.mark.parametrize('random_seed',[41, 42, 45])
 def test_pipeline_gradient(random_seed):
     data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'),'rb'))
     basis_set = {
@@ -326,7 +327,7 @@ def test_pipeline_gradient(random_seed):
     var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-5)
 
     estimator = xc.ml.NetworkEstimator(1, 4, [1e-5,1e-5,1e-5,0],
-                            alpha=0.001, max_steps = 4001, test_size = 0.0,
+                            alpha=0.01, max_steps = 201, test_size = 0.0,
                             valid_size = 0.0, random_seed=random_seed)
 
     pipeline_list = [('spec_group',  spec_group),
@@ -356,13 +357,14 @@ def test_pipeline_gradient(random_seed):
             xm[:,ix] -= incr*im
             Ep = ml_pipeline.predict(xp)[0]
             Em = ml_pipeline.predict(xm)[0]
-            grad_fd[:,ix] += (Ep-Em)/(2*incr)*im
+            grad_fd[:,ix] += (Ep-Em)/(2*incr*im)
 
     print(grad_analytic[0,1:20])
     print(grad_fd[0,1:20])
-    assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-2,
-                        atol = 1e-3)
-
+    # assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-2,
+    #                     atol = 1e-3)
+    assert np.allclose(grad_fd[0,1:20], grad_analytic[0,1:20], rtol=1e-4,
+                        atol = 1e-5)
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.realspace
 @pytest.mark.fast
