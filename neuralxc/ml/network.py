@@ -22,7 +22,7 @@ import pickle
 import shutil
 Dataset = namedtuple("Dataset", "data species")
 
-#TODO: Pipeline should save energy units 
+#TODO: Pipeline should save energy units
 class NXCPipeline(Pipeline):
 
     def __init__(self, steps, basis_instructions, symmetrize_instructions):
@@ -550,6 +550,9 @@ class Energy_Network():
 
             cost += loss
 
+            if not isinstance(b_, list):
+                b_ = [b_]*len(species)
+                
             for i, s in enumerate(species):
                 train_feed_dict['{}/b:0'.format(s)] = b_[i]
                 valid_feed_dict['{}/b:0'.format(s)] = 0
