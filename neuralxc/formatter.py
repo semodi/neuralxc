@@ -96,6 +96,14 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         """ Transform from ungrouped to grouped represenation
         """
+        made_dict = False
+        if isinstance(X, dict):
+            basis_instructions = X['basis_instructions']
+            self._attrs = basis_instructions
+            X = X['data']
+            made_dict = True
+
+        print('=========From Species Grouper===========', self._attrs)
         y = X[:,-1].real
         X = X[:,:-1]
 
@@ -104,7 +112,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             y = self._y
 
         system = X[:,0]
-        n_sys = np.max(system) + 1
+        n_sys = (np.max(system) + 1).real
 
         X = X[:,1:]
 
@@ -112,7 +120,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         targets = []
 
         if not n_sys == len(self._sys_species):
-            raise ValueError('Number of systems in X and len(sys_species) incompatible')
+            raise ValueError('Number of systems in X and len(sys_species) incompatible: n_sys: {}, len(sys_species): {}'.format(n_sys,len(self._sys_species)))
 
         for this_sys, _ in enumerate(self._sys_species):
             this_species = self._sys_species[this_sys]
@@ -136,8 +144,11 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
             features.append(feat_dict)
             targets.append(y_sys)
-
-        return features, targets
+        if made_dict:
+            return {'data': (features, targets),
+                'basis_instructions': basis_instructions}
+        else:
+            return features, targets
 
     def get_gradient(self, X):
         # Required by NXCPipeline

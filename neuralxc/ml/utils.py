@@ -4,9 +4,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator
 
-def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = False):
-
-    def find_attr_in_tree(file, tree, attr):
+def find_attr_in_tree(file, tree, attr):
 
         if attr in file[tree].attrs:
             return file[tree].attrs[attr]
@@ -17,6 +15,8 @@ def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = 
             subtree = '/'.join(tree_list[:-i])
             if attr in file[subtree].attrs:
                 return file[subtree].attrs[attr]
+                    
+def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = False):
 
     data_base = datafile[baseline]
     data_ref = datafile[reference]

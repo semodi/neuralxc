@@ -9,7 +9,11 @@ import math
 from ..doc_inherit import doc_inherit
 from .spher_grad import grlylm
 from ..base import ABCRegistry
-class BaseProjector(metaclass = ABCRegistry):
+
+class ProjectorRegistry(ABCRegistry):
+    REGISTRY = {}
+
+class BaseProjector(metaclass = ProjectorRegistry):
 
     _registry_name = 'base'
     @abstractmethod
@@ -69,15 +73,16 @@ class BaseProjector(metaclass = ABCRegistry):
 
 class DensityProjector(BaseProjector):
 
-    _registry_name = 'default'
+    _registry_name = 'default_projector'
     #TODO: Make some functions private
     @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
-            W[species] = self.get_W(basis_instructions[species]['r_o'],
-                               basis_instructions[species]['n'])
+            if len(species) == 1:
+                W[species] = self.get_W(basis_instructions[species]['r_o'],
+                                   basis_instructions[species]['n'])
 
         # Determine unitcell constants
         U = np.array(unitcell) # Matrix to go from real space to mesh coordinates

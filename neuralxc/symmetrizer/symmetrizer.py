@@ -8,6 +8,9 @@ import numpy as np
 from ..formatter import expand
 from ..base import ABCRegistry
 
+class SymmetrizerRegistry(ABCRegistry):
+    REGISTRY = {}
+
 class BaseSymmetrizer(metaclass = ABCRegistry):
 
     def __init__(self):
@@ -59,7 +62,6 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         """
         self._attrs = symmetrize_instructions
         self._cgs = 0
-        pass
 
     def get_params(self, *args, **kwargs):
         return {'symmetrize_instructions': self._attrs}
@@ -69,6 +71,10 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
     def transform(self, X, y = None):
         # If used in ML-pipeline X might actually contain (X, y)
+        if isinstance(X, dict):
+            self._attrs.update({'basis': X['basis_instructions']})
+            X = X['data']
+
         if isinstance(X, tuple):
             return self.get_symmetrized(X[0]), X[1]
         else:
@@ -329,7 +335,7 @@ def symmetrizer_factory(symmetrize_instructions):
     symtype = sym_ins['symmetrizer_type']
 
     if not symtype in registry:
-        raise Excpetion('Symmetrizer: {} not registered'.format(symtype))
+        raise Exception('Symmetrizer: {} not registered'.format(symtype))
 
     return registry[symtype](sym_ins)
 

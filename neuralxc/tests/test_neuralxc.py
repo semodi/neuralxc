@@ -253,7 +253,6 @@ def test_species_grouper():
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.realspace
-@pytest.mark.fast
 def test_neuralxc_benzene():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
@@ -268,10 +267,9 @@ def test_neuralxc_benzene():
     V = V/Hartree
     forces = forces/Hartree*Bohr
 
-    
+
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.force
-@pytest.mark.fast
 def test_force_correction():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))

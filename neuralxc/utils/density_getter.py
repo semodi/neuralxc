@@ -3,9 +3,13 @@
 import numpy as np
 import struct
 from abc import ABC, abstractmethod
+from ..base import ABCRegistry
 
-class BaseDensityGetter():
-
+class DensityGetterRegistry(ABCRegistry):
+    REGISTRY = {}
+    
+class BaseDensityGetter(metaclass= DensityGetterRegistry):
+    _registry_name = 'base'
     def __init__(self):
         pass
 
@@ -15,6 +19,7 @@ class BaseDensityGetter():
 
 class SiestaDensityGetter(BaseDensityGetter):
 
+    _registry_name = 'siesta'
     def __init__(self, binary):
         self._binary = binary
 
@@ -96,3 +101,27 @@ class SiestaDensityGetter(BaseDensityGetter):
         rho = rho[:, :, :, 0]
         grid = grid[:3]
         return rho, unitcell, grid
+
+
+def density_getter_factory(application, *args,**kwargs):
+    """
+    Factory for various DensityGetters
+
+    Parameters:
+    ------------
+    application : str
+        Should specify which application created density file
+
+    Returns:
+    --------
+    DensityGetter
+
+    """
+
+    registry = BaseDensityGetter.get_registry()
+    # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
+
+    if not application in registry:
+        raise Exception('DensityGetter: {} not registered'.format(application))
+
+    return registry[application](*args,**kwargs)
