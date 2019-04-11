@@ -149,13 +149,13 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
     if mask:
         params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
         inp.update({'hyperparameters': params})
-        inp.update({'cv':2,'n_jobs':1})
+        inp.update({'cv':2,'n_workers':1,'threads_per_worker':1})
         open(inputfile,'w').write(json.dumps(inp, indent = 4))
         open(preprocessor,'w').write(json.dumps({'basis': basis,
                                 'src_path': '',
                                 'traj_path': xyz,
                                 'target_path': '',
-                                'num_workers': 1}, indent= 4))
+                                'n_workers': 1}, indent= 4))
     else:
         if 'hyperparameters' in inp:
             hyper = inp['hyperparameters']
@@ -169,13 +169,13 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
 
         hyper.update(basis_grid)
         cv = inp.get('cv',2)
-        n_jobs = inp.get('n_jobs', 1)
+        n_jobs = inp.get('n_workers', 1)
         verbose = inp.get('verbose',10)
 
         preprocessor = Preprocessor(basis, pre['src_path'],
                                            pre['traj_path'],
                                            pre['target_path'],
-                                           pre.get('num_workers',1))
+                                           pre.get('n_workers',1))
 
         pipe = Pipeline((('preprocessor', preprocessor),
                             ('ml', pipeline)))
@@ -206,7 +206,7 @@ if __name__ == '__main__':
         inp = {}
         pre = {}
 
-    if 'xyz' in pre:
+    if 'traj_path' in pre and pre['traj_path'] != '':
         atoms = read(pre['xyz'], ':')
     elif xyz != '':
         atoms = read(xyz, ':')
@@ -214,7 +214,8 @@ if __name__ == '__main__':
         raise ValueError('Must specify path to to xyz file')
 
 
-    cluster = LocalCluster(n_workers = inp['n_jobs'],threads_per_worker=6)
+    cluster = LocalCluster(n_workers = inp.get('n_workers',1),
+        threads_per_worker=inp.get('threads_per_worker',1))
     client = Client(cluster)
     with parallel_backend('dask'):
         best_model = get_grid_cv(preprocessor, inputfile, mask, xyz)

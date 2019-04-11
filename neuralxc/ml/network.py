@@ -288,7 +288,7 @@ class NetworkEstimator(BaseEstimator):
         for X_,y_ in zip(X,y):
             scores.append(metric_function(self.predict(X_) - y_))
 
-        return np.mean(scores)
+        return -np.mean(scores)
 
 class Energy_Network():
     """ Machine learned correcting functional (MLCF) for energies
