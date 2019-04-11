@@ -1,0 +1,235 @@
+#!/usr/bin/python3
+from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
+from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedStandardScaler
+from neuralxc.ml import NetworkEstimator as NetworkWrapper
+from neuralxc.ml import NXCPipeline
+from neuralxc.ml.network import load_pipeline
+from neuralxc.ml.utils import SampleSelector, load_data
+from neuralxc.preprocessor import Preprocessor
+import sys
+import h5py
+import json
+import numpy as np
+from sklearn.model_selection import GridSearchCV
+# from dask_ml.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+import pandas as pd
+import argparse
+from ase.io import read
+from pprint import pprint
+from dask.distributed import Client, LocalCluster
+from sklearn.externals.joblib import parallel_backend
+import time
+import os
+import shutil
+def match_hyperparameter(hp, parameters):
+    matches = []
+    for par in parameters:
+        if hp in par:
+            matches.append(par)
+    if len(matches) != 1:
+        raise ValueError('{} matches found for hyperparameter name. Must be exactly 1'.format(len(matches)))
+    return matches[0]
+
+def to_full_hyperparameters(hp, parameters):
+    full = {}
+    for name in hp:
+        new_key = 'ml__' + match_hyperparameter(name, parameters)
+        full[new_key] = hp[name]
+        if not isinstance(full[new_key], list):
+            full[new_key] = [full[new_key]]
+    return full
+
+
+def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_threshold = 0.999):
+
+    symmetrizer_instructions = {'basis': basis,
+                         'symmetrizer_type': symmetrizer_type}
+
+    spec_group = SpeciesGrouper(basis, [species])
+    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+    var_selector = GroupedVarianceThreshold()
+
+    estimator = NetworkWrapper(1, 4, 0,
+                            alpha=0.001, max_steps = 4001, test_size = 0.0,
+                               valid_size=0, random_seed = None)
+
+    pipeline_list = [('spec_group',  spec_group),
+                     ('symmetrizer', symmetrizer),
+                     ('var_selector', var_selector)]
+
+    if pca_threshold < 1:
+        pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
+        pipeline_list.append(('pca', pca))
+
+    pipeline_list.append(('scaler', GroupedStandardScaler()))
+    pipeline_list.append(('estimator', estimator))
+
+    basis_instructions = basis
+    symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
+
+    return  NXCPipeline(pipeline_list, basis_instructions=basis_instructions,
+                             symmetrize_instructions=symmetrizer_instructions)
+
+def load_sets(datafile, baseline, reference):
+
+    all_species = []
+    X, y, basis, species =\
+        load_data(datafile, baseline, reference, 0 ,False)
+
+    X = np.concatenate([np.array([0]*len(X)).reshape(-1,1), X],axis = 1)
+
+    data = np.concatenate([X,y.reshape(-1,1)], axis =1)
+    return data, basis, [species]
+
+def get_basis_grid(preprocessor):
+
+    basis = preprocessor['basis']
+
+    from collections import abc
+    def nested_dict_iter(nested):
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                yield from nested_dict_iter(value)
+            else:
+                yield key, value
+
+    def nested_dict_build(nested, i):
+        select_dict = {}
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                select_dict[key] =  nested_dict_build(value,i)
+            else:
+                if isinstance(value, list):
+                    select_dict[key] = value[i]
+                else:
+                    select_dict[key] = value
+        return select_dict
+
+    max_len = 0
+
+    dict_mask = {}
+    #Check for consistency and build dict mask
+    for key, value in nested_dict_iter(basis):
+        if isinstance(value, list):
+            new_len = len(value)
+            if new_len != max_len and max_len != 0:
+                raise ValueError('Inconsistent list lengths in basis sets')
+            else:
+                max_len = new_len
+
+    max_len = max(max_len,1)
+    basis_grid = [nested_dict_build(basis,i) for i in range(max_len)]
+    basis_grid = {'preprocessor__basis_instructions': basis_grid}
+
+    return basis_grid
+
+def get_grid_cv(preprocessor, config, mask=False, xyz=''):
+    if not mask:
+        inp = json.loads(open(inputfile,'r').read())
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        inp = {}
+        pre = {}
+
+    if 'xyz' in pre:
+        atoms = read(pre['xyz'], '0')
+    elif xyz != '':
+        atoms = read(xyz, '0')
+    else:
+        raise ValueError('Must specify path to to xyz file')
+
+    species = atoms.get_chemical_symbols()
+    basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in species}
+
+    pipeline = get_default_pipeline(basis, species)
+
+    if mask:
+        params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
+        inp.update({'hyperparameters': params})
+        inp.update({'cv':2,'n_jobs':1})
+        open(inputfile,'w').write(json.dumps(inp, indent = 4))
+        open(preprocessor,'w').write(json.dumps({'basis': basis,
+                                'src_path': '',
+                                'traj_path': xyz,
+                                'target_path': '',
+                                'num_workers': 1}, indent= 4))
+    else:
+        if 'hyperparameters' in inp:
+            hyper = inp['hyperparameters']
+        else:
+            print('No hyperparameters specified, fitting default pipeline to data')
+            pipeline.fit(data)
+            sys.exit()
+
+        hyper = to_full_hyperparameters(hyper , pipeline.get_params())
+        basis_grid = get_basis_grid(pre)
+
+        hyper.update(basis_grid)
+        cv = inp.get('cv',2)
+        n_jobs = inp.get('n_jobs', 1)
+        verbose = inp.get('verbose',10)
+
+        preprocessor = Preprocessor(basis, pre['src_path'],
+                                           pre['traj_path'],
+                                           pre['target_path'],
+                                           pre.get('num_workers',1))
+
+        pipe = Pipeline((('preprocessor', preprocessor),
+                            ('ml', pipeline)))
+        # pprint(hyper.keys())
+        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
+        # pprint(pipe.get_params().keys())
+        return grid_cv
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Preprocess electron density ad fit a NeuralXC model')
+    parser.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    parser.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    parser.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    parser.add_argument('-xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
+
+    args = parser.parse_args()
+    inputfile = args.config
+    preprocessor = args.preprocessor
+    xyz = args.xyz
+    mask = args.mask
+
+    if not mask:
+        inp = json.loads(open(inputfile,'r').read())
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        inp = {}
+        pre = {}
+
+    if 'xyz' in pre:
+        atoms = read(pre['xyz'], ':')
+    elif xyz != '':
+        atoms = read(xyz, ':')
+    else:
+        raise ValueError('Must specify path to to xyz file')
+
+
+    cluster = LocalCluster(n_workers = inp['n_jobs'],threads_per_worker=6)
+    client = Client(cluster)
+    with parallel_backend('dask'):
+        best_model = get_grid_cv(preprocessor, inputfile, mask, xyz)
+
+        if not mask:
+            start = time.time()
+            try:
+                os.mkdir('.tmp')
+            except FileExistsError:
+                shutil.rmtree('.tmp')
+                os.mkdir('.tmp')
+            best_model.fit(list(range(len(atoms))))
+            end = time.time()
+            print('Took {}s'.format(end-start))
+            open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
+            pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
+            best_model.best_estimator_.steps[1][1].start_at(2).save('best_model',True)
+            shutil.rmtree('.tmp')

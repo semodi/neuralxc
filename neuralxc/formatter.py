@@ -103,7 +103,6 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             X = X['data']
             made_dict = True
 
-        print('=========From Species Grouper===========', self._attrs)
         y = X[:,-1].real
         X = X[:,:-1]
 
