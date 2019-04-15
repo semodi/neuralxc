@@ -27,9 +27,10 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         self.filename = self.basis_to_filename(self.basis_instructions)
         if not self.computed_basis == self.basis_instructions:
             if os.path.isfile(self.filename):
-                print('Reusing data stored in ' + self.filename)
+                print('Preprocessor: Reusing data stored in ' + self.filename)
                 self.data = np.load(self.filename)
             else:
+                print('Preprocessor: {} not found Projecting onto basis'.format(self.filename))
                 basis_rep = self.get_basis_rep()
                 sys_idx = np.array([0]*len(basis_rep)).reshape(-1,1)
                 targets = np.load(self.target_path).reshape(-1,1)
@@ -46,7 +47,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
     @staticmethod
     def basis_to_filename(basis):
         return os.path.join('.tmp',
-            hashlib.md5(json.dumps(basis).encode()).hexdigest())
+            hashlib.md5(json.dumps(basis).encode()).hexdigest() + '.npy')
 
     def get_basis_rep(self):
 
@@ -69,12 +70,15 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             jobs.append(self.transform_one(pjoin(self.src_path,str(i),filename),
                 system.get_positions(),
                 system.get_chemical_symbols()))
-        # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
-        results = np.array([j for j in jobs])
+        results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
+        # results = np.array([j for j in jobs])
 
         return results
 
-    # @delayed
+    def score(self, *args, **kwargs):
+        return  0
+
+    @delayed
     def transform_one(self, path, pos, species):
 
         density_getter = density_getter_factory(\

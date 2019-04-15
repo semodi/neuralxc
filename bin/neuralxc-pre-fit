@@ -134,8 +134,8 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
         inp = {}
         pre = {}
 
-    if 'xyz' in pre:
-        atoms = read(pre['xyz'], '0')
+    if 'traj_path' in pre:
+        atoms = read(pre['traj_path'], '0')
     elif xyz != '':
         atoms = read(xyz, '0')
     else:
@@ -181,9 +181,9 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
                             ('ml', pipeline)))
         # pprint(hyper.keys())
         grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
+        grid_cv_pre = GridSearchCV(Pipeline([pipe.steps[0]]), basis_grid, cv=2, n_jobs= n_jobs, refit = True, verbose=10)
         # pprint(pipe.get_params().keys())
-        return grid_cv
-
+        return grid_cv, pipe.steps[0][1]
 
 if __name__ == '__main__':
 
@@ -207,30 +207,37 @@ if __name__ == '__main__':
         pre = {}
 
     if 'traj_path' in pre and pre['traj_path'] != '':
-        atoms = read(pre['xyz'], ':')
+        atoms = read(pre['traj_path'], ':')
     elif xyz != '':
         atoms = read(xyz, ':')
     else:
         raise ValueError('Must specify path to to xyz file')
 
 
-    cluster = LocalCluster(n_workers = inp.get('n_workers',1),
-        threads_per_worker=inp.get('threads_per_worker',1))
-    client = Client(cluster)
-    with parallel_backend('dask'):
-        best_model = get_grid_cv(preprocessor, inputfile, mask, xyz)
 
-        if not mask:
-            start = time.time()
-            try:
-                os.mkdir('.tmp')
-            except FileExistsError:
-                shutil.rmtree('.tmp')
-                os.mkdir('.tmp')
-            best_model.fit(list(range(len(atoms))))
-            end = time.time()
-            print('Took {}s'.format(end-start))
-            open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
-            pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
-            best_model.best_estimator_.steps[1][1].start_at(2).save('best_model',True)
+    best_model, preprocessor = get_grid_cv(preprocessor, inputfile, mask, xyz)
+    if not mask:
+        start = time.time()
+        try:
+            os.mkdir('.tmp')
+        except FileExistsError:
             shutil.rmtree('.tmp')
+            os.mkdir('.tmp')
+        print('======Projecting onto basis sets======')
+        basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
+        for basis_instr in basis_grid:
+            print(basis_instr)
+            preprocessor.basis_instructions = basis_instr
+            preprocessor.fit_transform(list(range(len(atoms))))
+        cluster = LocalCluster(n_workers = inp.get('n_workers',1),
+        threads_per_worker=inp.get('threads_per_worker',1))
+        client = Client(cluster)
+        with parallel_backend('dask'):
+            print('======Hyperparameter search======')
+            best_model.fit(list(range(len(atoms))))
+        end = time.time()
+        print('Took {}s'.format(end-start))
+        open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
+        pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
+        best_model.best_estimator_.steps[1][1].start_at(2).save('best_model',True)
+        shutil.rmtree('.tmp')
