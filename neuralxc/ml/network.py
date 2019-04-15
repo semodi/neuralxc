@@ -491,9 +491,16 @@ class Energy_Network():
             build_graph = False
 
         with self.graph.as_default():
-
+            config = tf.ConfigProto(
+                    intra_op_parallelism_threads=1,
+                    inter_op_parallelism_threads=1,
+                    device_count={"CPU":6},
+                    use_per_session_threads=True)
+            config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+            pool = config.session_inter_op_thread_pool.add()
+            pool.num_threads = 1
             if self.sess == None:
-                sess = tf.Session()
+                sess = tf.Session(config=config)
                 self.sess = sess
             else:
                 sess = self.sess
@@ -552,7 +559,7 @@ class Energy_Network():
 
             if not isinstance(b_, list):
                 b_ = [b_]*len(species)
-                
+
             for i, s in enumerate(species):
                 train_feed_dict['{}/b:0'.format(s)] = b_[i]
                 valid_feed_dict['{}/b:0'.format(s)] = 0

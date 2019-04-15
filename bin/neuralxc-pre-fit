@@ -169,7 +169,9 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
 
         hyper.update(basis_grid)
         cv = inp.get('cv',2)
-        n_jobs = inp.get('n_workers', 1)
+        n_workers = inp.get('n_workers', 1)
+        n_jobs = inp.get('n_jobs', 1)
+        n_threads = inp.get('threads_per_worker', 1)
         verbose = inp.get('verbose',10)
 
         preprocessor = Preprocessor(basis, pre['src_path'],
@@ -221,8 +223,7 @@ if __name__ == '__main__':
         try:
             os.mkdir('.tmp')
         except FileExistsError:
-            shutil.rmtree('.tmp')
-            os.mkdir('.tmp')
+            pass
         print('======Projecting onto basis sets======')
         basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
         for basis_instr in basis_grid:
