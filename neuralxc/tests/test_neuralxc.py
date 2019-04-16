@@ -101,7 +101,7 @@ def test_density_projector():
                   [[0.0,         0.0,        0.0],
                   [-0.75846035, -0.59257417, 0.0],
                   [ 0.75846035, -0.59257417, 0.0]]
-                  )*xc.constants.Bohr
+                  )/xc.constants.Bohr
 
     basis_rep = density_projector.get_basis_rep(rho, positions, ['O','H','H'])
     print(basis_rep)

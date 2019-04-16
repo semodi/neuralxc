@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 import pickle
 import copy
 import matplotlib.pyplot as plt
-from neuralxc.constants import Bohr, Hartree
+from neuralxc.constants import  Hartree
 try:
     import ase
     ase_found = True

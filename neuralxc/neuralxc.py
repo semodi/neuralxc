@@ -11,7 +11,7 @@ from .ml.network import load_pipeline
 from .projector import DensityProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
-from .constants import Rydberg, Bohr
+from .constants import Rydberg
 from abc import ABC, abstractmethod
 # from mpi4py import MPI
 

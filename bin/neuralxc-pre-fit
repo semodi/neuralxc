@@ -226,16 +226,20 @@ if __name__ == '__main__':
             pass
         print('======Projecting onto basis sets======')
         basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
+
         for basis_instr in basis_grid:
             print(basis_instr)
             preprocessor.basis_instructions = basis_instr
-            preprocessor.fit_transform(list(range(len(atoms))))
+            # preprocessor.fit_transform(list(range(len(atoms))))
+            preprocessor.fit_transform([0])
+
         cluster = LocalCluster(n_workers = inp.get('n_workers',1),
         threads_per_worker=inp.get('threads_per_worker',1))
         client = Client(cluster)
         with parallel_backend('dask'):
             print('======Hyperparameter search======')
             best_model.fit(list(range(len(atoms))))
+        # best_model.fit(list(range(len(atoms))))
         end = time.time()
         print('Took {}s'.format(end-start))
         open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
