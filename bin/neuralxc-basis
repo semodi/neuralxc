@@ -1,0 +1,22 @@
+#!/usr/bin/python3
+import matplotlib.pyplot as plt
+import json
+import numpy as np
+import neuralxc as xc
+import sys
+
+if  __name__ == '__main__':
+
+    basis_instructions = json.loads(open(sys.argv[1],'r').read())
+    # projector = xc.projector.DensityProjector(np.eye(3),np.ones(3), basis_instructions)
+    projector = xc.projector.BehlerProjector(np.eye(3),np.ones(3), basis_instructions)
+    # projector = xc.projector.NonOrthoProjector(np.eye(3),np.ones(3), basis_instructions)
+
+    for spec in basis_instructions['basis']:
+        n = basis_instructions['basis'][spec]['n']
+        W = projector.get_W(1,n)
+        r = np.linspace(0,1,100)
+        radials = projector.radials(r,1,W)
+        for rad in radials:
+            plt.plot(r, rad)
+        plt.show()

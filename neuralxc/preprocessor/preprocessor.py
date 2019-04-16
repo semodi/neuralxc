@@ -1,7 +1,7 @@
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from ..utils.density_getter import density_getter_factory
-from ..projector import DensityProjector
+from ..projector import DensityProjector, BehlerProjector, NonOrthoProjector
 from ..formatter import atomic_shape, system_shape
 from dask import delayed
 from ase.io import read
@@ -98,6 +98,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
         rho, unitcell, grid = density_getter.get_density(path)
         projector = DensityProjector(unitcell, grid, self.basis_instructions)
+        # projector = BehlerProjector(unitcell, grid, self.basis_instructions)
 
         basis_rep = projector.get_basis_rep(rho, pos, species)
         del rho

@@ -134,7 +134,8 @@ class NetworkEstimator(BaseEstimator):
 
     def __init__(self, n_nodes, n_layers, b, alpha=0.01,
         max_steps = 20001, test_size = 0.2, valid_size = 0.2,
-        random_seed = None) :
+        random_seed = None, batch_size=0, activation=tf.nn.sigmoid,
+        optimizer=None):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
         """
@@ -148,6 +149,9 @@ class NetworkEstimator(BaseEstimator):
         self._random_seed = random_seed
         self.path = None
         self._network = None
+        self._batch_size = batch_size
+        self._activation = activation
+        self._optimizer= optimizer
 
     def get_params(self, *args, **kwargs):
         return {'n_nodes' : self._n_nodes,
@@ -157,7 +161,11 @@ class NetworkEstimator(BaseEstimator):
                 'max_steps': self.max_steps,
                 'test_size' : self._test_size,
                 'valid_size': self._valid_size,
-                'random_seed': self._random_seed}
+                'random_seed': self._random_seed,
+                'batch_size': self._batch_size,
+                'activation': self._activation,
+                'optimizer': self._optimizer
+                }
 
     def build_network(self, X, y=None):
         if isinstance(X, tuple):
@@ -174,12 +182,17 @@ class NetworkEstimator(BaseEstimator):
         for feat, tar in zip(X,y):
             nets = []
             for spec in feat:
-                for j in range(feat[spec].shape[1]):
-                    nets.append(Subnet())
-                    nets[-1].layers = [self._n_nodes] * self._n_layers
-                    nets[-1].activations = [nets[-1].activations[0]] * self._n_layers
-                    nets[-1].add_dataset(Dataset(feat[spec][:,j:j+1], spec.lower()),
-                        tar, test_size = self._test_size)
+                # for j in range(feat[spec].shape[1]):
+                #     nets.append(Subnet())
+                #     nets[-1].layers = [self._n_nodes] * self._n_layers
+                #     nets[-1].activations = [nets[-1].activations[0]] * self._n_layers
+                #     nets[-1].add_dataset(Dataset(feat[spec][:,j:j+1], spec.lower()),
+                #         tar, test_size = self._test_size)
+                nets.append(Subnet())
+                nets[-1].layers = [self._n_nodes] * self._n_layers
+                nets[-1].activations = [self._activation] * self._n_layers
+                nets[-1].add_dataset(Dataset(feat[spec], spec.lower()),
+                    tar, test_size = self._test_size)
             subnets.append(nets)
 
         self._network = Energy_Network(subnets)
@@ -192,8 +205,8 @@ class NetworkEstimator(BaseEstimator):
         self.build_network(X, y)
 
         self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
-            b_=self._b, train_valid_split=1-self._valid_size,
-            random_seed=self._random_seed)
+            b_=self._b, train_valid_split=1-self._valid_size, optimizer=self._optimizer,
+            random_seed=self._random_seed,batch_size =self._batch_size)
 
 
     def get_gradient(self, X, *args, **kwargs):
@@ -451,7 +464,8 @@ class Energy_Network():
               optimizer=None,
               multiplier = 1.0,
               train_valid_split = 0.8,
-              random_seed = None):
+              random_seed = None,
+              batch_size = 0):
 
         """ Train the master neural network
 
@@ -586,10 +600,18 @@ class Energy_Network():
             train_writer = tf.summary.FileWriter('./log/',
                                       self.graph)
             old_cost = 1e8
-
+            if batch_size > 0:
+                batch_generator = BatchGenerator()
             for _ in range(0,max_steps):
 
-                sess.run(train_step,feed_dict=train_feed_dict)
+                if batch_size > 0:
+                    start = 0
+                    while(start != -1):
+                        batch_feed_dict, start = batch_generator.get_batch_feed(train_feed_dict,
+                                                            start, batch_size)
+                        sess.run(train_step, feed_dict = batch_feed_dict)
+                else:
+                    sess.run(train_step,feed_dict=train_feed_dict)
 
                 if _%int(max_steps/10) == 0 and verbose:
                     print('Step: ' + str(_))
@@ -986,3 +1008,47 @@ def reshape_group(x, n):
     x = x.T.reshape(n,n1,n0).swapaxes(1,2)
 
     return x
+
+
+class BatchGenerator:
+
+    def __init__(self):
+        self.shuffle_state = None
+
+
+    def get_batch_feed(self, feed_dict, start, batch_size):
+
+        do_shuffle = False
+        if not isinstance(self.shuffle_state, np.ndarray):
+            do_shuffle = True
+        # print('start {}'.format(start))
+        batch_feed_dict = {}
+        reached_end = False
+        for key in feed_dict:
+            if 'b' in key:
+                batch_feed_dict[key] = feed_dict[key]
+                continue
+            if start + batch_size >= len(feed_dict[key]):
+                reached_end = True
+            if feed_dict[key].ndim == 2:
+                if reached_end:
+                    batch_size = len(feed_dict[key]) - start
+                if do_shuffle:
+                    self.shuffle_state = np.random.permutation(len(feed_dict[key]))
+                batch_feed_dict[key] = feed_dict[key][self.shuffle_state][start: start + batch_size]
+
+                # print('feed_dict ', key , feed_dict[key].shape)
+                # print(batch_feed_dict[key].shape)
+            else:
+                if reached_end:
+                    batch_size = feed_dict[key].shape[1] - start
+                if do_shuffle:
+                    self.shuffle_state = np.random.permutation(feed_dict[key].shape[1])
+                batch_feed_dict[key] = feed_dict[key][:,self.shuffle_state][:, start:start + batch_size, :]
+                # print('feed_dict ', key ,  feed_dict[key].shape)
+                # print('batch_feed', key, batch_feed_dict[key].shape)
+
+        if reached_end:
+            start = -1 - batch_size
+            self.shuffle_state = np.random.permutation(len(self.shuffle_state))
+        return batch_feed_dict, start + batch_size

@@ -75,7 +75,7 @@ class DensityProjector(BaseProjector):
 
     _registry_name = 'default_projector'
     #TODO: Make some functions private
-    @doc_inherit
+    # @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
@@ -100,7 +100,7 @@ class DensityProjector(BaseProjector):
         self.basis = basis_instructions
         self.W = W
 
-    @doc_inherit
+    # @doc_inherit
     def get_basis_rep(self, rho, positions, species):
 
         basis_rep = {}
@@ -137,7 +137,7 @@ class DensityProjector(BaseProjector):
 
         return basis_rep
 
-    @doc_inherit
+    # @doc_inherit
     def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
@@ -621,6 +621,51 @@ class DensityProjector(BaseProjector):
                 for j in range(i+1, nmax):
                     S_matrix[j,i] = S_matrix[i,j]
             return S_matrix
+
+
+class NonOrthoProjector(DensityProjector):
+    @classmethod
+    def S(cls, r_o, nmax):
+        '''
+        Overlap matrix between radial basis functions
+
+        Parameters
+        -------
+
+            r_o: float
+                outer radial cutoff
+            nmax: int
+                max. number of radial functions
+
+        Returns
+        -------
+
+            np.ndarray (nmax, nmax)
+                Overlap matrix
+        '''
+
+        S_matrix = np.zeros([nmax,nmax])
+        r_grid = np.linspace(0, r_o, 1000)
+        dr = r_grid[1] - r_grid[0]
+        for i in range(nmax):
+            for j in range(i,nmax):
+                S_matrix[i,j] = np.sum(cls.g(r_grid,r_o,i+1)*cls.g(r_grid,r_o,j+1))*dr
+        for i in range(nmax):
+            for j in range(i+1, nmax):
+                S_matrix[j,i] = S_matrix[i,j]
+        return S_matrix
+
+class BehlerProjector(DensityProjector):
+
+    @staticmethod
+    def g(r, r_o, a):
+        sigma = 0.005
+        mu = a/10 * r_o
+        return r*(r_o - r)*np.exp(-(r-mu)**2/sigma)
+
+    @classmethod
+    def get_W(cls, r_o, n):
+        return np.eye(n)
 
 def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
     """
