@@ -39,22 +39,23 @@ def test_drad(r_o, n):
 
     projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
 
+    basis =  {'n' : n, 'l' : 3, 'r_o': r_o}
     r = np.linspace(0, r_o, 100)
     incr = 0.000001
     rp = r + incr
     rm = r - incr
     for a in range(1,10,3):
-        gp =  projector.g(rp, r_o, a)
-        gm =  projector.g(rm, r_o, a)
+        gp =  projector.g(rp, basis, a)
+        gm =  projector.g(rm, basis, a)
         dg_fd = (gp-gm)/(2*incr)
-        dg = projector.dg(r, r_o, a)
+        dg = projector.dg(r, basis, a)
         assert np.allclose(dg_fd, dg, atol = incr)
 
-    W = projector.get_W(r_o, n)
-    radp = projector.radials(rp, r_o, W)
-    radm = projector.radials(rm, r_o, W)
+    W = projector.get_W(basis)
+    radp = projector.radials(rp, basis, W)
+    radm = projector.radials(rm, basis, W)
     drad_fd = [(p-m)/(2*incr) for p,m in zip(radp, radm)]
-    drad = projector.dradials(r, r_o, W)
+    drad = projector.dradials(r, basis, W)
 
     for exact, fd in zip(drad, drad_fd):
         assert np.allclose(exact, fd, atol = incr)

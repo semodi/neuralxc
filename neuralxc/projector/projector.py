@@ -89,8 +89,7 @@ class DensityProjector(BaseProjector):
         W = {}
         for species in basis_instructions:
             if len(species) == 1:
-                W[species] = self.get_W(basis_instructions[species]['r_o'],
-                                   basis_instructions[species]['n'])
+                W[species] = self.get_W(basis_instructions[species])
 
         # Determine unitcell constants
         U = np.array(unitcell) # Matrix to go from real space to mesh coordinates
@@ -123,8 +122,7 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            basis_rep[spec].append(self.project(rho, box, basis['n'], basis['l'],
-                basis['r_o'], self.W[spec]))
+            basis_rep[spec].append(self.project(rho, box, basis, self.W[spec]))
 
         for spec in basis_rep:
             basis_rep[spec] = np.concatenate(basis_rep[spec], axis = 0)
@@ -144,8 +142,7 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            basis_rep[spec].append(self.project(rho, box, basis['n'], basis['l'],
-                basis['r_o'], self.W[spec], True))
+            basis_rep[spec].append(self.project(rho, box, basis, self.W[spec], True))
 
         return basis_rep
 
@@ -167,15 +164,13 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            V[tuple(box['mesh'])] += self.build(coeffs, box, basis['n'], basis['l'],
-                basis['r_o'], self.W[spec])
+            V[tuple(box['mesh'])] += self.build(coeffs, box, basis, self.W[spec])
 
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
                 force_corrections[i] = self.get_force_correction(rho, coeffs,
-                    box, basis['n'], basis['l'],
-                    basis['r_o'], self.W[spec])
+                    box, basis, self.W[spec])
 
         if calc_forces:
             return V.real, force_corrections
@@ -206,7 +201,7 @@ class DensityProjector(BaseProjector):
         return sph_harm(m,l,phi,theta)
 
 
-    def get_force_correction(self, rho, coeffs, box, n_rad, n_l, r_o, W = None):
+    def get_force_correction(self, rho, coeffs, box, basis, W = None):
         """ Calculate the contribution to the forces that arises from the
         dependence of the (nxc-)basis set on the atomic positions
 
@@ -233,6 +228,11 @@ class DensityProjector(BaseProjector):
             force: np.ndarray
                 force correction
         """
+
+        n_rad = basis['n']
+        n_l = basis['l']
+        r_o = basis['r_o']
+
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
         X, Y, Z = box['real']
@@ -263,10 +263,10 @@ class DensityProjector(BaseProjector):
         dangs = dangs.reshape(len(dangs),*X.shape,3)
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
-            W = self.get_W(r_o, n_rad) # Matrix to orthogonalize radial basis
+            W = self.get_W(basis) # Matrix to orthogonalize radial basis
 
-        drads = self.dradials(R, r_o, W)
-        rads = self.radials(R, r_o, W)
+        drads = self.dradials(R, basis, W)
+        rads = self.radials(R, basis, W)
         radsr = np.array(rads)
         # radsr[R==0] = 0
         radsr = radsr/R
@@ -294,7 +294,7 @@ class DensityProjector(BaseProjector):
             force[ix] = np.sum(rho*v.real)* self.V_cell
         return force
 
-    def build(self, coeffs, box, n_rad, n_l, r_o, W = None):
+    def build(self, coeffs, box, basis, W = None):
         """ Build the contribution from this atom to the potential V in a
         provided bounding box
 
@@ -320,6 +320,10 @@ class DensityProjector(BaseProjector):
                 contribution to total potential by this atom in 'box'
         """
 
+        n_rad = basis['n']
+        n_l = basis['l']
+        r_o = basis['r_o']
+
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
 
@@ -337,9 +341,9 @@ class DensityProjector(BaseProjector):
 
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
-            W = self.get_W(r_o, n_rad) # Matrix to orthogonalize radial basis
+            W = self.get_W(basis) # Matrix to orthogonalize radial basis
 
-        rads = self.radials(R, r_o, W)
+        rads = self.radials(R, basis, W)
 
         v = np.zeros_like(Xm, dtype= complex)
         idx = 0
@@ -351,7 +355,7 @@ class DensityProjector(BaseProjector):
                     idx += 1
         return v
 
-    def project(self, rho, box, n_rad, n_l, r_o, W = None, return_dict=False):
+    def project(self, rho, box, basis, W = None, return_dict=False):
             '''
             Project the real space density rho onto a set of basis functions
 
@@ -377,6 +381,9 @@ class DensityProjector(BaseProjector):
                     dictionary containing the coefficients
             '''
 
+            n_rad = basis['n']
+            n_l = basis['l']
+            r_o = basis['r_o']
             R, Theta, Phi = box['radial']
             Xm, Ym, Zm = box['mesh']
 
@@ -397,9 +404,9 @@ class DensityProjector(BaseProjector):
 
             #Build radial part of b.f.
             if not isinstance(W, np.ndarray):
-                W = self.get_W(r_o, n_rad) # Matrix to orthogonalize radial basis
+                W = self.get_W(basis) # Matrix to orthogonalize radial basis
 
-            rads = self.radials(R, r_o, W)
+            rads = self.radials(R, basis, W)
 
             coeff = []
             coeff_dict = {}
@@ -474,7 +481,7 @@ class OrthoProjector(DensityProjector):
         pass
 
     @staticmethod
-    def dg(r, r_o, a):
+    def dg(r, basis, a):
         """
         Derivative of non-orthogonalized radial functions
 
@@ -483,8 +490,8 @@ class OrthoProjector(DensityProjector):
 
             r: float
                 radius
-            r_o: float
-                outer radial cutoff
+            basis: dict
+                dictionary containing r_o
             a: int
                 exponent (equiv. to radial index n)
 
@@ -494,7 +501,7 @@ class OrthoProjector(DensityProjector):
             float
                 derivative of radial function at radius r
         """
-
+        r_o = basis['r_o']
         def dg_(r, r_o, a):
             return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)
 
@@ -504,7 +511,7 @@ class OrthoProjector(DensityProjector):
 
 
     @staticmethod
-    def g(r, r_o, a):
+    def g(r, basis, a):
         """
         Non-orthogonalized radial functions
 
@@ -513,8 +520,8 @@ class OrthoProjector(DensityProjector):
 
             r: float
                 radius
-            r_o: float
-                outer radial cutoff
+            basis: dict
+                dictionary containing r_o
             a: int
                 exponent (equiv. to radial index n)
 
@@ -525,6 +532,7 @@ class OrthoProjector(DensityProjector):
                 value of radial function at radius r
         """
 
+        r_o = basis['r_o']
         def g_(r, r_o, a):
             return (r)**(2)*(r_o-r)**(a+2)
         # Write out factorial fraction to avoid overflow
@@ -533,8 +541,20 @@ class OrthoProjector(DensityProjector):
         return g_(r, r_o,a)/N
 
 
+    @staticmethod
+    def orthogonalize(func, r, basis, W):
+        r_o = basis['r_o']
+        result = np.zeros([len(W)] + list(r.shape))
+        for k in range(0,len(W)):
+            rad = func(r, basis, k+1)
+            for j in range(0, len(W)):
+                result[j] += W[j,k] * rad
+        result[:,r > r_o] = 0
+        return result
+
+
     @classmethod
-    def dradials(cls, r, r_o, W):
+    def dradials(cls, r, basis, W):
         '''
         Get derivative of orthonormal radial basis functions
 
@@ -551,17 +571,10 @@ class OrthoProjector(DensityProjector):
             np.ndarray
                 radial functions
         '''
-
-        result = np.zeros([len(W)] + list(r.shape))
-        for k in range(0,len(W)):
-            rad = cls.dg(r, r_o, k+1)
-            for j in range(0, len(W)):
-                result[j] += W[j,k] * rad
-        result[:,r > r_o] = 0
-        return result
+        return cls.orthogonalize(cls.dg,r, basis, W)
 
     @classmethod
-    def radials(cls, r, r_o, W):
+    def radials(cls, r, basis, W):
         '''
         Get orthonormal radial basis functions
 
@@ -581,17 +594,10 @@ class OrthoProjector(DensityProjector):
             np.ndarray
                 radial functions
         '''
-
-        result = np.zeros([len(W)] + list(r.shape))
-        for k in range(0,len(W)):
-            rad = cls.g(r, r_o, k+1)
-            for j in range(0, len(W)):
-                result[j] += W[j,k] * rad
-        result[:,r > r_o] = 0
-        return result
+        return cls.orthogonalize(cls.g,r, basis, W)
 
     @classmethod
-    def get_W(cls, r_o, n):
+    def get_W(cls, basis):
         '''
         Get matrix to orthonormalize radial basis functions
 
@@ -608,42 +614,103 @@ class OrthoProjector(DensityProjector):
             np.ndarray
                 W, orthogonalization matrix
         '''
-        return scipy.linalg.sqrtm(np.linalg.pinv(cls.S(r_o, n)))
+        return scipy.linalg.sqrtm(np.linalg.pinv(cls.S(basis)))
 
     @classmethod
-    def S(cls, r_o, nmax):
-            '''
-            Overlap matrix between radial basis functions
+    def S(cls, basis):
+        '''
+        Overlap matrix between radial basis functions
 
-            Parameters
-            -------
+        Parameters
+        -------
 
-                r_o: float
-                    outer radial cutoff
-                nmax: int
-                    max. number of radial functions
+            r_o: float
+                outer radial cutoff
+            nmax: int
+                max. number of radial functions
 
-            Returns
-            -------
+        Returns
+        -------
 
-                np.ndarray (nmax, nmax)
-                    Overlap matrix
-            '''
+            np.ndarray (nmax, nmax)
+                Overlap matrix
+        '''
+        r_o = basis['r_o']
+        nmax = basis['n']
+        S_matrix = np.zeros([nmax,nmax])
+        r_grid = np.linspace(0, r_o, 1000)
+        dr = r_grid[1] - r_grid[0]
+        for i in range(nmax):
+            for j in range(i,nmax):
+                S_matrix[i,j] = np.sum(cls.g(r_grid,basis,i+1)*cls.g(r_grid,basis,j+1)*r_grid**2)*dr
+        for i in range(nmax):
+            for j in range(i+1, nmax):
+                S_matrix[j,i] = S_matrix[i,j]
+        return S_matrix
 
-            S_matrix = np.zeros([nmax,nmax])
-            r_grid = np.linspace(0, r_o, 1000)
-            dr = r_grid[1] - r_grid[0]
-            for i in range(nmax):
-                for j in range(i,nmax):
-                    S_matrix[i,j] = np.sum(cls.g(r_grid,r_o,i+1)*cls.g(r_grid,r_o,j+1)*r_grid**2)*dr
-            for i in range(nmax):
-                for j in range(i+1, nmax):
-                    S_matrix[j,i] = S_matrix[i,j]
-            return S_matrix
 class NonOrthoProjector(OrthoProjector):
     _registry_name ='non-ortho'
+
+    @staticmethod
+    def dg(r, basis, a):
+        """
+        Derivative of non-orthogonalized radial functions
+
+        Parameters
+        -------
+
+            r: float
+                radius
+            basis: dict
+                dictionary containing r_o
+            a: int
+                exponent (equiv. to radial index n)
+
+        Returns
+        ------
+
+            float
+                derivative of radial function at radius r
+        """
+        r_o = basis['r_o']
+        def dg_(r, r_o, a):
+            return -(2 + a)*(r_o-r)**(a+1)
+
+        N = np.sqrt(r_o**(2*a+5/(2*a+5)))
+        return dg_(r, r_o,a)/N
+
+
+    @staticmethod
+    def g(r, basis, a):
+        """
+        Non-orthogonalized radial functions
+
+        Parameters
+        -------
+
+            r: float
+                radius
+            basis: dict
+                dictionary containing r_o
+            a: int
+                exponent (equiv. to radial index n)
+
+        Returns
+        ------
+
+            float
+                value of radial function at radius r
+        """
+
+        r_o = basis['r_o']
+        def g_(r, r_o, a):
+            return (r_o-r)**(a+2)
+        # Write out factorial fraction to avoid overflow
+        N = np.sqrt(r_o**(2*a+5/(2*a+5)))
+        return g_(r, r_o,a)/N
+
     @classmethod
-    def S(cls, r_o, nmax):
+    def S(cls, basis):
         '''
         Overlap matrix between radial basis functions
 
@@ -662,12 +729,11 @@ class NonOrthoProjector(OrthoProjector):
                 Overlap matrix
         '''
 
+        nmax = basis['n']
         S_matrix = np.zeros([nmax,nmax])
-        r_grid = np.linspace(0, r_o, 1000)
-        dr = r_grid[1] - r_grid[0]
-        for i in range(nmax):
-            for j in range(i,nmax):
-                S_matrix[i,j] = np.sum(cls.g(r_grid,r_o,i+1)*cls.g(r_grid,r_o,j+1))*dr
+        for i in range(1,nmax+1):
+            for j in range(i,nmax+1):
+                S_matrix[i-1,j-1] = np.sqrt((5+2*i)*(5+2*j))/(5+i+j)
         for i in range(nmax):
             for j in range(i+1, nmax):
                 S_matrix[j,i] = S_matrix[i,j]
@@ -677,14 +743,15 @@ class BehlerProjector(OrthoProjector):
 
     _registry_name ='behler'
     @staticmethod
-    def g(r, r_o, a):
-        sigma = 0.005
-        mu = a/10 * r_o
-        return r*(r_o - r)*np.exp(-(r-mu)**2/sigma)
+    def g(r, basis, a):
+        r_o = basis['r_o']
+        sigma = basis.get('sigma',0.005)
+        mu = a/(basis['n']+1) * r_o
+        return r*(r_o - r)*np.exp(-(r-mu)**2/(sigma*r_o))
 
     @classmethod
-    def get_W(cls, r_o, n):
-        return np.eye(n)
+    def get_W(cls, basis):
+        return np.eye(basis['n'])
 
 def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
     """

@@ -27,10 +27,11 @@ import shutil
 def match_hyperparameter(hp, parameters):
     matches = []
     for par in parameters:
-        if hp in par:
+        if hp == par:
             matches.append(par)
     if len(matches) != 1:
-        raise ValueError('{} matches found for hyperparameter name. Must be exactly 1'.format(len(matches)))
+        print(matches)
+        raise ValueError('{} matches found for hyperparameter {}. Must be exactly 1'.format(len(matches),hp))
     return matches[0]
 
 def to_full_hyperparameters(hp, parameters):
@@ -149,7 +150,7 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
     if mask:
         params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
         inp.update({'hyperparameters': params})
-        inp.update({'cv':2,'n_workers':1,'threads_per_worker':1})
+        inp.update({'cv':2,'n_workers':1,'threads_per_worker':1,'n_jobs':1})
         open(inputfile,'w').write(json.dumps(inp, indent = 4))
         open(preprocessor,'w').write(json.dumps({'basis': basis,
                                 'src_path': '',
@@ -185,7 +186,7 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
         # pprint(hyper.keys())
         grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
         grid_cv_pre = GridSearchCV(Pipeline([pipe.steps[0]]), basis_grid, cv=2, n_jobs= n_jobs, refit = True, verbose=10)
-        # pprint(pipe.get_params().keys())
+        pprint(pipe.get_params().keys())
         return grid_cv, pipe.steps[0][1]
 
 if __name__ == '__main__':
@@ -236,8 +237,14 @@ if __name__ == '__main__':
 
         cluster = LocalCluster(n_workers = inp.get('n_workers',1),
         threads_per_worker=inp.get('threads_per_worker',1))
+        # cluster = LocalCluster(processes=False)
         client = Client(cluster)
-        with parallel_backend('dask'):
+        if inp.get('n_workers',1)==1 and inp.get('threads_per_worker',1)==1:
+            backend = 'loky'
+        else:
+            backend = 'dask'
+        print("BACKEND: ", backend)
+        with parallel_backend(backend):
             print('======Hyperparameter search======')
             best_model.fit(list(range(len(atoms))))
         # best_model.fit(list(range(len(atoms))))
@@ -246,4 +253,3 @@ if __name__ == '__main__':
         open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
         pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
         best_model.best_estimator_.steps[1][1].start_at(2).save('best_model',True)
-        shutil.rmtree('.tmp')

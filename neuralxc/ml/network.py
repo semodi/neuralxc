@@ -139,31 +139,31 @@ class NetworkEstimator(BaseEstimator):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
         """
-        self._n_nodes = n_nodes
-        self._n_layers = n_layers
-        self._b = b
+        self.n_nodes = n_nodes
+        self.n_layers = n_layers
+        self.b = b
         self.alpha = alpha
         self.max_steps = max_steps
-        self._test_size = test_size
-        self._valid_size = valid_size
-        self._random_seed = random_seed
+        self.test_size = test_size
+        self.valid_size = valid_size
+        self.random_seed = random_seed
         self.path = None
         self._network = None
-        self._batch_size = batch_size
-        self._activation = activation
-        self._optimizer= optimizer
+        self.batch_size = batch_size
+        self.activation = activation
+        self.optimizer= optimizer
 
     def get_params(self, *args, **kwargs):
-        return {'n_nodes' : self._n_nodes,
-                'n_layers': self._n_layers,
-                'b': self._b,
+        return {'n_nodes' : self.n_nodes,
+                'n_layers': self.n_layers,
+                'b': self.b,
                 'alpha': self.alpha,
                 'max_steps': self.max_steps,
-                'test_size' : self._test_size,
-                'valid_size': self._valid_size,
-                'random_seed': self._random_seed,
-                'batch_size': self._batch_size,
-                'activation': self._activation,
+                'test_size' : self.test_size,
+                'valid_size': self.valid_size,
+                'random_seed': self.random_seed,
+                'batch_size': self.batch_size,
+                'activation': self.activation,
                 }
 
     def build_network(self, X, y=None):
@@ -188,10 +188,10 @@ class NetworkEstimator(BaseEstimator):
                 #     nets[-1].add_dataset(Dataset(feat[spec][:,j:j+1], spec.lower()),
                 #         tar, test_size = self._test_size)
                 nets.append(Subnet())
-                nets[-1].layers = [self._n_nodes] * self._n_layers
-                nets[-1].activations = [getattr(tf.nn,self._activation)] * self._n_layers
+                nets[-1].layers = [self.n_nodes] * self.n_layers
+                nets[-1].activations = [getattr(tf.nn, self.activation)] * self.n_layers
                 nets[-1].add_dataset(Dataset(feat[spec], spec.lower()),
-                    tar, test_size = self._test_size)
+                    tar, test_size = self.test_size)
             subnets.append(nets)
 
         self._network = Energy_Network(subnets)
@@ -202,10 +202,12 @@ class NetworkEstimator(BaseEstimator):
 
         #TODO: Currently does not allow to continue training
         self.build_network(X, y)
-
+        print('\n=========Parameters==========\n')
+        print(self.get_params())
+        print('\n')
         self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
-            b_=self._b, train_valid_split=1-self._valid_size, optimizer=self._optimizer,
-            random_seed=self._random_seed,batch_size =self._batch_size)
+            b_=self.b, train_valid_split=1-self.valid_size, optimizer=self.optimizer,
+            random_seed=self.random_seed,batch_size =self.batch_size)
 
 
     def get_gradient(self, X, *args, **kwargs):
@@ -507,8 +509,9 @@ class Energy_Network():
             config = tf.ConfigProto(
                     intra_op_parallelism_threads=1,
                     inter_op_parallelism_threads=1,
-                    device_count={"CPU":6},
+                    device_count={"CPU":1},
                     use_per_session_threads=True)
+                    # log_device_placement=True)
             config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
             pool = config.session_inter_op_thread_pool.add()
             pool.num_threads = 1
