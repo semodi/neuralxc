@@ -60,8 +60,22 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         symmetrize_instructions: dict
             Attributes needed to symmetrize input (such as angular momentum etc.)
         """
-        self._attrs = symmetrize_instructions
+
+        sym_ins = symmetrize_instructions
+        registry = BaseSymmetrizer.get_registry()
+        if not 'symmetrizer_type' in sym_ins:
+            raise Exception('symmetrize_instructions must contain symmetrizer_type key')
+
+        symtype = sym_ins['symmetrizer_type']
+
+        if not symtype in registry:
+            raise Exception('Symmetrizer: {} not registered'.format(symtype))
+
+        self.symmetrizer  = registry[symtype](sym_ins)
         self._cgs = 0
+
+    def __getattr__(self, attr):
+        return getattr(self.symmetrizer, attr)
 
     def get_params(self, *args, **kwargs):
         return {'symmetrize_instructions': self._attrs}
@@ -147,6 +161,9 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 class CasimirSymmetrizer(Symmetrizer):
 
     _registry_name = 'casimir'
+
+    def __init__(self, symmetrize_instructions):
+        self._attrs = symmetrize_instructions
 
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
@@ -323,21 +340,22 @@ def symmetrizer_factory(symmetrize_instructions):
     Symmetrizer
 
     """
-    sym_ins = symmetrize_instructions
-    # symmetrizer_dict = dict(casimir = CasimirSymmetrizer,
-                        # bispectrum = BispectrumSymmetrizer)
-
-    registry = BaseSymmetrizer.get_registry()
-    # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
-    if not 'symmetrizer_type' in sym_ins:
-        raise Exception('symmetrize_instructions must contain symmetrizer_type key')
-
-    symtype = sym_ins['symmetrizer_type']
-
-    if not symtype in registry:
-        raise Exception('Symmetrizer: {} not registered'.format(symtype))
-
-    return registry[symtype](sym_ins)
+    return Symmetrizer(symmetrize_instructions)
+    # sym_ins = symmetrize_instructions
+    # # symmetrizer_dict = dict(casimir = CasimirSymmetrizer,
+    #                     # bispectrum = BispectrumSymmetrizer)
+    #
+    # registry = BaseSymmetrizer.get_registry()
+    # # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
+    # if not 'symmetrizer_type' in sym_ins:
+    #     raise Exception('symmetrize_instructions must contain symmetrizer_type key')
+    #
+    # symtype = sym_ins['symmetrizer_type']
+    #
+    # if not symtype in registry:
+    #     raise Exception('Symmetrizer: {} not registered'.format(symtype))
+    #
+    # return registry[symtype](sym_ins)
 
 
 # def cg_matrix(n_l):

@@ -86,14 +86,17 @@ def test_siesta_density_getter():
             assert np.allclose(results_ref[key],results[key])
 
 @pytest.mark.fast
-def test_density_projector():
+@pytest.mark.parametrize('projector_type',[name for name in \
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base']])
+def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary = True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir,'h2o.RHO'))
 
     basis_set = {
                 'O': {'n' : 2, 'l' : 3, 'r_o': 1},
-                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5}
+                'H': {'n' : 2, 'l' : 2, 'r_o': 1.5},
+                'projector_type' : projector_type
                 }
 
     density_projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
@@ -105,15 +108,16 @@ def test_density_projector():
 
     basis_rep = density_projector.get_basis_rep(rho, positions, ['O','H','H'])
     print(basis_rep)
-    if save_test_density_projector:
-        with open(os.path.join(test_dir, 'h2o_rep.pckl'),'wb') as file:
-            pickle.dump(basis_rep, file)
-    else:
-        with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
-            basis_rep_ref = pickle.load(file)
+    if projector_type =='ortho':
+        if save_test_density_projector:
+            with open(os.path.join(test_dir, 'h2o_rep.pckl'),'wb') as file:
+                pickle.dump(basis_rep, file)
+        else:
+            with open(os.path.join(test_dir, 'h2o_rep.pckl'),'rb') as file:
+                basis_rep_ref = pickle.load(file)
 
-        for spec in basis_rep:
-            assert np.allclose(basis_rep[spec],basis_rep_ref[spec])
+            for spec in basis_rep:
+                assert np.allclose(basis_rep[spec],basis_rep_ref[spec])
 
 
 @pytest.mark.fast

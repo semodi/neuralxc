@@ -71,12 +71,20 @@ class BaseProjector(metaclass = ProjectorRegistry):
         pass
 
 
+
 class DensityProjector(BaseProjector):
 
-    _registry_name = 'default_projector'
+    _registry_name = 'default'
     #TODO: Make some functions private
     # @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
+
+        projector_type = basis_instructions.get('projector_type','ortho')
+        registry = BaseProjector.get_registry()
+        if not projector_type in registry:
+            raise Exception('Projector: {} not registered'.format(projector_type))
+
+        self.projector  = registry[projector_type](basis_instructions)
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
@@ -99,6 +107,10 @@ class DensityProjector(BaseProjector):
         self.a = a
         self.basis = basis_instructions
         self.W = W
+
+
+    def __getattr__(self, attr):
+        return getattr(self.projector, attr)
 
     # @doc_inherit
     def get_basis_rep(self, rho, positions, species):
@@ -454,6 +466,13 @@ class DensityProjector(BaseProjector):
 
         return {'mesh':[Xm, Ym, Zm],'real': [X,Y,Z],'radial':[R, Theta, Phi]}
 
+
+class OrthoProjector(DensityProjector):
+
+    _registry_name = 'ortho'
+    def __init__(self, *args, **kwargs):
+        pass
+
     @staticmethod
     def dg(r, r_o, a):
         """
@@ -621,9 +640,8 @@ class DensityProjector(BaseProjector):
                 for j in range(i+1, nmax):
                     S_matrix[j,i] = S_matrix[i,j]
             return S_matrix
-
-
-class NonOrthoProjector(DensityProjector):
+class NonOrthoProjector(OrthoProjector):
+    _registry_name ='non-ortho'
     @classmethod
     def S(cls, r_o, nmax):
         '''
@@ -655,8 +673,9 @@ class NonOrthoProjector(DensityProjector):
                 S_matrix[j,i] = S_matrix[i,j]
         return S_matrix
 
-class BehlerProjector(DensityProjector):
+class BehlerProjector(OrthoProjector):
 
+    _registry_name ='behler'
     @staticmethod
     def g(r, r_o, a):
         sigma = 0.005

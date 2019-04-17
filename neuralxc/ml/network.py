@@ -134,7 +134,7 @@ class NetworkEstimator(BaseEstimator):
 
     def __init__(self, n_nodes, n_layers, b, alpha=0.01,
         max_steps = 20001, test_size = 0.2, valid_size = 0.2,
-        random_seed = None, batch_size=0, activation=tf.nn.sigmoid,
+        random_seed = None, batch_size=0, activation='sigmoid',
         optimizer=None):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
@@ -164,7 +164,6 @@ class NetworkEstimator(BaseEstimator):
                 'random_seed': self._random_seed,
                 'batch_size': self._batch_size,
                 'activation': self._activation,
-                'optimizer': self._optimizer
                 }
 
     def build_network(self, X, y=None):
@@ -190,7 +189,7 @@ class NetworkEstimator(BaseEstimator):
                 #         tar, test_size = self._test_size)
                 nets.append(Subnet())
                 nets[-1].layers = [self._n_nodes] * self._n_layers
-                nets[-1].activations = [self._activation] * self._n_layers
+                nets[-1].activations = [getattr(tf.nn,self._activation)] * self._n_layers
                 nets[-1].add_dataset(Dataset(feat[spec], spec.lower()),
                     tar, test_size = self._test_size)
             subnets.append(nets)
@@ -601,14 +600,11 @@ class Energy_Network():
                                       self.graph)
             old_cost = 1e8
             if batch_size > 0:
-                batch_generator = BatchGenerator()
+                batch_generator = BatchGenerator(batch_size)
             for _ in range(0,max_steps):
 
                 if batch_size > 0:
-                    start = 0
-                    while(start != -1):
-                        batch_feed_dict, start = batch_generator.get_batch_feed(train_feed_dict,
-                                                            start, batch_size)
+                    for batch_feed_dict in batch_generator.get_batch_feed(train_feed_dict):
                         sess.run(train_step, feed_dict = batch_feed_dict)
                 else:
                     sess.run(train_step,feed_dict=train_feed_dict)
@@ -1012,43 +1008,52 @@ def reshape_group(x, n):
 
 class BatchGenerator:
 
-    def __init__(self):
+    def __init__(self, batch_size, shuffle = True):
+        """ Class for batch generation
+
+        Parameters
+        ----------
+        batch_size: int
+            size of batches to generate
+
+        shuffle: bool (optional, default = True)
+            shuffle samples at the beginning of every epoch
+
+        """
+
         self.shuffle_state = None
+        self.batch_size = batch_size
+        self.shuffle = shuffle
 
+    def get_batch_feed(self, feed_dict):
 
-    def get_batch_feed(self, feed_dict, start, batch_size):
-
-        do_shuffle = False
-        if not isinstance(self.shuffle_state, np.ndarray):
+        batch_size = self.batch_size
+        if self.shuffle:
             do_shuffle = True
-        # print('start {}'.format(start))
-        batch_feed_dict = {}
+        start = 0
         reached_end = False
-        for key in feed_dict:
-            if 'b' in key:
-                batch_feed_dict[key] = feed_dict[key]
-                continue
-            if start + batch_size >= len(feed_dict[key]):
-                reached_end = True
-            if feed_dict[key].ndim == 2:
-                if reached_end:
-                    batch_size = len(feed_dict[key]) - start
-                if do_shuffle:
-                    self.shuffle_state = np.random.permutation(len(feed_dict[key]))
-                batch_feed_dict[key] = feed_dict[key][self.shuffle_state][start: start + batch_size]
+        while(True):
+            batch_feed_dict = {}
+            for key in feed_dict:
+                if 'b' in key:
+                    batch_feed_dict[key] = feed_dict[key]
+                    continue
 
-                # print('feed_dict ', key , feed_dict[key].shape)
-                # print(batch_feed_dict[key].shape)
+                if feed_dict[key].ndim == 2:
+                    if do_shuffle:
+                        self.shuffle_state = np.random.permutation(len(feed_dict[key]))
+                        do_shuffle = False
+                    batch_feed_dict[key] = feed_dict[key][self.shuffle_state][start: start + batch_size]
+                else:
+                    if do_shuffle:
+                        self.shuffle_state = np.random.permutation(feed_dict[key].shape[1])
+                        do_shuffle = False
+                    batch_feed_dict[key] = feed_dict[key][:,self.shuffle_state][:, start:start + batch_size, :]
+
+                if len(batch_feed_dict[key]) == 0:
+                    reached_end = True
+            if reached_end:
+                break
             else:
-                if reached_end:
-                    batch_size = feed_dict[key].shape[1] - start
-                if do_shuffle:
-                    self.shuffle_state = np.random.permutation(feed_dict[key].shape[1])
-                batch_feed_dict[key] = feed_dict[key][:,self.shuffle_state][:, start:start + batch_size, :]
-                # print('feed_dict ', key ,  feed_dict[key].shape)
-                # print('batch_feed', key, batch_feed_dict[key].shape)
-
-        if reached_end:
-            start = -1 - batch_size
-            self.shuffle_state = np.random.permutation(len(self.shuffle_state))
-        return batch_feed_dict, start + batch_size
+                start += batch_size
+                yield batch_feed_dict

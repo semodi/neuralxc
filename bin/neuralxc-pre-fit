@@ -156,6 +156,7 @@ def get_grid_cv(preprocessor, config, mask=False, xyz=''):
                                 'traj_path': xyz,
                                 'target_path': '',
                                 'n_workers': 1}, indent= 4))
+        return None, None
     else:
         if 'hyperparameters' in inp:
             hyper = inp['hyperparameters']
