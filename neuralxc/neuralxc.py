@@ -68,6 +68,7 @@ class NXCAdapter(ABC):
 
 class SiestaNXC(NXCAdapter):
 
+    #TODO: Find library that takes care of this
     element_dict = {8: 'O', 1: 'H', 6: 'C'}
 
     @prints_error
@@ -105,7 +106,7 @@ class SiestaNXC(NXCAdapter):
         unitcell = unitcell.T
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
-        np.save('rho.npy',rho_reshaped)
+        # np.save('rho.npy',rho_reshaped)
         Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid,
                             positions, elements, calc_forces = calc_forces)
         if calc_forces:
@@ -118,6 +119,7 @@ class SiestaNXC(NXCAdapter):
         V[:, :] = Vnxc + V
         print('Enxc = {} eV'.format(Enxc*Rydberg))
         return Enxc
+
     @prints_error
     def correct_forces(self, forces):
         try:
