@@ -252,4 +252,8 @@ if __name__ == '__main__':
         print('Took {}s'.format(end-start))
         open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
         pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
-        best_model.best_estimator_.steps[1][1].start_at(2).save('best_model',True)
+        best_params_ = best_model.best_params_
+        best_estimator = best_model.best_estimator_.steps[1][1].start_at(2)
+        best_estimator.basis_instructions =  best_params_['preprocessor__basis_instructions']
+        best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
+        best_estimator.save('best_model',True)

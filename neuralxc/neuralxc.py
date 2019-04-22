@@ -8,7 +8,7 @@ and all other relevant classes
 
 import numpy as np
 from .ml.network import load_pipeline
-from .projector import DensityProjector
+from .projector import DensityProjector, DeltaProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
 from .constants import Rydberg
@@ -23,7 +23,7 @@ def prints_error(method):
         try:
             return method(*args, **kwargs)
         except Exception as e:
-            print(e)
+            print('NeuralXC: ', e)
             raise(e)
 
     return wrapper_print_error
@@ -40,7 +40,6 @@ def get_nxc_adapter(kind, path):
     kind = kind.lower()
     adapter_dict = {'siesta': SiestaNXC}
     if not kind in adapter_dict:
-        print('Selected Adapter not available')
         raise ValueError('Selected Adapter not available')
     else:
         adapter = adapter_dict[kind](path)
@@ -61,6 +60,7 @@ class NXCAdapter(ABC):
         # from mpi4py import MPI
         path = ''.join(path.split())
         self._adaptee = NeuralXC(path)
+        self.initialized = False
 
     @abstractmethod
     def get_V(self):
@@ -70,6 +70,22 @@ class SiestaNXC(NXCAdapter):
 
     #TODO: Find library that takes care of this
     element_dict = {8: 'O', 1: 'H', 6: 'C'}
+
+    @prints_error
+    def initialize(self, rho, unitcell, grid, positions, elements):
+        elements = [self.element_dict[e] for e in elements]
+        unitcell = unitcell.T
+        positions = positions.T
+        rho_reshaped = rho.reshape(*grid).T
+        self._adaptee.initialize(unitcell, grid, positions, elements)
+        if self._adaptee._pipeline.get_basis_instructions().get('extension','RHOXC') == 'DRHO':
+            print('NeuralXC: Using DRHO')
+            self._adaptee.projector = DeltaProjector(self._adaptee.projector)
+            self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
+        else:
+            print('NeuralXC: Using RHOXC')
+        self.initialized = True
+
 
     @prints_error
     def get_V(self, rho, unitcell, grid, positions, elements, V, calc_forces=False):
@@ -107,8 +123,10 @@ class SiestaNXC(NXCAdapter):
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
         # np.save('rho.npy',rho_reshaped)
-        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, unitcell, grid,
-                            positions, elements, calc_forces = calc_forces)
+        if not self.initialized:
+            raise Exception('Must call initialize before calling get_V')
+
+        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces = calc_forces)
         if calc_forces:
             self.force_correction = Vnxc[1].T/Rydberg
             Vnxc = Vnxc[0]
@@ -117,39 +135,59 @@ class SiestaNXC(NXCAdapter):
         Vnxc = Vnxc.real.T.reshape(-1,1)/Rydberg
         # print('Not correcting V!')
         V[:, :] = Vnxc + V
-        print('Enxc = {} eV'.format(Enxc*Rydberg))
+        print('NeuralXC: Enxc = {} eV'.format(Enxc*Rydberg))
         return Enxc
 
     @prints_error
     def correct_forces(self, forces):
-        try:
-            if hasattr(self, 'force_correction'):
-                forces[:] = forces + self.force_correction
-            else:
-                raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
-        except Exception as e:
-            print(e)
-            raise(e)
+        if hasattr(self, 'force_correction'):
+            forces[:] = forces + self.force_correction
+        else:
+            raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
 
 class NeuralXC():
 
+    @prints_error
     def __init__(self, path = None, pipeline = None):
 
-        print('Instantiate NeuralXC')
-        try:
-            if isinstance(path, str):
-                print('Load pipeline from ' + path)
-                self._pipeline = load_pipeline(path)
-            elif not (pipeline is None):
-                self._pipeline = pipeline
-            else:
-                raise Exception('Either provide path to pipeline or pipeline')
-        except Exception as e:
-            print(e)
-            raise e
-        print('Pipeline successfully loaded')
+        print('NeuralXC: Instantiate NeuralXC')
+        if isinstance(path, str):
+            print('NeuralXC: Load pipeline from ' + path)
+            self._pipeline = load_pipeline(path)
+        elif not (pipeline is None):
+            self._pipeline = pipeline
+        else:
+            raise Exception('Either provide path to pipeline or pipeline')
 
-    def get_V(self, rho, unitcell, grid, positions, species, calc_forces= False):
+        symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
+        symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
+        self.symmetrizer = symmetrizer_factory(symmetrize_dict)
+
+        print('NeuralXC: Pipeline successfully loaded')
+
+    @prints_error
+    def initialize(self, unitcell, grid, positions, species):
+
+        """Parameters
+        ------------------
+        unitcell, array float
+        	Unitcell in bohr
+        grid, array float
+        	Grid points per unitcell
+        positions, array float
+        	atomic positions
+        species, list string
+        	atomic species (chem. symbols)
+        """
+
+        self.unitcell = unitcell
+        self.grid = grid
+        self.positions = positions
+        self.species = species
+        self.projector = DensityProjector(unitcell, grid,
+            self._pipeline.get_basis_instructions())
+    @prints_error
+    def get_V(self, rho, calc_forces= False):
         """Parameters
         ------------------
         rho, array, float
@@ -170,23 +208,10 @@ class NeuralXC():
         E, V, (force_correction) np.ndarray
         	Machine learned potential
         """
-        projector = DensityProjector(unitcell, grid,
-            self._pipeline.get_basis_instructions())
 
-        symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
-        symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
-
-        symmetrizer = symmetrizer_factory(symmetrize_dict)
-
-        C = projector.get_basis_rep(rho, positions, species)
-
-        D = symmetrizer.get_symmetrized(C)
-        dEdC = symmetrizer.get_gradient(self._pipeline.get_gradient(D))
+        C = self.projector.get_basis_rep(rho, self.positions, self.species)
+        D = self.symmetrizer.get_symmetrized(C)
+        dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
         E = self._pipeline.predict(D)[0]
-        V = projector.get_V(dEdC, positions, species, calc_forces, rho)
+        V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
         return E, V
-
-
-if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    pass

@@ -42,15 +42,15 @@ class NXCPipeline(Pipeline):
             Instructions for symmetrizer.
             Example {symmetrizer_type: 'casimir'}
         """
-        self._basis_instructions = basis_instructions
-        self._symmetrize_instructions = symmetrize_instructions
+        self.basis_instructions = basis_instructions
+        self.symmetrize_instructions = symmetrize_instructions
         super().__init__(steps)
 
     def get_symmetrize_instructions(self):
-        return self._symmetrize_instructions
+        return self.symmetrize_instructions
 
     def get_basis_instructions(self):
-        return self._basis_instructions
+        return self.basis_instructions
 
     def _validate_steps(self):
         """ In addition to sklearn.Pipleine validation check that
@@ -93,8 +93,8 @@ class NXCPipeline(Pipeline):
         """
 
         return NXCPipeline(self.steps[step_idx:],
-        basis_instructions = self._basis_instructions,
-        symmetrize_instructions = self._symmetrize_instructions)
+        basis_instructions = self.basis_instructions,
+        symmetrize_instructions = self.symmetrize_instructions)
 
     def save(self, path, override = False):
         """ Save entire pipeline to disk.

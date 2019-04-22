@@ -753,6 +753,33 @@ class BehlerProjector(OrthoProjector):
     def get_W(cls, basis):
         return np.eye(basis['n'])
 
+class DeltaProjector():
+
+    def __init__(self, projector):
+        """ Wrapper class that can store a constant basis set representation
+        and subtract it from given densities (e.g. subtract contribution from
+        core densities)
+        """
+        self.projector = projector
+        self.constant_basis_rep = {}
+
+    def set_constant_density(self, rho, positions, species):
+        self.constant_basis_rep = \
+            self.projector.get_basis_rep(rho, positions, species)
+
+    def get_basis_rep(self, rho, positions, species):
+        basis_rep = self.projector.get_basis_rep(rho, positions, species)
+        for spec in basis_rep:
+            basis_rep[spec] -= self.constant_basis_rep[spec]
+        return basis_rep
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return getattr(self, attr)
+        else:
+            return getattr(self.projector, attr)
+
+
 def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
     """
     Returns a 3d mesh taking into account periodic boundary conditions
