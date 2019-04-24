@@ -9,6 +9,7 @@ import math
 from ..doc_inherit import doc_inherit
 from .spher_grad import grlylm
 from ..base import ABCRegistry
+from numba import jit
 
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
@@ -480,8 +481,15 @@ class OrthoProjector(DensityProjector):
     def __init__(self, *args, **kwargs):
         pass
 
+
+    @classmethod
+    def dg(cls, r, basis, a):
+        r_o = basis['r_o']
+        return cls.dg_compiled(r,r_o,a)
+
     @staticmethod
-    def dg(r, basis, a):
+    @jit(nopython=True)
+    def dg_compiled(r, r_o, a):
         """
         Derivative of non-orthogonalized radial functions
 
@@ -501,17 +509,19 @@ class OrthoProjector(DensityProjector):
             float
                 derivative of radial function at radius r
         """
-        r_o = basis['r_o']
-        def dg_(r, r_o, a):
-            return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)
-
         N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
-                                           (2*a+6)*(2*a+5)))
-        return dg_(r, r_o,a)/N
+                                       (2*a+6)*(2*a+5)))
+        return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)/N
 
+
+    @classmethod
+    def g(cls, r, basis, a):
+        r_o = basis['r_o']
+        return cls.g_compiled(r, r_o, a)
 
     @staticmethod
-    def g(r, basis, a):
+    @jit(nopython=True)
+    def g_compiled(r, r_o, a):
         """
         Non-orthogonalized radial functions
 
@@ -531,14 +541,9 @@ class OrthoProjector(DensityProjector):
             float
                 value of radial function at radius r
         """
-
-        r_o = basis['r_o']
-        def g_(r, r_o, a):
-            return (r)**(2)*(r_o-r)**(a+2)
-        # Write out factorial fraction to avoid overflow
         N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
                                            (2*a+6)*(2*a+5)))
-        return g_(r, r_o,a)/N
+        return (r)**(2)*(r_o-r)**(a+2)/N
 
 
     @staticmethod
@@ -617,6 +622,7 @@ class OrthoProjector(DensityProjector):
         return scipy.linalg.sqrtm(np.linalg.pinv(cls.S(basis)))
 
     @classmethod
+    # @jit
     def S(cls, basis):
         '''
         Overlap matrix between radial basis functions
