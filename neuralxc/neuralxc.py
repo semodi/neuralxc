@@ -78,7 +78,9 @@ class SiestaNXC(NXCAdapter):
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
         self._adaptee.initialize(unitcell, grid, positions, elements)
+        use_drho = False
         if self._adaptee._pipeline.get_basis_instructions().get('extension','RHOXC') == 'DRHO':
+            use_drho = True
             print('NeuralXC: Using DRHO')
             self._adaptee.projector = DeltaProjector(self._adaptee.projector)
             self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
@@ -86,6 +88,7 @@ class SiestaNXC(NXCAdapter):
             print('NeuralXC: Using RHOXC')
         self.initialized = True
 
+        return use_drho
 
     @prints_error
     def get_V(self, rho, unitcell, grid, positions, elements, V, calc_forces=False):

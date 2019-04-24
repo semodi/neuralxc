@@ -267,23 +267,35 @@ def test_neuralxc_benzene():
 
     positions = benzene_traj.get_positions()/Bohr
     species = benzene_traj.get_chemical_symbols()
-    V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
+    benzene_nxc.initialize(unitcell,grid,positions,species)
+    V, forces = benzene_nxc.get_V(rho, calc_forces = True)[1]
     V = V/Hartree
     forces = forces/Hartree*Bohr
 
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.force
-def test_force_correction():
+@pytest.mark.parametrize('use_delta', [False, True])
+def test_force_correction(use_delta):
 
-    benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
     benzene_traj = ase.io.read(os.path.join(test_dir,'benzene_test','benzene.xyz'),'0')
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir,
-                                'benzene_test','benzene.RHOXC'))
-
+                                    'benzene_test','benzene.DRHO'))
     positions = benzene_traj.get_positions()/Bohr
     species = benzene_traj.get_chemical_symbols()
+    if use_delta:
+        drho, _, _ = density_getter.get_density(os.path.join(test_dir,
+                                    'benzene_test','benzene.DRHO'))
+        benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','dbenzene'))
+        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.projector = xc.projector.DeltaProjector(benzene_nxc.projector)
+        benzene_nxc.projector.set_constant_density(drho, positions, species)
+
+    else:
+        benzene_nxc = xc.NeuralXC(os.path.join(test_dir,'benzene_test','benzene'))
+        benzene_nxc.initialize(unitcell, grid, positions, species)
+
 
     def get_V_shifted(self, rho, unitcell, grid, positions, positions_shifted, species, calc_forces= False):
         """ only defined to calculate basis set contribution to forces with numerical derivatives.
@@ -292,6 +304,11 @@ def test_force_correction():
         """
         projector = xc.projector.DensityProjector(unitcell, grid,
             self._pipeline.get_basis_instructions())
+
+        if use_delta:
+            projector = xc.projector.DeltaProjector(projector)
+            projector.set_constant_density(drho, positions, species)
+
 
         symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
@@ -306,7 +323,7 @@ def test_force_correction():
 
         return E, projector.get_V(dEdC, positions_shifted, species, calc_forces, rho)
 
-    V, forces = benzene_nxc.get_V(rho, unitcell, grid, positions, species, calc_forces = True)[1]
+    V, forces = benzene_nxc.get_V(rho, calc_forces = True)[1]
 
     assert np.allclose(np.sum(forces, axis = 0), np.zeros(3), atol = 1e-6)
     for incr_atom in [0,1,2,3]:
@@ -319,7 +336,7 @@ def test_force_correction():
             pm[incr_atom, incr_idx] -= incr
 
             Vp = get_V_shifted(benzene_nxc, rho, unitcell, grid, positions, pp, species)[1]
-            Vm = get_V_shifted(benzene_nxc, rho, unitcell, grid, positions,pm, species)[1]
+            Vm = get_V_shifted(benzene_nxc, rho, unitcell, grid, positions, pm, species)[1]
 
             dv = (unitcell[0,0]/grid[0])**3
             fp = dv*np.sum(Vp*rho)

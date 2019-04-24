@@ -126,7 +126,7 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
 
     incr = 0.01
     grad_fd = np.zeros_like(grad_analytic, dtype = complex)
-    for ix in range(1, 20): #IMPORTANT: don't alter ix = 0 (system index)
+    for ix in range(1, 20): 
         for im in [1,1j]:
             xp = np.array(x)
             xp[:,ix] += incr*im

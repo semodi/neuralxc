@@ -764,6 +764,8 @@ class DeltaProjector():
         self.constant_basis_rep = {}
 
     def set_constant_density(self, rho, positions, species):
+        self.constant_rho = np.array(rho)
+        print('NeuralXC: set_constant_density called ')
         self.constant_basis_rep = \
             self.projector.get_basis_rep(rho, positions, species)
 
@@ -772,6 +774,14 @@ class DeltaProjector():
         for spec in basis_rep:
             basis_rep[spec] -= self.constant_basis_rep[spec]
         return basis_rep
+
+
+    def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
+
+        if isinstance(rho, np.ndarray):
+            rho = rho - self.constant_rho
+
+        return self.projector.get_V(dEdC, positions, species, calc_forces, rho)
 
     def __getattr__(self, attr):
         if attr in self.__dict__:
