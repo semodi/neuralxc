@@ -135,7 +135,7 @@ class NetworkEstimator(BaseEstimator):
     def __init__(self, n_nodes, n_layers, b, alpha=0.01,
         max_steps = 20001, test_size = 0.2, valid_size = 0.2,
         random_seed = None, batch_size=0, activation='sigmoid',
-        optimizer=None):
+        optimizer=None, target_loss = -1):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
         """
@@ -152,6 +152,7 @@ class NetworkEstimator(BaseEstimator):
         self.batch_size = batch_size
         self.activation = activation
         self.optimizer= optimizer
+        self.target_loss = target_loss
 
     def get_params(self, *args, **kwargs):
         return {'n_nodes' : self.n_nodes,
@@ -164,6 +165,8 @@ class NetworkEstimator(BaseEstimator):
                 'random_seed': self.random_seed,
                 'batch_size': self.batch_size,
                 'activation': self.activation,
+                'optimizer': self.optimizer,
+                'target_loss': self.target_loss,
                 }
 
     def build_network(self, X, y=None):
@@ -207,7 +210,8 @@ class NetworkEstimator(BaseEstimator):
         print('\n')
         self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
             b_=self.b, train_valid_split=1-self.valid_size, optimizer=self.optimizer,
-            random_seed=self.random_seed,batch_size =self.batch_size)
+            random_seed=self.random_seed,batch_size =self.batch_size,
+            target_loss = self.target_loss)
 
 
     def get_gradient(self, X, *args, **kwargs):
@@ -466,7 +470,8 @@ class Energy_Network():
               multiplier = 1.0,
               train_valid_split = 0.8,
               random_seed = None,
-              batch_size = 0):
+              batch_size = 0,
+              target_loss = -1):
 
         """ Train the master neural network
 
@@ -496,7 +501,6 @@ class Energy_Network():
             --------
             None
         """
-
 
         self.model_loaded = True
         if self.graph is None:
@@ -617,8 +621,12 @@ class Energy_Network():
                     print('Training set loss:')
                     if len(cost_list) > 1:
                         for i, c in enumerate(cost_list):
-                            print('{}: {}'.format(i,sess.run(tf.sqrt(c),feed_dict=train_feed_dict)))
-                    print('Total: {}'.format(sess.run(tf.sqrt(cost-loss),feed_dict=train_feed_dict)))
+                            training_loss = sess.run(tf.sqrt(c),feed_dict=train_feed_dict)
+                            print('{}: {}'.format(i,training_loss))
+                    training_loss = sess.run(tf.sqrt(cost-loss),feed_dict=train_feed_dict)
+                    print('Total: {}'.format(training_loss))
+                    if training_loss <= target_loss:
+                        return 0
                     print('Validation set loss:')
                     if len(cost_list) > 1:
                         for i, c in enumerate(cost_list):

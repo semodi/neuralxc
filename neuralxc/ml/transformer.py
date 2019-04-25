@@ -64,7 +64,9 @@ class GroupedTransformer(ABC):
             for spec in X:
                 self._spec_dict[spec] =\
                  type(self)(*self._initargs,
-                  **self._initkwargs).fit(self._before_fit(atomic_shape(X[spec])))
+                  **self._initkwargs)
+                self._spec_dict[spec].__dict__.update(self.get_params())
+                self._spec_dict[spec].fit(self._before_fit(atomic_shape(X[spec])))
             return self
         else:
             return super().fit(atomic_shape(X))
