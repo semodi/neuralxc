@@ -5,11 +5,14 @@ import struct
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
 
+
 class DensityGetterRegistry(ABCRegistry):
     REGISTRY = {}
-    
-class BaseDensityGetter(metaclass= DensityGetterRegistry):
+
+
+class BaseDensityGetter(metaclass=DensityGetterRegistry):
     _registry_name = 'base'
+
     def __init__(self):
         pass
 
@@ -17,9 +20,11 @@ class BaseDensityGetter(metaclass= DensityGetterRegistry):
     def get_density(self, file_path):
         pass
 
+
 class SiestaDensityGetter(BaseDensityGetter):
 
     _registry_name = 'siesta'
+
     def __init__(self, binary):
         self._binary = binary
 
@@ -36,24 +41,23 @@ class SiestaDensityGetter(BaseDensityGetter):
         #Warning: Only works for cubic cells!!!
         #TODO: Implement for arb. cells
 
-        bin_file = open(file_path, mode = 'rb')
+        bin_file = open(file_path, mode='rb')
 
         unitcell = '<I9dI'
         grid = '<I4iI'
 
-        unitcell = np.array(struct.unpack(unitcell,
-            bin_file.read(struct.calcsize(unitcell))))[1:-1].reshape(3,3)
+        unitcell = np.array(struct.unpack(unitcell, bin_file.read(struct.calcsize(unitcell))))[1:-1].reshape(3, 3)
 
-        grid = np.array(struct.unpack(grid,bin_file.read(struct.calcsize(grid))))[1:-1]
+        grid = np.array(struct.unpack(grid, bin_file.read(struct.calcsize(grid))))[1:-1]
         if (grid[0] == grid[1] == grid[2]) and grid[3] == 1:
             a = grid[0]
         else:
             raise Exception('get_data_bin cannot handle non-cubic unitcells or spin')
 
-        block = '<' + 'I{}fI'.format(a)*a*a
-        content = np.array(struct.unpack(block,bin_file.read(struct.calcsize(block))))
+        block = '<' + 'I{}fI'.format(a) * a * a
+        content = np.array(struct.unpack(block, bin_file.read(struct.calcsize(block))))
 
-        rho = content.reshape(a+2, a, a, order = 'F')[1:-1,:,:]
+        rho = content.reshape(a + 2, a, a, order='F')[1:-1, :, :]
         return rho, unitcell, grid[:3]
 
     @staticmethod
@@ -103,7 +107,7 @@ class SiestaDensityGetter(BaseDensityGetter):
         return rho, unitcell, grid
 
 
-def density_getter_factory(application, *args,**kwargs):
+def density_getter_factory(application, *args, **kwargs):
     """
     Factory for various DensityGetters
 
@@ -124,4 +128,4 @@ def density_getter_factory(application, *args,**kwargs):
     if not application in registry:
         raise Exception('DensityGetter: {} not registered'.format(application))
 
-    return registry[application](*args,**kwargs)
+    return registry[application](*args, **kwargs)

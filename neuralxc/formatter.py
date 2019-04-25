@@ -2,9 +2,9 @@ import numpy as np
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 
-class Formatter(TransformerMixin, BaseEstimator):
 
-    def __init__(self, basis = None):
+class Formatter(TransformerMixin, BaseEstimator):
+    def __init__(self, basis=None):
         """ Formatter allows to convert between the np.ndarray and the dictionary
         format of basis set representations
         """
@@ -24,7 +24,7 @@ class Formatter(TransformerMixin, BaseEstimator):
          that is used internally by neuralxc to an ordered np.ndarray format
         """
         self.fit(C)
-        transformed = [{}]*len(C)
+        transformed = [{}] * len(C)
 
         for idx, key, data in expand(C):
             data = data[0]
@@ -42,16 +42,18 @@ class Formatter(TransformerMixin, BaseEstimator):
         """ Transforms from an ordered np.ndarray format to a dictionary
         format ({n,l,m} : value) that is used internally by neuralxc
         """
-        transformed = [{}]*len(C)
+        transformed = [{}] * len(C)
 
         for idx, key, data in expand(C):
             data = data[0]
             if not key in transformed[idx]: transformed[idx][key] = []
 
-
             if not isinstance(self._rule, dict):
                 basis = self._basis[key]
-                rule = ['{},{},{}'.format(n,l,m) for n in range(0,basis['n'])  for l in range(0,basis['l']) for m in range(-l,l+1)]
+                rule = [
+                    '{},{},{}'.format(n, l, m) for n in range(0, basis['n']) for l in range(0, basis['l'])
+                    for m in range(-l, l + 1)
+                ]
             else:
                 rule = self._rule[key]
             for d in data:
@@ -62,8 +64,8 @@ class Formatter(TransformerMixin, BaseEstimator):
         else:
             return transformed
 
-class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
+class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def __init__(self, attrs, sys_species):
         """SpeciesGrouper allows to transform an array with columns
         [system_idx, feature1, feature2, ..., featureN, target]
@@ -88,9 +90,9 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         self._sys_species = sys_species
 
     def get_params(self, *args, **kwargs):
-        return {'attrs' : self._attrs, 'sys_species': self._sys_species}
+        return {'attrs': self._attrs, 'sys_species': self._sys_species}
 
-    def fit(self, X, y=None,**fit_params):
+    def fit(self, X, y=None, **fit_params):
         return self
 
     def transform(self, X, y=None):
@@ -103,23 +105,25 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             X = X['data']
             made_dict = True
 
-        y = X[:,-1].real
-        X = X[:,:-1]
+        y = X[:, -1].real
+        X = X[:, :-1]
 
         # First column should give system index
-        if not isinstance(y,np.ndarray):
+        if not isinstance(y, np.ndarray):
             y = self._y
 
-        system = X[:,0]
+        system = X[:, 0]
         n_sys = (np.max(system) + 1).real
 
-        X = X[:,1:]
+        X = X[:, 1:]
 
         features = []
         targets = []
 
         if not n_sys == len(self._sys_species):
-            raise ValueError('Number of systems in X and len(sys_species) incompatible: n_sys: {}, len(sys_species): {}'.format(n_sys,len(self._sys_species)))
+            raise ValueError(
+                'Number of systems in X and len(sys_species) incompatible: n_sys: {}, len(sys_species): {}'.format(
+                    n_sys, len(self._sys_species)))
 
         for this_sys, _ in enumerate(self._sys_species):
             this_species = self._sys_species[this_sys]
@@ -133,19 +137,18 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
                 if spec not in feat_dict:
                     feat_dict[spec] = []
 
-                vec_len = self._attrs[spec]['n'] * sum([2*l+1 for l in range(self._attrs[spec]['l'])])
+                vec_len = self._attrs[spec]['n'] * sum([2 * l + 1 for l in range(self._attrs[spec]['l'])])
 
-                feat_dict[spec].append(X_sys[:,idx:idx+vec_len])
+                feat_dict[spec].append(X_sys[:, idx:idx + vec_len])
                 idx += vec_len
 
             for spec in feat_dict:
-                feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0,1)
+                feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
 
             features.append(feat_dict)
             targets.append(y_sys)
         if made_dict:
-            return {'data': (features, targets),
-                'basis_instructions': basis_instructions}
+            return {'data': (features, targets), 'basis_instructions': basis_instructions}
         else:
             return features, targets
 
@@ -155,7 +158,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             targets = [np.zeros(len(list(x.values())[0])) for x in X]
         else:
             targets = [np.zeros(len(list(X.values())[0]))]
-        return self.inverse_transform(X,targets)
+        return self.inverse_transform(X, targets)
 
     def inverse_transform(self, features, targets):
         """ Transform from grouped to ungrouped representation
@@ -164,10 +167,8 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         max_vec_len = np.max([np.sum([feat[spec].shape[1]*feat[spec].shape[2] for spec in feat])\
                        for feat in features])
 
-
-        X = np.zeros([total_length, max_vec_len + 1], dtype = complex)
+        X = np.zeros([total_length, max_vec_len + 1], dtype=complex)
         y = np.zeros(total_length)
-
 
         if not len(features) == len(targets) == len(self._sys_species):
             raise ValueError('number of systems inconsistent')
@@ -176,24 +177,24 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         for sysidx, (feat, tar) in enumerate(zip(features, targets)):
             this_species = self._sys_species[sysidx]
             this_len = len(tar)
-            X[sys_loc:sys_loc+this_len, 0] = sysidx
+            X[sys_loc:sys_loc + this_len, 0] = sysidx
             unique_species = np.unique([char for char in this_species])
             spec_loc = {spec: 0 for spec in unique_species}
             idx = 1
 
             for spec in this_species:
-                insert = feat[spec][:,spec_loc[spec],:]
-#                 print(insert.shape)
-#                 print(X[sys_loc:sys_loc+this_len,idx:idx+insert.shape[-1]].shape)
-                X[sys_loc:sys_loc+this_len,idx:idx+insert.shape[-1]] = insert
+                insert = feat[spec][:, spec_loc[spec], :]
+                #                 print(insert.shape)
+                #                 print(X[sys_loc:sys_loc+this_len,idx:idx+insert.shape[-1]].shape)
+                X[sys_loc:sys_loc + this_len, idx:idx + insert.shape[-1]] = insert
                 spec_loc[spec] += 1
                 idx += insert.shape[-1]
-
 
             y[sys_loc:sys_loc + this_len] = tar
             sys_loc += this_len
 
-        return np.concatenate([X, y.reshape(-1,1)], axis = -1 )
+        return np.concatenate([X, y.reshape(-1, 1)], axis=-1)
+
 
 def expand(*args):
     """ Takes the common format in which datasets such as D and C are provided
@@ -206,10 +207,12 @@ def expand(*args):
 
     for idx, datasets in enumerate(zip(*args)):
         for key in datasets[0]:
-            yield (idx, key , [data[key] for data in datasets])
+            yield (idx, key, [data[key] for data in datasets])
+
 
 def atomic_shape(X):
-    return X.reshape(-1,X.shape[-1])
+    return X.reshape(-1, X.shape[-1])
+
 
 def system_shape(X, n):
-    return X.reshape(-1,n,X.shape[-1])
+    return X.reshape(-1, n, X.shape[-1])

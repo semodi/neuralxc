@@ -22,9 +22,9 @@ import pickle
 import shutil
 Dataset = namedtuple("Dataset", "data species")
 
+
 #TODO: Pipeline should save energy units
 class NXCPipeline(Pipeline):
-
     def __init__(self, steps, basis_instructions, symmetrize_instructions):
         """ Class that extends the scikit-learn Pipeline by adding get_gradient
         and save methods. The save method is necessary if the final estimator
@@ -60,7 +60,6 @@ class NXCPipeline(Pipeline):
         super()._validate_steps
         names, estimators = zip(*self.steps)
 
-
         for t in estimators:
             if t is None:
                 continue
@@ -93,10 +92,10 @@ class NXCPipeline(Pipeline):
         """
 
         return NXCPipeline(self.steps[step_idx:],
-        basis_instructions = self.basis_instructions,
-        symmetrize_instructions = self.symmetrize_instructions)
+                           basis_instructions=self.basis_instructions,
+                           symmetrize_instructions=self.symmetrize_instructions)
 
-    def save(self, path, override = False):
+    def save(self, path, override=False):
         """ Save entire pipeline to disk.
 
         Parameters
@@ -119,23 +118,33 @@ class NXCPipeline(Pipeline):
 
         network = self.steps[-1][-1]._network
         self.steps[-1][-1]._network = None
-        pickle.dump(self, open(os.path.join(path,'pipeline.pckl'),'wb'))
-        network.save_model(os.path.join(path,'network'))
+        pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
+        network.save_model(os.path.join(path, 'network'))
         self.steps[-1][-1]._network = network
+
 
 def load_pipeline(path):
     """ Load a NXCPipeline from the directory specified in path
     """
-    pipeline = pickle.load(open(os.path.join(path,'pipeline.pckl'),'rb'))
-    pipeline.steps[-1][-1].path = os.path.join(path,'network')
+    pipeline = pickle.load(open(os.path.join(path, 'pipeline.pckl'), 'rb'))
+    pipeline.steps[-1][-1].path = os.path.join(path, 'network')
     return pipeline
 
-class NetworkEstimator(BaseEstimator):
 
-    def __init__(self, n_nodes, n_layers, b, alpha=0.01,
-        max_steps = 20001, test_size = 0.2, valid_size = 0.2,
-        random_seed = None, batch_size=0, activation='sigmoid',
-        optimizer=None, target_loss = -1):
+class NetworkEstimator(BaseEstimator):
+    def __init__(self,
+                 n_nodes,
+                 n_layers,
+                 b,
+                 alpha=0.01,
+                 max_steps=20001,
+                 test_size=0.2,
+                 valid_size=0.2,
+                 random_seed=None,
+                 batch_size=0,
+                 activation='sigmoid',
+                 optimizer=None,
+                 target_loss=-1):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
         """
@@ -151,23 +160,24 @@ class NetworkEstimator(BaseEstimator):
         self._network = None
         self.batch_size = batch_size
         self.activation = activation
-        self.optimizer= optimizer
+        self.optimizer = optimizer
         self.target_loss = target_loss
 
     def get_params(self, *args, **kwargs):
-        return {'n_nodes' : self.n_nodes,
-                'n_layers': self.n_layers,
-                'b': self.b,
-                'alpha': self.alpha,
-                'max_steps': self.max_steps,
-                'test_size' : self.test_size,
-                'valid_size': self.valid_size,
-                'random_seed': self.random_seed,
-                'batch_size': self.batch_size,
-                'activation': self.activation,
-                'optimizer': self.optimizer,
-                'target_loss': self.target_loss,
-                }
+        return {
+            'n_nodes': self.n_nodes,
+            'n_layers': self.n_layers,
+            'b': self.b,
+            'alpha': self.alpha,
+            'max_steps': self.max_steps,
+            'test_size': self.test_size,
+            'valid_size': self.valid_size,
+            'random_seed': self.random_seed,
+            'batch_size': self.batch_size,
+            'activation': self.activation,
+            'optimizer': self.optimizer,
+            'target_loss': self.target_loss,
+        }
 
     def build_network(self, X, y=None):
         if isinstance(X, tuple):
@@ -181,7 +191,7 @@ class NetworkEstimator(BaseEstimator):
             y = [np.zeros(len(list(x.values())[0])) for x in X]
 
         subnets = []
-        for feat, tar in zip(X,y):
+        for feat, tar in zip(X, y):
             nets = []
             for spec in feat:
                 # for j in range(feat[spec].shape[1]):
@@ -193,26 +203,28 @@ class NetworkEstimator(BaseEstimator):
                 nets.append(Subnet())
                 nets[-1].layers = [self.n_nodes] * self.n_layers
                 nets[-1].activations = [getattr(tf.nn, self.activation)] * self.n_layers
-                nets[-1].add_dataset(Dataset(feat[spec], spec.lower()),
-                    tar, test_size = self.test_size)
+                nets[-1].add_dataset(Dataset(feat[spec], spec.lower()), tar, test_size=self.test_size)
             subnets.append(nets)
 
         self._network = Energy_Network(subnets)
         if not self.path is None:
             self._network.restore_model(self.path)
 
-    def fit(self,X ,y = None, *args, **kwargs):
+    def fit(self, X, y=None, *args, **kwargs):
 
         #TODO: Currently does not allow to continue training
         self.build_network(X, y)
         print('\n=========Parameters==========\n')
         print(self.get_params())
         print('\n')
-        self._network.train(step_size=self.alpha, max_steps=self.max_steps ,
-            b_=self.b, train_valid_split=1-self.valid_size, optimizer=self.optimizer,
-            random_seed=self.random_seed,batch_size =self.batch_size,
-            target_loss = self.target_loss)
-
+        self._network.train(step_size=self.alpha,
+                            max_steps=self.max_steps,
+                            b_=self.b,
+                            train_valid_split=1 - self.valid_size,
+                            optimizer=self.optimizer,
+                            random_seed=self.random_seed,
+                            batch_size=self.batch_size,
+                            target_loss=self.target_loss)
 
     def get_gradient(self, X, *args, **kwargs):
 
@@ -228,7 +240,7 @@ class NetworkEstimator(BaseEstimator):
             made_list = True
 
         X_list = X
-        predictions = [{}]*len(X_list)
+        predictions = [{}] * len(X_list)
 
         for sys_idx, X in enumerate(X_list):
             for spec in X:
@@ -238,14 +250,14 @@ class NetworkEstimator(BaseEstimator):
                     feat = feat.reshape(-1, feat.shape[-1])
 
                 predictions[sys_idx][spec] = self._network.predict(feat,
-                                                    species= spec.lower(),
-                                                    *args, return_gradient = True,
-                                                    **kwargs)[1].reshape(*old_shape)
+                                                                   species=spec.lower(),
+                                                                   *args,
+                                                                   return_gradient=True,
+                                                                   **kwargs)[1].reshape(*old_shape)
 
         if made_list:
             predictions = predictions[0]
         return predictions
-
 
     def predict(self, X, *args, **kwargs):
 
@@ -272,10 +284,9 @@ class NetworkEstimator(BaseEstimator):
                 if feat.ndim == 3:
                     feat = feat.reshape(-1, feat.shape[-1])
 
-                prediction += np.sum(self._network.predict(feat,
-                                                    species= spec.lower(),
-                                                    *args,
-                                                    **kwargs).reshape(n_sys,-1), axis = -1)
+                prediction += np.sum(self._network.predict(feat, species=spec.lower(), *args,
+                                                           **kwargs).reshape(n_sys, -1),
+                                     axis=-1)
 
             predictions.append(prediction)
 
@@ -283,8 +294,7 @@ class NetworkEstimator(BaseEstimator):
             predictions = predictions[0]
         return predictions
 
-
-    def score(self, X, y = None, metric = 'mae'):
+    def score(self, X, y=None, metric='mae'):
 
         if isinstance(X, tuple):
             y = X[1]
@@ -297,16 +307,18 @@ class NetworkEstimator(BaseEstimator):
         else:
             raise Exception('Metric unknown or not implemented')
 
+
 #         metric_function = (lambda x: np.mean(np.abs(x)))
         scores = []
         if not isinstance(X, list):
             X = [X]
             y = [y]
 
-        for X_,y_ in zip(X,y):
+        for X_, y_ in zip(X, y):
             scores.append(metric_function(self.predict(X_) - y_))
 
         return -np.mean(scores)
+
 
 class Energy_Network():
     """ Machine learned correcting functional (MLCF) for energies
@@ -318,14 +330,13 @@ class Energy_Network():
                 each subnetwork belongs to a single atom inside the system
                 and computes the atomic contributio to the total energy
     """
-    def __init__(self, subnets):
 
+    def __init__(self, subnets):
 
         if not isinstance(subnets, list):
             self.subnets = [subnets]
         else:
             self.subnets = subnets
-
 
         self.model_loaded = False
         self.rand_state = np.random.get_state()
@@ -372,7 +383,6 @@ class Energy_Network():
         self.optimizer = None
         self.checkpoint_path = None
 
-
     def construct_network(self):
         """ Builds the tensorflow graph from subnets
         """
@@ -380,7 +390,7 @@ class Energy_Network():
         cnt = 0
         logits = []
         for subnet in self.subnets:
-            if isinstance(subnet,list):
+            if isinstance(subnet, list):
                 sublist = []
                 for s in subnet:
                     sublist.append(s.get_logits(cnt)[0])
@@ -392,7 +402,7 @@ class Energy_Network():
 
         return logits
 
-    def get_feed(self, which = 'train', train_valid_split = 0.8, seed = 42):
+    def get_feed(self, which='train', train_valid_split=0.8, seed=42):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
         Parameters
@@ -415,7 +425,7 @@ class Energy_Network():
         test_feed_dict = {}
 
         for subnet in self.subnets:
-            if isinstance(subnet,list):
+            if isinstance(subnet, list):
                 for s in subnet:
                     train_feed_dict.update(s.get_feed('train', train_valid_split, seed))
                     valid_feed_dict.update(s.get_feed('valid', train_valid_split, seed))
@@ -423,13 +433,12 @@ class Energy_Network():
             else:
                 train_feed_dict.update(subnet.get_feed('train', train_valid_split, seed))
                 valid_feed_dict.update(subnet.get_feed('valid', train_valid_split, seed))
-                test_feed_dict.update(subnet.get_feed('test', seed = seed))
+                test_feed_dict.update(subnet.get_feed('test', seed=seed))
 
         if which == 'train':
             return train_feed_dict, valid_feed_dict
         elif which == 'test':
             return test_feed_dict, None
-
 
     def get_cost(self):
         """ Build the tensorflow node that defines the cost function
@@ -443,23 +452,20 @@ class Energy_Network():
         cost_list = []
 
         for subnet in self.subnets:
-            if isinstance(subnet,list):
+            if isinstance(subnet, list):
                 cost = 0
                 y_ = self.graph.get_tensor_by_name(subnet[0].y_name)
                 log = 0
                 for s in subnet:
                     log += self.graph.get_tensor_by_name(s.logits_name)
-                cost += tf.reduce_mean(tf.reduce_mean(tf.square(y_-log),0))
+                cost += tf.reduce_mean(tf.reduce_mean(tf.square(y_ - log), 0))
             else:
                 log = self.graph.get_tensor_by_name(subnet.logits_name)
                 y_ = self.graph.get_tensor_by_name(subnet.y_name)
-                cost = tf.reduce_mean(tf.reduce_mean(tf.square(y_-log),0))
+                cost = tf.reduce_mean(tf.reduce_mean(tf.square(y_ - log), 0))
             cost_list.append(cost)
 
         return cost_list
-
-
-
 
     def train(self,
               step_size=0.01,
@@ -467,12 +473,11 @@ class Energy_Network():
               b_=0,
               verbose=True,
               optimizer=None,
-              multiplier = 1.0,
-              train_valid_split = 0.8,
-              random_seed = None,
-              batch_size = 0,
-              target_loss = -1):
-
+              multiplier=1.0,
+              train_valid_split=0.8,
+              random_seed=None,
+              batch_size=0,
+              target_loss=-1):
         """ Train the master neural network
 
             Parameters
@@ -510,12 +515,11 @@ class Energy_Network():
             build_graph = False
 
         with self.graph.as_default():
-            config = tf.ConfigProto(
-                    intra_op_parallelism_threads=1,
-                    inter_op_parallelism_threads=1,
-                    device_count={"CPU":1},
-                    use_per_session_threads=True)
-                    # log_device_placement=True)
+            config = tf.ConfigProto(intra_op_parallelism_threads=1,
+                                    inter_op_parallelism_threads=1,
+                                    device_count={"CPU": 1},
+                                    use_per_session_threads=True)
+            # log_device_placement=True)
             config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
             pool = config.session_inter_op_thread_pool.add()
             pool.num_threads = 1
@@ -525,45 +529,42 @@ class Energy_Network():
             else:
                 sess = self.sess
 
-
             if not random_seed is None:
                 tf.set_random_seed(random_seed)
             # Get number of distinct subnet species
             species = {}
             for net in self.subnets:
-                if isinstance(net,list):
+                if isinstance(net, list):
                     for net in net:
-                        for l,_ in enumerate(net.layers):
+                        for l, _ in enumerate(net.layers):
                             name = net.species
                             species[name] = 1
                 else:
-                    for l,_ in enumerate(net.layers):
+                    for l, _ in enumerate(net.layers):
                         name = net.species
                         species[name] = 1
             n_species = len(species)
-
 
             # Build all the required tensors
             b = {}
 
             self.construct_network()
             for s in species:
-                b[s] = tf.placeholder(tf.float32,name = '{}/b'.format(s))
+                b[s] = tf.placeholder(tf.float32, name='{}/b'.format(s))
             cost_list = self.get_cost()
-            train_feed_dict, valid_feed_dict = self.get_feed('train',
-             train_valid_split=train_valid_split)
+            train_feed_dict, valid_feed_dict = self.get_feed('train', train_valid_split=train_valid_split)
             cost = 0
             if not isinstance(multiplier, list):
-                multiplier = [1.0]*len(cost_list)
+                multiplier = [1.0] * len(cost_list)
             print('multipliers: {}'.format(multiplier))
             for c, m in zip(cost_list, multiplier):
-                cost += c*m
+                cost += c * m
 
             # L2-loss
             loss = 0
             with tf.variable_scope("", reuse=True):
                 for net in self.subnets:
-                    if isinstance(net,list):
+                    if isinstance(net, list):
                         for net in net:
                             for l, layer in enumerate(net.layers):
                                 name = net.species
@@ -578,16 +579,15 @@ class Energy_Network():
             cost += loss
 
             if not isinstance(b_, list):
-                b_ = [b_]*len(species)
+                b_ = [b_] * len(species)
 
             for i, s in enumerate(species):
                 train_feed_dict['{}/b:0'.format(s)] = b_[i]
                 valid_feed_dict['{}/b:0'.format(s)] = 0
 
-
             if self.optimizer == None:
                 if optimizer == None:
-                    self.optimizer = tf.train.AdamOptimizer(learning_rate = step_size)
+                    self.optimizer = tf.train.AdamOptimizer(learning_rate=step_size)
                 else:
                     self.optimizer = optimizer
 
@@ -596,46 +596,45 @@ class Energy_Network():
             # Workaround to load the AdamOptimizer variables
             if not self.checkpoint_path == None:
                 saver = tf.train.Saver()
-                saver.restore(self.sess,self.checkpoint_path)
+                saver.restore(self.sess, self.checkpoint_path)
                 self.checkpoint_path = None
 
             initialize_uninitialized(self.sess)
 
             self.initialized = True
 
-            train_writer = tf.summary.FileWriter('./log/',
-                                      self.graph)
+            train_writer = tf.summary.FileWriter('./log/', self.graph)
             old_cost = 1e8
             if batch_size > 0:
                 batch_generator = BatchGenerator(batch_size)
-            for _ in range(0,max_steps):
+            for _ in range(0, max_steps):
 
                 if batch_size > 0:
                     for batch_feed_dict in batch_generator.get_batch_feed(train_feed_dict):
-                        sess.run(train_step, feed_dict = batch_feed_dict)
+                        sess.run(train_step, feed_dict=batch_feed_dict)
                 else:
-                    sess.run(train_step,feed_dict=train_feed_dict)
+                    sess.run(train_step, feed_dict=train_feed_dict)
 
-                if _%int(max_steps/10) == 0 and verbose:
+                if _ % int(max_steps / 10) == 0 and verbose:
                     print('Step: ' + str(_))
                     print('Training set loss:')
                     if len(cost_list) > 1:
                         for i, c in enumerate(cost_list):
-                            training_loss = sess.run(tf.sqrt(c),feed_dict=train_feed_dict)
-                            print('{}: {}'.format(i,training_loss))
-                    training_loss = sess.run(tf.sqrt(cost-loss),feed_dict=train_feed_dict)
+                            training_loss = sess.run(tf.sqrt(c), feed_dict=train_feed_dict)
+                            print('{}: {}'.format(i, training_loss))
+                    training_loss = sess.run(tf.sqrt(cost - loss), feed_dict=train_feed_dict)
                     print('Total: {}'.format(training_loss))
                     if training_loss <= target_loss:
                         return 0
                     print('Validation set loss:')
                     if len(cost_list) > 1:
                         for i, c in enumerate(cost_list):
-                            print('{}: {}'.format(i,sess.run(tf.sqrt(c),feed_dict=valid_feed_dict)))
-                    print('Total: {}'.format(sess.run(tf.sqrt(cost),feed_dict=valid_feed_dict)))
+                            print('{}: {}'.format(i, sess.run(tf.sqrt(c), feed_dict=valid_feed_dict)))
+                    print('Total: {}'.format(sess.run(tf.sqrt(cost), feed_dict=valid_feed_dict)))
                     print('--------------------')
-                    print('L2-loss: {}'.format(sess.run(loss,feed_dict=train_feed_dict)))
+                    print('L2-loss: {}'.format(sess.run(loss, feed_dict=train_feed_dict)))
 
-    def predict(self, features, species, return_gradient = False):
+    def predict(self, features, species, return_gradient=False):
         """ Get predicted energies
 
         Parameters
@@ -656,7 +655,7 @@ class Energy_Network():
         """
         species = species.lower()
         if features.ndim == 2:
-            features = features.reshape(-1,1,features.shape[1])
+            features = features.reshape(-1, 1, features.shape[1])
         else:
             raise Exception('features.ndim != 2')
 
@@ -671,7 +670,7 @@ class Energy_Network():
             for s in self.subnets:
                 if found == True:
                     break
-                if isinstance(s,list):
+                if isinstance(s, list):
                     for s2 in s:
                         if s2.species == ds.species:
                             snet.layers = s2.layers
@@ -701,11 +700,9 @@ class Energy_Network():
                     self.species_nets_names[species] = logits.name
                     self.species_gradients_names[species] = gradients.name
                 sess = self.sess
-                energies = sess.run(logits, feed_dict=snet.get_feed(which='train',
-                     train_valid_split=1.0))
+                energies = sess.run(logits, feed_dict=snet.get_feed(which='train', train_valid_split=1.0))
                 if return_gradient:
-                    grad = sess.run(gradients, feed_dict=snet.get_feed(which='train',
-                     train_valid_split=1.0))[0]
+                    grad = sess.run(gradients, feed_dict=snet.get_feed(which='train', train_valid_split=1.0))[0]
                     energies = (energies, grad)
 
                 return energies
@@ -720,7 +717,7 @@ class Energy_Network():
         with self.graph.as_default():
             sess = self.sess
             saver = tf.train.Saver()
-            saver.save(sess,save_path = path + '.ckpt')
+            saver.save(sess, save_path=path + '.ckpt')
 
     def restore_model(self, path):
         """ Load trained model from path
@@ -734,13 +731,14 @@ class Energy_Network():
         with g.as_default():
             sess = tf.Session()
             self.construct_network()
-            b = tf.placeholder(tf.float32,name = 'b')
+            b = tf.placeholder(tf.float32, name='b')
             saver = tf.train.Saver()
-            saver.restore(sess,path + '.ckpt')
+            saver.restore(sess, path + '.ckpt')
             self.model_loaded = True
             self.sess = sess
             self.graph = g
             self.initialized = True
+
 
 class Subnet():
     """ Subnetwork that is associated with one Atom
@@ -767,19 +765,18 @@ class Subnet():
         self.activations = [tf.nn.sigmoid] * 3
 
     def __add__(self, other):
-        if not isinstance(other,Subnet):
+        if not isinstance(other, Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Energy_Network([[self,other]])
+            return Energy_Network([[self, other]])
 
     def __mod__(self, other):
-        if not isinstance(other,Subnet):
+        if not isinstance(other, Subnet):
             raise Exception("Incompatible data types")
         else:
-            return Energy_Network([[self],[other]])
+            return Energy_Network([[self], [other]])
 
-
-    def get_feed(self, which, train_valid_split = 0.8, seed = None):
+    def get_feed(self, which, train_valid_split=0.8, seed=None):
         """ Return a dictionary that can be used as a feed_dict in tensorflow
 
         Parameters
@@ -804,11 +801,9 @@ class Subnet():
         else:
             shuffle = True
 
-
         if which == 'train' or which == 'valid':
 
-            X_train = np.concatenate([self.X_train[i] for i in range(self.n_copies)],
-                axis = 1)
+            X_train = np.concatenate([self.X_train[i] for i in range(self.n_copies)], axis=1)
 
             X_train, X_valid, y_train, y_valid = \
                 train_test_split(X_train,self.y_train,
@@ -818,15 +813,13 @@ class Subnet():
                                reshape_group(X_valid, self.n_copies)
 
             if which == 'train':
-                return {self.x_name : X_train, self.y_name: y_train}
+                return {self.x_name: X_train, self.y_name: y_train}
             else:
-                return {self.x_name : X_valid, self.y_name : y_valid}
+                return {self.x_name: X_valid, self.y_name: y_valid}
 
         elif which == 'test':
 
-            return {self.x_name : self.X_test, self.y_name: self.y_test}
-
-
+            return {self.x_name: self.X_test, self.y_name: self.y_test}
 
     def get_logits(self, i):
         """ Builds the subnetwork by defining logits and placeholders
@@ -842,11 +835,11 @@ class Subnet():
         """
 
         with tf.variable_scope(self.name) as scope:
-                        try:
-                            logits,x,y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
-                        except ValueError:
-                            scope.reuse_variables()
-                            logits,x,y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
+            try:
+                logits, x, y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
+            except ValueError:
+                scope.reuse_variables()
+                logits, x, y_ = self.constructor(self, i, np.mean(self.targets), np.std(self.targets))
 
         self.logits_name = logits.name
         self.x_name = x.name
@@ -857,8 +850,8 @@ class Subnet():
         """ Use pickle to save the subnet to path
         """
 
-        with open(path,'wb') as file:
-            pickle.dump(self,file)
+        with open(path, 'wb') as file:
+            pickle.dump(self, file)
 
     def load(self, path):
         """ Load subnet from path
@@ -867,8 +860,7 @@ class Subnet():
         with open(path, 'rb') as file:
             self = pickle.load(file)
 
-    def add_dataset(self, dataset, targets,
-        test_size = 0.2, target_filter = None):
+    def add_dataset(self, dataset, targets, test_size=0.2, target_filter=None):
         """ Adds dataset to the subnetwork.
 
             Parameters
@@ -897,7 +889,6 @@ class Subnet():
         self.n_copies = dataset.data.shape[1]
         self.name = dataset.species
 
-
         if not test_size == 0.0:
             X_train, X_test, y_train, y_test = \
                 train_test_split(dataset.data, targets,
@@ -908,13 +899,13 @@ class Subnet():
             X_test = np.array(X_train)
             y_test = np.array(y_train)
 
-        self.X_train = X_train.swapaxes(0,1)
-        self.X_test = X_test.swapaxes(0,1)
+        self.X_train = X_train.swapaxes(0, 1)
+        self.X_test = X_test.swapaxes(0, 1)
         self.features = X_train.shape[2]
 
         if y_train.ndim == 1:
-            self.y_train = y_train.reshape(-1,1)
-            self.y_test = y_test.reshape(-1,1)
+            self.y_train = y_train.reshape(-1, 1)
+            self.y_test = y_test.reshape(-1, 1)
         else:
             self.y_train = y_train
             self.y_test = y_test
@@ -922,7 +913,8 @@ class Subnet():
         assert len(X_train) == len(y_train)
         assert len(X_test) == len(y_test)
 
-def fc_nn_g(network, i, mean = 0, std = 1):
+
+def fc_nn_g(network, i, mean=0, std=1):
     """Builds a fully connected neural network that consists of network.n_copies
     copies of a subnetwork
 
@@ -953,51 +945,53 @@ def fc_nn_g(network, i, mean = 0, std = 1):
     activations = network.activations
     namescope = network.name
     n_copies = network.n_copies
-    mean = mean/network.n_copies
-    std = std/network.n_copies
+    mean = mean / network.n_copies
+    std = std / network.n_copies
 
     n = len(layers)
 
     W = []
     b = []
     hidden = []
-    x = tf.placeholder(tf.float32,[n_copies,None,features],'x' + str(i))
-    y_ = tf.placeholder(tf.float32,[None, targets], 'y_' + str(i))
+    x = tf.placeholder(tf.float32, [n_copies, None, features], 'x' + str(i))
+    y_ = tf.placeholder(tf.float32, [None, targets], 'y_' + str(i))
 
+    W.append(tf.get_variable(initializer=tf.truncated_normal_initializer(), shape=[features, layers[0]], name='W1'))
+    b.append(tf.get_variable(initializer=tf.constant_initializer(0), shape=[layers[0]], name='b1'))
 
+    for l in range(1, n):
+        W.append(
+            tf.get_variable(initializer=tf.truncated_normal_initializer(),
+                            shape=[layers[l - 1], layers[l]],
+                            name='W' + str(l + 1)))
+        b.append(tf.get_variable(initializer=tf.constant_initializer(0), shape=[layers[l]], name='b' + str(l + 1)))
 
-    W.append(tf.get_variable(initializer = tf.truncated_normal_initializer(),shape = [features,layers[0]],name='W1'))
-    b.append(tf.get_variable(initializer = tf.constant_initializer(0),shape = [layers[0]],name='b1'))
-
-
-    for l in range(1,n):
-        W.append(tf.get_variable(initializer = tf.truncated_normal_initializer(),shape = [layers[l-1],layers[l]],name='W' + str(l+1)))
-        b.append(tf.get_variable(initializer = tf.constant_initializer(0),shape = [layers[l]],name='b' + str(l+1)))
-
-
-    W.append(tf.get_variable(initializer = tf.random_normal_initializer(0,std), shape= [layers[n-1],targets],name='W' + str(n+1)))
-    b.append(tf.get_variable(initializer = tf.constant_initializer(mean), shape = [targets],name='b' + str(n+1)))
-
+    W.append(
+        tf.get_variable(initializer=tf.random_normal_initializer(0, std),
+                        shape=[layers[n - 1], targets],
+                        name='W' + str(n + 1)))
+    b.append(tf.get_variable(initializer=tf.constant_initializer(mean), shape=[targets], name='b' + str(n + 1)))
 
     for n_g in range(n_copies):
         # hidden.append(activations[0](tf.matmul(tf.gather(x,n_g),W[0])/features*10 + b[0]))
-        hidden.append(activations[0](tf.matmul(tf.gather(x,n_g),W[0]) + b[0]))
-        for l in range(0,n-1):
+        hidden.append(activations[0](tf.matmul(tf.gather(x, n_g), W[0]) + b[0]))
+        for l in range(0, n - 1):
             # hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1])/layers[l]*10 + b[l+1]))
-            hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1]) + b[l+1]))
+            hidden.append(activations[l + 1](tf.matmul(hidden[n_g * n + l], W[l + 1]) + b[l + 1]))
 
         if n_g == 0:
-            logits = tf.matmul(hidden[n_g*n+n-1],W[n])+b[n]
+            logits = tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
         else:
-            logits +=  tf.matmul(hidden[n_g*n+n-1],W[n])+b[n]
+            logits += tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
 
-    return logits,x,y_
+    return logits, x, y_
+
 
 def initialize_uninitialized(sess):
     """ Search graph for uninitialized variables and initialize them
     """
-    global_vars          = tf.global_variables()
-    is_not_initialized   = sess.run([tf.is_variable_initialized(var) for var in global_vars])
+    global_vars = tf.global_variables()
+    is_not_initialized = sess.run([tf.is_variable_initialized(var) for var in global_vars])
     not_initialized_vars = [v for (v, f) in zip(global_vars, is_not_initialized) if not f]
 
     # print([str(i.name) for i in not_initialized_vars]) # only for testing
@@ -1011,15 +1005,14 @@ def reshape_group(x, n):
     """
 
     n0 = x.shape[0]
-    n1 = int(x.shape[1]/n)
-    x = x.T.reshape(n,n1,n0).swapaxes(1,2)
+    n1 = int(x.shape[1] / n)
+    x = x.T.reshape(n, n1, n0).swapaxes(1, 2)
 
     return x
 
 
 class BatchGenerator:
-
-    def __init__(self, batch_size, shuffle = True):
+    def __init__(self, batch_size, shuffle=True):
         """ Class for batch generation
 
         Parameters
@@ -1043,7 +1036,7 @@ class BatchGenerator:
             do_shuffle = True
         start = 0
         reached_end = False
-        while(True):
+        while (True):
             batch_feed_dict = {}
             for key in feed_dict:
                 if 'b' in key:
@@ -1054,12 +1047,12 @@ class BatchGenerator:
                     if do_shuffle:
                         self.shuffle_state = np.random.permutation(len(feed_dict[key]))
                         do_shuffle = False
-                    batch_feed_dict[key] = feed_dict[key][self.shuffle_state][start: start + batch_size]
+                    batch_feed_dict[key] = feed_dict[key][self.shuffle_state][start:start + batch_size]
                 else:
                     if do_shuffle:
                         self.shuffle_state = np.random.permutation(feed_dict[key].shape[1])
                         do_shuffle = False
-                    batch_feed_dict[key] = feed_dict[key][:,self.shuffle_state][:, start:start + batch_size, :]
+                    batch_feed_dict[key] = feed_dict[key][:, self.shuffle_state][:, start:start + batch_size, :]
 
                 if len(batch_feed_dict[key]) == 0:
                     reached_end = True

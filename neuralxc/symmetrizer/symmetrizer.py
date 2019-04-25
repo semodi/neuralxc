@@ -8,11 +8,12 @@ import numpy as np
 from ..formatter import expand
 from ..base import ABCRegistry
 
+
 class SymmetrizerRegistry(ABCRegistry):
     REGISTRY = {}
 
-class BaseSymmetrizer(metaclass = ABCRegistry):
 
+class BaseSymmetrizer(metaclass=ABCRegistry):
     def __init__(self):
         pass
 
@@ -50,9 +51,11 @@ class BaseSymmetrizer(metaclass = ABCRegistry):
         """
         pass
 
+
 class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
 
     _registry_name = 'default'
+
     def __init__(self, symmetrize_instructions):
         """ Symmetrizer
         Parameters
@@ -71,7 +74,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         if not symtype in registry:
             raise Exception('Symmetrizer: {} not registered'.format(symtype))
 
-        self.symmetrizer  = registry[symtype](sym_ins)
+        self.symmetrizer = registry[symtype](sym_ins)
         self._cgs = 0
 
     def __getattr__(self, attr):
@@ -83,7 +86,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
     def fit(self, X=None, y=None):
         return self
 
-    def transform(self, X, y = None):
+    def transform(self, X, y=None):
         # If used in ML-pipeline X might actually contain (X, y)
         if isinstance(X, dict):
             self._attrs.update({'basis': X['basis_instructions']})
@@ -112,13 +115,10 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         self.C = C
         basis = self._attrs['basis']
 
-        results = [{}]*len(C)
+        results = [{}] * len(C)
 
         for idx, key, data in expand(C):
-            results[idx][key] = self._symmetrize_function(*data,
-                                     basis[key]['l'],
-                                     basis[key]['n'],
-                                     self._cgs)
+            results[idx][key] = self._symmetrize_function(*data, basis[key]['l'], basis[key]['n'], self._cgs)
         if not isinstance(C, list):
             return results[0]
         else:
@@ -145,18 +145,17 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
             assert False
         basis = self._attrs['basis']
 
-        results = [{}]*len(C)
+        results = [{}] * len(C)
 
         for idx, key, data in expand(dEdD, C):
-            results[idx][key] = self._gradient_function(*data,
-                                     basis[key]['l'],
-                                     basis[key]['n'])
+            results[idx][key] = self._gradient_function(*data, basis[key]['l'], basis[key]['n'])
         if not isinstance(C, list):
             self.C = None
             return results[0]
         else:
             self.C = None
             return results
+
 
 class CasimirSymmetrizer(Symmetrizer):
 
@@ -190,14 +189,14 @@ class CasimirSymmetrizer(Symmetrizer):
 
         c_shape = c.shape
 
-        c = c.reshape(-1,c_shape[-1])
+        c = c.reshape(-1, c_shape[-1])
         casimirs = []
         idx = 0
 
         for n_ in range(0, n):
             for l in range(n_l):
-                casimirs.append(np.linalg.norm(c[:,idx:idx+(2*l+1)], axis = 1)**2)
-                idx += 2*l + 1
+                casimirs.append(np.linalg.norm(c[:, idx:idx + (2 * l + 1)], axis=1)**2)
+                idx += 2 * l + 1
         casimirs = np.array(casimirs).T
 
         return casimirs.reshape(*c_shape[:-1], -1)
@@ -227,19 +226,20 @@ class CasimirSymmetrizer(Symmetrizer):
         dEdC: dict of np.ndarrays
         """
         dEdd_shape = dEdd.shape
-        dEdd = dEdd.reshape(-1,dEdd.shape[-1])
+        dEdd = dEdd.reshape(-1, dEdd.shape[-1])
         c = np.conj(c.reshape(-1, c.shape[-1]))
         casimirs_mask = np.zeros_like(c)
         idx = 0
         cnt = 0
         for n_ in range(0, n):
             for l in range(n_l):
-                casimirs_mask[:,idx:idx+(2*l+1)] = dEdd[:,cnt:cnt+1]
-                idx += 2*l + 1
+                casimirs_mask[:, idx:idx + (2 * l + 1)] = dEdd[:, cnt:cnt + 1]
+                idx += 2 * l + 1
                 cnt += 1
 
-        grad = 2*c*casimirs_mask
+        grad = 2 * c * casimirs_mask
         return grad.reshape(*dEdd_shape[:-1], grad.shape[-1])
+
 
 # class BispectrumSymmetrizer(Symmetrizer):
 #
@@ -324,6 +324,7 @@ class CasimirSymmetrizer(Symmetrizer):
 #         bispectrum =  bispectrum.reshape(*c_shape[:-1], -1)
 #         bispectrum = np.concatenate([casimirs, bispectrum], axis = -1)
 #         return bispectrum
+
 
 def symmetrizer_factory(symmetrize_instructions):
     """

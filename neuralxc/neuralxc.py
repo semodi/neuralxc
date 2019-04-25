@@ -15,23 +15,27 @@ from .constants import Rydberg
 from abc import ABC, abstractmethod
 # from mpi4py import MPI
 
+
 def prints_error(method):
     """ Decorator:forpy only prints stdout, no error messages,
     therefore print each error message to stdout instead
     """
+
     def wrapper_print_error(*args, **kwargs):
         try:
             return method(*args, **kwargs)
         except Exception as e:
             print('NeuralXC: ', e)
-            raise(e)
+            raise (e)
 
     return wrapper_print_error
+
 
 def verify_type(obj):
     print('Type of object is:')
     print(obj)
-    print(hasattr(obj, 'get_V' ))
+    print(hasattr(obj, 'get_V'))
+
 
 @prints_error
 def get_nxc_adapter(kind, path):
@@ -45,6 +49,7 @@ def get_nxc_adapter(kind, path):
         adapter = adapter_dict[kind](path)
     return adapter
 
+
 @prints_error
 def get_V(nxc, *args):
     """ Covenience function. Syntactically it might be easier (e.g. from
@@ -54,7 +59,6 @@ def get_V(nxc, *args):
 
 
 class NXCAdapter(ABC):
-
     @prints_error
     def __init__(self, path):
         # from mpi4py import MPI
@@ -65,6 +69,7 @@ class NXCAdapter(ABC):
     @abstractmethod
     def get_V(self):
         pass
+
 
 class SiestaNXC(NXCAdapter):
 
@@ -79,7 +84,7 @@ class SiestaNXC(NXCAdapter):
         rho_reshaped = rho.reshape(*grid).T
         self._adaptee.initialize(unitcell, grid, positions, elements)
         use_drho = False
-        if self._adaptee._pipeline.get_basis_instructions().get('extension','RHOXC') == 'DRHO':
+        if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
             use_drho = True
             print('NeuralXC: Using DRHO')
             self._adaptee.projector = DeltaProjector(self._adaptee.projector)
@@ -92,7 +97,6 @@ class SiestaNXC(NXCAdapter):
 
     @prints_error
     def get_V(self, rho, unitcell, grid, positions, elements, V, calc_forces=False):
-
         """Parameters
         ------------------
         rho, array, float
@@ -129,16 +133,16 @@ class SiestaNXC(NXCAdapter):
         if not self.initialized:
             raise Exception('Must call initialize before calling get_V')
 
-        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces = calc_forces)
+        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces=calc_forces)
         if calc_forces:
-            self.force_correction = Vnxc[1].T/Rydberg
+            self.force_correction = Vnxc[1].T / Rydberg
             Vnxc = Vnxc[0]
 
-        Enxc = Enxc/Rydberg
-        Vnxc = Vnxc.real.T.reshape(-1,1)/Rydberg
+        Enxc = Enxc / Rydberg
+        Vnxc = Vnxc.real.T.reshape(-1, 1) / Rydberg
         # print('Not correcting V!')
         V[:, :] = Vnxc + V
-        print('NeuralXC: Enxc = {} eV'.format(Enxc*Rydberg))
+        print('NeuralXC: Enxc = {} eV'.format(Enxc * Rydberg))
         return Enxc
 
     @prints_error
@@ -148,10 +152,10 @@ class SiestaNXC(NXCAdapter):
         else:
             raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
 
-class NeuralXC():
 
+class NeuralXC():
     @prints_error
-    def __init__(self, path = None, pipeline = None):
+    def __init__(self, path=None, pipeline=None):
 
         print('NeuralXC: Instantiate NeuralXC')
         if isinstance(path, str):
@@ -170,7 +174,6 @@ class NeuralXC():
 
     @prints_error
     def initialize(self, unitcell, grid, positions, species):
-
         """Parameters
         ------------------
         unitcell, array float
@@ -187,10 +190,10 @@ class NeuralXC():
         self.grid = grid
         self.positions = positions
         self.species = species
-        self.projector = DensityProjector(unitcell, grid,
-            self._pipeline.get_basis_instructions())
+        self.projector = DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
+
     @prints_error
-    def get_V(self, rho, calc_forces= False):
+    def get_V(self, rho, calc_forces=False):
         """Parameters
         ------------------
         rho, array, float

@@ -12,17 +12,18 @@ import numpy as np
 import hashlib
 import json
 from dask.distributed import Client, LocalCluster
-class Preprocessor(TransformerMixin, BaseEstimator):
 
-    def __init__(self, basis_instructions, src_path, traj_path, target_path,
-                    num_workers = 1):
+
+class Preprocessor(TransformerMixin, BaseEstimator):
+    def __init__(self, basis_instructions, src_path, traj_path, target_path, num_workers=1):
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.traj_path = traj_path
         self.target_path = target_path
         self.computed_basis = {}
         self.num_workers = num_workers
-    def fit(self, X=None,y=None, **kwargs):
+
+    def fit(self, X=None, y=None, **kwargs):
         self.client = kwargs.get('client', None)
         return self
 
@@ -33,11 +34,12 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                 print('Preprocessor: Reusing data stored in ' + self.filename)
                 self.data = np.load(self.filename)
             else:
-                print('Preprocessor: {} not found Projecting onto basis, with {} workers'.format(self.filename, self.num_workers))
+                print('Preprocessor: {} not found Projecting onto basis, with {} workers'.format(
+                    self.filename, self.num_workers))
                 basis_rep = self.get_basis_rep()
-                sys_idx = np.array([0]*len(basis_rep)).reshape(-1,1)
-                targets = np.load(self.target_path).reshape(-1,1)
-                self.data = np.concatenate([sys_idx, basis_rep, targets], axis = -1)
+                sys_idx = np.array([0] * len(basis_rep)).reshape(-1, 1)
+                targets = np.load(self.target_path).reshape(-1, 1)
+                self.data = np.concatenate([sys_idx, basis_rep, targets], axis=-1)
                 self.computed_basis = self.basis_instructions
                 np.save(self.filename, self.data)
         data = np.array(self.data)
@@ -45,29 +47,27 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         if isinstance(X, list) or isinstance(X, np.ndarray):
             data = data[X]
 
-        return {'data': data, 'basis_instructions' :self.basis_instructions}
+        return {'data': data, 'basis_instructions': self.basis_instructions}
 
     @staticmethod
     def basis_to_filename(basis):
-        return os.path.join('.tmp',
-            hashlib.md5(json.dumps(basis).encode()).hexdigest() + '.npy')
+        return os.path.join('.tmp', hashlib.md5(json.dumps(basis).encode()).hexdigest() + '.npy')
 
     def get_basis_rep(self):
 
-        cluster = LocalCluster(n_workers = 1,
-            threads_per_worker = self.num_workers)
+        cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
         print(cluster)
         client = Client(cluster)
 
-        atoms = read(self.traj_path,':')
-        extension = self.basis_instructions.get('extension','RHOXC')
+        atoms = read(self.traj_path, ':')
+        extension = self.basis_instructions.get('extension', 'RHOXC')
         if extension[0] != '.':
             extension = '.' + extension
 
         jobs = []
         for i, system in enumerate(atoms):
             filename = ''
-            for file in os.listdir(pjoin(self.src_path,str(i))):
+            for file in os.listdir(pjoin(self.src_path, str(i))):
                 if file.endswith(extension):
                     filename = file
                     break
@@ -75,17 +75,17 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                 raise Exception('Density file not found in ' +\
                     pjoin(self.src_path,str(i)))
 
-
-            jobs.append([pjoin(self.src_path,str(i),filename),
-                system.get_positions()/Bohr,
-                system.get_chemical_symbols()])
+            jobs.append(
+                [pjoin(self.src_path, str(i), filename),
+                 system.get_positions() / Bohr,
+                 system.get_chemical_symbols()])
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
         futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)])
         results = [f.result() for f in futures]
         return results
 
     def score(self, *args, **kwargs):
-        return  0
+        return 0
 
     def id(self, *args):
         return 1
@@ -104,7 +104,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         del rho
         results = []
 
-        scnt = {spec : 0 for spec in species}
+        scnt = {spec: 0 for spec in species}
         for spec in species:
             results.append(basis_rep[spec][scnt[spec]])
             scnt[spec] += 1

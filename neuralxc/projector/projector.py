@@ -11,12 +11,15 @@ from .spher_grad import grlylm
 from ..base import ABCRegistry
 from numba import jit
 
+
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
 
-class BaseProjector(metaclass = ProjectorRegistry):
+
+class BaseProjector(metaclass=ProjectorRegistry):
 
     _registry_name = 'base'
+
     @abstractmethod
     def __init__(self, unitcell, grid, basis_instructions):
         """
@@ -72,20 +75,20 @@ class BaseProjector(metaclass = ProjectorRegistry):
         pass
 
 
-
 class DensityProjector(BaseProjector):
 
     _registry_name = 'default'
+
     #TODO: Make some functions private
     # @doc_inherit
     def __init__(self, unitcell, grid, basis_instructions):
 
-        projector_type = basis_instructions.get('projector_type','ortho')
+        projector_type = basis_instructions.get('projector_type', 'ortho')
         registry = BaseProjector.get_registry()
         if not projector_type in registry:
             raise Exception('Projector: {} not registered'.format(projector_type))
 
-        self.projector  = registry[projector_type](basis_instructions)
+        self.projector = registry[projector_type](basis_instructions)
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
@@ -93,11 +96,10 @@ class DensityProjector(BaseProjector):
                 W[species] = self.get_W(basis_instructions[species])
 
         # Determine unitcell constants
-        U = np.array(unitcell) # Matrix to go from real space to mesh coordinates
+        U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
         for i in range(3):
-            U[i,:] = U[i,:] / grid[i]
-        a = np.linalg.norm(unitcell, axis = 1)/grid[:3]
-
+            U[i, :] = U[i, :] / grid[i]
+        a = np.linalg.norm(unitcell, axis=1) / grid[:3]
 
         self.unitcell = unitcell
         self.grid = grid
@@ -107,7 +109,6 @@ class DensityProjector(BaseProjector):
         self.a = a
         self.basis = basis_instructions
         self.W = W
-
 
     def __getattr__(self, attr):
         return getattr(self.projector, attr)
@@ -126,10 +127,9 @@ class DensityProjector(BaseProjector):
             basis_rep[spec].append(self.project(rho, box, basis, self.W[spec]))
 
         for spec in basis_rep:
-            basis_rep[spec] = np.concatenate(basis_rep[spec], axis = 0)
+            basis_rep[spec] = np.concatenate(basis_rep[spec], axis=0)
 
         return basis_rep
-
 
     def get_basis_rep_dict(self, rho, positions, species):
         """ Same as get_basis_rep but return feature as a dict with keys
@@ -148,16 +148,16 @@ class DensityProjector(BaseProjector):
         return basis_rep
 
     # @doc_inherit
-    def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
+    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None):
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
 
-        V = np.zeros(self.grid, dtype= complex)
-        spec_idx = {spec : -1 for spec in species}
-        force_corrections = np.zeros([len(species),3])
+        V = np.zeros(self.grid, dtype=complex)
+        spec_idx = {spec: -1 for spec in species}
+        force_corrections = np.zeros([len(species), 3])
         for i, (pos, spec) in enumerate(zip(positions, species)):
             spec_idx[spec] += 1
-            if dEdC[spec].ndim==3:
+            if dEdC[spec].ndim == 3:
                 assert dEdC[spec].shape[0] == 1
                 dEdC[spec] = dEdC[spec][0]
 
@@ -170,8 +170,7 @@ class DensityProjector(BaseProjector):
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.get_force_correction(rho, coeffs,
-                    box, basis, self.W[spec])
+                force_corrections[i] = self.get_force_correction(rho, coeffs, box, basis, self.W[spec])
 
         if calc_forces:
             return V.real, force_corrections
@@ -199,10 +198,9 @@ class DensityProjector(BaseProjector):
         float or np.ndarray
             Value of angular function at provided point(s)
         """
-        return sph_harm(m,l,phi,theta)
+        return sph_harm(m, l, phi, theta)
 
-
-    def get_force_correction(self, rho, coeffs, box, basis, W = None):
+    def get_force_correction(self, rho, coeffs, box, basis, W=None):
         """ Calculate the contribution to the forces that arises from the
         dependence of the (nxc-)basis set on the atomic positions
 
@@ -244,7 +242,7 @@ class DensityProjector(BaseProjector):
         angs = []
         for l in range(n_l):
             angs.append([])
-            for m in range(-l,l+1):
+            for m in range(-l, l + 1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                 angs[l].append(self.angulars(l, m, Theta, Phi))
 
@@ -252,50 +250,50 @@ class DensityProjector(BaseProjector):
         M = M_make_complex(n_l)
         dangs = []
         for l in range(n_l**2):
-            dangs.append(np.zeros([len(X.flatten()),3]))
+            dangs.append(np.zeros([len(X.flatten()), 3]))
 
-        for ir, r in enumerate(zip(X.flatten(),Y.flatten(),Z.flatten())):
-            vecspher = grlylm(n_l - 1, r) # shape: (3, n_l*n_l)
+        for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
+            vecspher = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
             for il, vs in enumerate(vecspher.T):
                 dangs[il][ir] = vs
 
         dangs = np.einsum('ij,jkl -> ikl', M, np.array(dangs))
 
-        dangs = dangs.reshape(len(dangs),*X.shape,3)
+        dangs = dangs.reshape(len(dangs), *X.shape, 3)
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
-            W = self.get_W(basis) # Matrix to orthogonalize radial basis
+            W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         drads = self.dradials(R, basis, W)
         rads = self.radials(R, basis, W)
         radsr = np.array(rads)
         # radsr[R==0] = 0
-        radsr = radsr/R
+        radsr = radsr / R
 
-        rhat = [X/R, Y/R, Z/R]
+        rhat = [X / R, Y / R, Z / R]
 
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
 
         for ix in range(3):
-            v = np.zeros_like(rho, dtype = complex)
+            v = np.zeros_like(rho, dtype=complex)
             idx_coeff = 0
             for n in range(n_rad):
                 idx_l = 0
                 for l in range(n_l):
-                    for m in range(2*l+1):
-                         v += coeffs[idx_coeff] *\
-                         (\
-                         (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
-                         (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])\
-                         )
-                         idx_l += 1
-                         idx_coeff += 1
+                    for m in range(2 * l + 1):
+                        v += coeffs[idx_coeff] *\
+                        (\
+                        (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
+                        (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])\
+                        )
+                        idx_l += 1
+                        idx_coeff += 1
             assert np.allclose(v.imag, np.zeros_like(v))
-            force[ix] = np.sum(rho*v.real)* self.V_cell
+            force[ix] = np.sum(rho * v.real) * self.V_cell
         return force
 
-    def build(self, coeffs, box, basis, W = None):
+    def build(self, coeffs, box, basis, W=None):
         """ Build the contribution from this atom to the potential V in a
         provided bounding box
 
@@ -335,29 +333,28 @@ class DensityProjector(BaseProjector):
         angs = []
         for l in range(n_l):
             angs.append([])
-            for m in range(-l,l+1):
+            for m in range(-l, l + 1):
                 # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                 angs[l].append(self.angulars(l, m, Theta, Phi))
 
-
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
-            W = self.get_W(basis) # Matrix to orthogonalize radial basis
+            W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
-        v = np.zeros_like(Xm, dtype= complex)
+        v = np.zeros_like(Xm, dtype=complex)
         idx = 0
 
         for n in range(n_rad):
             for l in range(n_l):
-                for m in range(2*l+1):
+                for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
         return v
 
-    def project(self, rho, box, basis, W = None, return_dict=False):
-            '''
+    def project(self, rho, box, basis, W=None, return_dict=False):
+        '''
             Project the real space density rho onto a set of basis functions
 
             Parameters
@@ -382,52 +379,52 @@ class DensityProjector(BaseProjector):
                     dictionary containing the coefficients
             '''
 
-            n_rad = basis['n']
-            n_l = basis['l']
-            r_o = basis['r_o']
-            R, Theta, Phi = box['radial']
-            Xm, Ym, Zm = box['mesh']
+        n_rad = basis['n']
+        n_l = basis['l']
+        r_o = basis['r_o']
+        R, Theta, Phi = box['radial']
+        Xm, Ym, Zm = box['mesh']
 
-            # Automatically detect whether entire charge density or only surrounding
-            # box was provided
-            if rho.shape == Xm.shape:
-                small_rho = True
-            else:
-                small_rho = False
+        # Automatically detect whether entire charge density or only surrounding
+        # box was provided
+        if rho.shape == Xm.shape:
+            small_rho = True
+        else:
+            small_rho = False
 
-            #Build angular part of basis functions
-            angs = []
-            for l in range(n_l):
-                angs.append([])
-                for m in range(-l,l+1):
-                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    angs[l].append(sph_harm(m, l, Phi, Theta))
+        #Build angular part of basis functions
+        angs = []
+        for l in range(n_l):
+            angs.append([])
+            for m in range(-l, l + 1):
+                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                angs[l].append(sph_harm(m, l, Phi, Theta))
 
-            #Build radial part of b.f.
-            if not isinstance(W, np.ndarray):
-                W = self.get_W(basis) # Matrix to orthogonalize radial basis
+        #Build radial part of b.f.
+        if not isinstance(W, np.ndarray):
+            W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
-            rads = self.radials(R, basis, W)
+        rads = self.radials(R, basis, W)
 
-            coeff = []
-            coeff_dict = {}
-            if small_rho:
-                for n in range(n_rad):
-                    for l in range(n_l):
-                        for m in range(2*l+1):
-                            coeff.append(np.sum(angs[l][m]*rads[n]*rho)*self.V_cell)
-                            coeff_dict['{},{},{}'.format(n,l,m-l)] = coeff[-1]
-            else:
-                for n in range(n_rad):
-                    for l in range(n_l):
-                        for m in range(2*l+1):
-                            coeff.append(np.sum(angs[l][m]*rads[n]*rho[Xm, Ym, Zm])*self.V_cell)
-                            coeff_dict['{},{},{}'.format(n,l,m-l)] = coeff[-1]
+        coeff = []
+        coeff_dict = {}
+        if small_rho:
+            for n in range(n_rad):
+                for l in range(n_l):
+                    for m in range(2 * l + 1):
+                        coeff.append(np.sum(angs[l][m] * rads[n] * rho) * self.V_cell)
+                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
+        else:
+            for n in range(n_rad):
+                for l in range(n_l):
+                    for m in range(2 * l + 1):
+                        coeff.append(np.sum(angs[l][m] * rads[n] * rho[Xm, Ym, Zm]) * self.V_cell)
+                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
 
-            if return_dict:
-                return coeff_dict
-            else:
-                return np.array(coeff).reshape(1,-1)
+        if return_dict:
+            return coeff_dict
+        else:
+            return np.array(coeff).reshape(1, -1)
 
     def box_around(self, pos, radius):
         '''
@@ -445,47 +442,47 @@ class DensityProjector(BaseProjector):
                 euclidean and spherical coordinates
         '''
 
-        if pos.shape != (1,3) and (pos.ndim != 1 or len(pos) !=3):
+        if pos.shape != (1, 3) and (pos.ndim != 1 or len(pos) != 3):
             raise Exception('please provide only one point for pos')
 
         pos = pos.flatten()
 
         #Create box with max. distance = radius
         rmax = np.ceil(radius / self.a).astype(int).tolist()
-        Xm, Ym, Zm = mesh_3d(self.U, self.a, scaled = False, rmax = rmax, indexing = 'ij')
-        X, Y, Z = mesh_3d(self.U, self.a, scaled = True, rmax = rmax, indexing = 'ij')
+        Xm, Ym, Zm = mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
+        X, Y, Z = mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
 
         #Find mesh pos.
         cm = np.round(self.U_inv.dot(pos)).astype(int)
-        dr = pos  - self.U.dot(cm)
+        dr = pos - self.U.dot(cm)
         X -= dr[0]
         Y -= dr[1]
         Z -= dr[2]
 
-        Xm = (Xm + cm[0])%self.grid[0]
-        Ym = (Ym + cm[1])%self.grid[1]
-        Zm = (Zm + cm[2])%self.grid[2]
+        Xm = (Xm + cm[0]) % self.grid[0]
+        Ym = (Ym + cm[1]) % self.grid[1]
+        Zm = (Zm + cm[2]) % self.grid[2]
 
         R = np.sqrt(X**2 + Y**2 + Z**2)
 
-        Phi = np.arctan2(Y,X)
-        Theta = np.arccos(Z/R, where = (R != 0))
+        Phi = np.arctan2(Y, X)
+        Theta = np.arccos(Z / R, where=(R != 0))
         Theta[R == 0] = 0
 
-        return {'mesh':[Xm, Ym, Zm],'real': [X,Y,Z],'radial':[R, Theta, Phi]}
+        return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
 
 
 class OrthoProjector(DensityProjector):
 
     _registry_name = 'ortho'
+
     def __init__(self, *args, **kwargs):
         pass
-
 
     @classmethod
     def dg(cls, r, basis, a):
         r_o = basis['r_o']
-        return cls.dg_compiled(r,r_o,a)
+        return cls.dg_compiled(r, r_o, a)
 
     @staticmethod
     @jit(nopython=True)
@@ -511,8 +508,7 @@ class OrthoProjector(DensityProjector):
         """
         N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
                                        (2*a+6)*(2*a+5)))
-        return r*(r_o-r)**(a+1)*(2*r_o - (a+4)*r)/N
-
+        return r * (r_o - r)**(a + 1) * (2 * r_o - (a + 4) * r) / N
 
     @classmethod
     def g(cls, r, basis, a):
@@ -543,20 +539,18 @@ class OrthoProjector(DensityProjector):
         """
         N = np.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
                                            (2*a+6)*(2*a+5)))
-        return (r)**(2)*(r_o-r)**(a+2)/N
-
+        return (r)**(2) * (r_o - r)**(a + 2) / N
 
     @staticmethod
     def orthogonalize(func, r, basis, W):
         r_o = basis['r_o']
         result = np.zeros([len(W)] + list(r.shape))
-        for k in range(0,len(W)):
-            rad = func(r, basis, k+1)
+        for k in range(0, len(W)):
+            rad = func(r, basis, k + 1)
             for j in range(0, len(W)):
-                result[j] += W[j,k] * rad
-        result[:,r > r_o] = 0
+                result[j] += W[j, k] * rad
+        result[:, r > r_o] = 0
         return result
-
 
     @classmethod
     def dradials(cls, r, basis, W):
@@ -576,7 +570,7 @@ class OrthoProjector(DensityProjector):
             np.ndarray
                 radial functions
         '''
-        return cls.orthogonalize(cls.dg,r, basis, W)
+        return cls.orthogonalize(cls.dg, r, basis, W)
 
     @classmethod
     def radials(cls, r, basis, W):
@@ -599,7 +593,7 @@ class OrthoProjector(DensityProjector):
             np.ndarray
                 radial functions
         '''
-        return cls.orthogonalize(cls.g,r, basis, W)
+        return cls.orthogonalize(cls.g, r, basis, W)
 
     @classmethod
     def get_W(cls, basis):
@@ -643,19 +637,20 @@ class OrthoProjector(DensityProjector):
         '''
         r_o = basis['r_o']
         nmax = basis['n']
-        S_matrix = np.zeros([nmax,nmax])
+        S_matrix = np.zeros([nmax, nmax])
         r_grid = np.linspace(0, r_o, 1000)
         dr = r_grid[1] - r_grid[0]
         for i in range(nmax):
-            for j in range(i,nmax):
-                S_matrix[i,j] = np.sum(cls.g(r_grid,basis,i+1)*cls.g(r_grid,basis,j+1)*r_grid**2)*dr
+            for j in range(i, nmax):
+                S_matrix[i, j] = np.sum(cls.g(r_grid, basis, i + 1) * cls.g(r_grid, basis, j + 1) * r_grid**2) * dr
         for i in range(nmax):
-            for j in range(i+1, nmax):
-                S_matrix[j,i] = S_matrix[i,j]
+            for j in range(i + 1, nmax):
+                S_matrix[j, i] = S_matrix[i, j]
         return S_matrix
 
+
 class NonOrthoProjector(OrthoProjector):
-    _registry_name ='non-ortho'
+    _registry_name = 'non-ortho'
 
     @staticmethod
     def dg(r, basis, a):
@@ -679,12 +674,12 @@ class NonOrthoProjector(OrthoProjector):
                 derivative of radial function at radius r
         """
         r_o = basis['r_o']
+
         def dg_(r, r_o, a):
-            return -(2 + a)*(r_o-r)**(a+1)
+            return -(2 + a) * (r_o - r)**(a + 1)
 
-        N = np.sqrt(r_o**(2*a+5/(2*a+5)))
-        return dg_(r, r_o,a)/N
-
+        N = np.sqrt(r_o**(2 * a + 5 / (2 * a + 5)))
+        return dg_(r, r_o, a) / N
 
     @staticmethod
     def g(r, basis, a):
@@ -709,11 +704,13 @@ class NonOrthoProjector(OrthoProjector):
         """
 
         r_o = basis['r_o']
+
         def g_(r, r_o, a):
-            return (r_o-r)**(a+2)
+            return (r_o - r)**(a + 2)
+
         # Write out factorial fraction to avoid overflow
-        N = np.sqrt(r_o**(2*a+5/(2*a+5)))
-        return g_(r, r_o,a)/N
+        N = np.sqrt(r_o**(2 * a + 5 / (2 * a + 5)))
+        return g_(r, r_o, a) / N
 
     @classmethod
     def S(cls, basis):
@@ -736,31 +733,33 @@ class NonOrthoProjector(OrthoProjector):
         '''
 
         nmax = basis['n']
-        S_matrix = np.zeros([nmax,nmax])
-        for i in range(1,nmax+1):
-            for j in range(i,nmax+1):
-                S_matrix[i-1,j-1] = np.sqrt((5+2*i)*(5+2*j))/(5+i+j)
+        S_matrix = np.zeros([nmax, nmax])
+        for i in range(1, nmax + 1):
+            for j in range(i, nmax + 1):
+                S_matrix[i - 1, j - 1] = np.sqrt((5 + 2 * i) * (5 + 2 * j)) / (5 + i + j)
         for i in range(nmax):
-            for j in range(i+1, nmax):
-                S_matrix[j,i] = S_matrix[i,j]
+            for j in range(i + 1, nmax):
+                S_matrix[j, i] = S_matrix[i, j]
         return S_matrix
+
 
 class BehlerProjector(OrthoProjector):
 
-    _registry_name ='behler'
+    _registry_name = 'behler'
+
     @staticmethod
     def g(r, basis, a):
         r_o = basis['r_o']
-        sigma = basis.get('sigma',0.005)
-        mu = a/(basis['n']+1) * r_o
-        return r*(r_o - r)*np.exp(-(r-mu)**2/(sigma*r_o))
+        sigma = basis.get('sigma', 0.005)
+        mu = a / (basis['n'] + 1) * r_o
+        return r * (r_o - r) * np.exp(-(r - mu)**2 / (sigma * r_o))
 
     @classmethod
     def get_W(cls, basis):
         return np.eye(basis['n'])
 
-class DeltaProjector():
 
+class DeltaProjector():
     def __init__(self, projector):
         """ Wrapper class that can store a constant basis set representation
         and subtract it from given densities (e.g. subtract contribution from
@@ -781,8 +780,7 @@ class DeltaProjector():
             basis_rep[spec] -= self.constant_basis_rep[spec]
         return basis_rep
 
-
-    def get_V(self, dEdC, positions, species, calc_forces = False, rho = None):
+    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None):
 
         if isinstance(rho, np.ndarray):
             rho = rho - self.constant_rho
@@ -796,7 +794,7 @@ class DeltaProjector():
             return getattr(self.projector, attr)
 
 
-def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
+def mesh_3d(U, a, rmax, scaled=False, indexing='xy'):
     """
     Returns a 3d mesh taking into account periodic boundary conditions
 
@@ -818,25 +816,23 @@ def mesh_3d(U, a, rmax, scaled = False, indexing= 'xy'):
     """
 
     # resolve the periodic boundary conditions
-    x_pbc = list(range(0, rmax[0] +1 )) + list(range(-rmax[0], 0))
-    y_pbc = list(range(0, rmax[1] +1 )) + list(range(-rmax[1], 0))
-    z_pbc = list(range(0, rmax[2] +1 )) + list(range(-rmax[2], 0))
+    x_pbc = list(range(0, rmax[0] + 1)) + list(range(-rmax[0], 0))
+    y_pbc = list(range(0, rmax[1] + 1)) + list(range(-rmax[1], 0))
+    z_pbc = list(range(0, rmax[2] + 1)) + list(range(-rmax[2], 0))
 
+    Xm, Ym, Zm = np.meshgrid(x_pbc, y_pbc, z_pbc, indexing=indexing)
 
-    Xm, Ym, Zm = np.meshgrid(x_pbc, y_pbc, z_pbc, indexing = indexing)
-
-    Rm = np.concatenate([Xm.reshape(*Xm.shape,1),
-                         Ym.reshape(*Xm.shape,1),
-                         Zm.reshape(*Xm.shape,1)], axis = 3)
+    Rm = np.concatenate([Xm.reshape(*Xm.shape, 1), Ym.reshape(*Xm.shape, 1), Zm.reshape(*Xm.shape, 1)], axis=3)
 
     if scaled:
-        R = np.einsum('ij,klmj -> iklm', U , Rm)
-        X = R[0,:,:,:]
-        Y = R[1,:,:,:]
-        Z = R[2,:,:,:]
-        return X,Y,Z
+        R = np.einsum('ij,klmj -> iklm', U, Rm)
+        X = R[0, :, :, :]
+        Y = R[1, :, :, :]
+        Z = R[2, :, :, :]
+        return X, Y, Z
     else:
-        return Xm,Ym,Zm
+        return Xm, Ym, Zm
+
 
 def M_make_complex(n_l):
     """Get a matrix to convert real into complex tensors
@@ -853,24 +849,24 @@ def M_make_complex(n_l):
         M : np.ndarray,
             conversion matrix
     """
-    M = np.zeros([n_l**2,n_l**2], dtype =complex)
+    M = np.zeros([n_l**2, n_l**2], dtype=complex)
     tensor = {}
     cnt = 0
     for l in range(n_l):
-        for m in range(-l,l+1):
-            tensor['{},{}'.format(l,m)] = cnt
+        for m in range(-l, l + 1):
+            tensor['{},{}'.format(l, m)] = cnt
             cnt += 1
 
     idx = 0
     for l in range(n_l):
-        for m in range(-l,0):
-            M[idx, tensor['{},{}'.format(l,-m)]] = (-1)**m*1/np.sqrt(2)
-            M[idx, tensor['{},{}'.format(l,m)]] = -(-1)**m*1j/np.sqrt(2)
-            idx +=1
-        M[idx, tensor['{},{}'.format(l,0)]] = 1
+        for m in range(-l, 0):
+            M[idx, tensor['{},{}'.format(l, -m)]] = (-1)**m * 1 / np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l, m)]] = -(-1)**m * 1j / np.sqrt(2)
+            idx += 1
+        M[idx, tensor['{},{}'.format(l, 0)]] = 1
         idx += 1
-        for m in range(1,l+1):
-            M[idx, tensor['{},{}'.format(l,m)]] = 1/np.sqrt(2)
-            M[idx, tensor['{},{}'.format(l,-m)]] = 1j/np.sqrt(2)
-            idx +=1
+        for m in range(1, l + 1):
+            M[idx, tensor['{},{}'.format(l, m)]] = 1 / np.sqrt(2)
+            M[idx, tensor['{},{}'.format(l, -m)]] = 1j / np.sqrt(2)
+            idx += 1
     return M

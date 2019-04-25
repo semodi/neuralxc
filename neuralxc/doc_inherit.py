@@ -31,6 +31,7 @@ Now, Bar.foo.__doc__ == Bar().foo.__doc__ == Foo.foo.__doc__ == "Frobber"
 
 from functools import wraps
 
+
 class DocInherit():
     """
     Docstring inheriting method descriptor
@@ -52,7 +53,7 @@ class DocInherit():
 
         overridden = getattr(super(cls, obj), self.name, None)
 
-        @wraps(self.mthd, assigned=('__name__','__module__'))
+        @wraps(self.mthd, assigned=('__name__', '__module__'))
         def f(*args, **kwargs):
             return self.mthd(obj, *args, **kwargs)
 
@@ -64,7 +65,7 @@ class DocInherit():
             overridden = getattr(parent, self.name, None)
             if overridden: break
 
-        @wraps(self.mthd, assigned=('__name__','__module__'))
+        @wraps(self.mthd, assigned=('__name__', '__module__'))
         def f(*args, **kwargs):
             return self.mthd(*args, **kwargs)
 
@@ -72,8 +73,9 @@ class DocInherit():
 
     def use_parent_doc(self, func, source):
         if source is None:
-            raise NameError("Can't find '%s' in parents"%self.name)
+            raise NameError("Can't find '%s' in parents" % self.name)
         func.__doc__ = source.__doc__
         return func
+
 
 doc_inherit = DocInherit

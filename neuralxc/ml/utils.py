@@ -4,19 +4,21 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator
 
+
 def find_attr_in_tree(file, tree, attr):
 
-        if attr in file[tree].attrs:
-            return file[tree].attrs[attr]
+    if attr in file[tree].attrs:
+        return file[tree].attrs[attr]
 
-        tree_list = tree.split('/')
+    tree_list = tree.split('/')
 
-        for i in range(1,len(tree_list)):
-            subtree = '/'.join(tree_list[:-i])
-            if attr in file[subtree].attrs:
-                return file[subtree].attrs[attr]
-                    
-def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = False):
+    for i in range(1, len(tree_list)):
+        subtree = '/'.join(tree_list[:-i])
+        if attr in file[subtree].attrs:
+            return file[subtree].attrs[attr]
+
+
+def load_data(datafile, baseline, reference, percentile_cutoff=0.0, grouped=False):
 
     data_base = datafile[baseline]
     data_ref = datafile[reference]
@@ -26,7 +28,7 @@ def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = 
 
     n_mol = find_attr_in_tree(datafile, baseline, 'n_mol')
 
-    tar = (data_ref[:,-1] - n_mol*E0_ref) - (data_base[:,-1] - n_mol * E0_base)
+    tar = (data_ref[:, -1] - n_mol * E0_ref) - (data_base[:, -1] - n_mol * E0_base)
     tar = tar.real
 
     # if percentile_cutoff > 0:
@@ -39,8 +41,8 @@ def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = 
     #
     # filter = filter2
 
-    data_base = data_base[:,:-1]
-    data_ref = data_ref[:,:-1]
+    data_base = data_base[:, :-1]
+    data_ref = data_ref[:, :-1]
 
     feat = {}
     all_species = find_attr_in_tree(datafile, baseline, 'species')
@@ -53,24 +55,25 @@ def load_data(datafile, baseline, reference, percentile_cutoff = 0.0, grouped = 
              for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
 
     if grouped:
-        for spec in unique_species: feat[spec] = []
+        for spec in unique_species:
+            feat[spec] = []
 
         current_loc = 0
         for spec in all_species:
-            len_descr = attrs[spec]['n']*sum([2*l+1 for l in range(attrs[spec]['l'])])
+            len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
             feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
             current_loc += len_descr
 
         for spec in unique_species:
-            feat[spec] = np.array(feat[spec]).swapaxes(0,1)
+            feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
 
         return feat, tar, attrs, ''.join(all_species)
     else:
         return data_base, tar, attrs, ''.join(all_species)
 
-class SampleSelector(BaseEstimator):
 
-    def __init__(self, n_instances, random_state = None):
+class SampleSelector(BaseEstimator):
+    def __init__(self, n_instances, random_state=None):
         self._n_instances = n_instances
         self._random_state = random_state
 
@@ -83,34 +86,42 @@ class SampleSelector(BaseEstimator):
             X = X[0]
         if not isinstance(X, list):
             X = [X]
-        picks = [[]*len(X)]
+        picks = [[] * len(X)]
         for idx, key, data in expand(X):
             data = data[0]
-            indices = np.zeros(data.shape[:-1], dtype = int)
-            indices[:] = np.arange(len(data)).reshape(-1,1)
-            picks[idx] += self.sample_clusters(atomic_shape(data),indices.flatten(), self._n_instances,
-                                         picked = picks[idx], random_state = self._random_state)
+            indices = np.zeros(data.shape[:-1], dtype=int)
+            indices[:] = np.arange(len(data)).reshape(-1, 1)
+            picks[idx] += self.sample_clusters(atomic_shape(data),
+                                               indices.flatten(),
+                                               self._n_instances,
+                                               picked=picks[idx],
+                                               random_state=self._random_state)
         return picks
 
     @staticmethod
-    def sample_clusters(data, indices,  n_samples, picked = [],
-                        cluster_method = KMeans, pca_threshold=0.99, random_state = None):
+    def sample_clusters(data,
+                        indices,
+                        n_samples,
+                        picked=[],
+                        cluster_method=KMeans,
+                        pca_threshold=0.99,
+                        random_state=None):
 
         pca = PCA(n_components=pca_threshold, svd_solver='full')
-        pca_results= pca.fit_transform(data)
+        pca_results = pca.fit_transform(data)
 
-        clustering = cluster_method(n_samples,random_state = random_state).fit(pca_results)
+        clustering = cluster_method(n_samples, random_state=random_state).fit(pca_results)
         labels = clustering.labels_
 
         sampled = []
 
         np.random.seed(random_state)
-        for label in np.unique(labels): # Loop over clusters
+        for label in np.unique(labels):  # Loop over clusters
             n = sum(labels == label)
             contained = False
-            for i in indices[labels==label]:
+            for i in indices[labels == label]:
                 if i in picked:
-                    contained = True # Was a representative of this cluster already picked?
+                    contained = True  # Was a representative of this cluster already picked?
                     break
             if not contained:
                 choice = np.random.choice(range(n), size=1, replace=False)

@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_density_cut(rho, rmax=0, plane=2, height = 0, *args, **kwargs):
+
+def plot_density_cut(rho, rmax=0, plane=2, height=0, *args, **kwargs):
     """Take a quick look at the loaded data in a particular plane
 
         Parameters
@@ -14,18 +15,13 @@ def plot_density_cut(rho, rmax=0, plane=2, height = 0, *args, **kwargs):
     RHO = _plane_cut(rho, plane, height, grid, rmax=rmax)
 
     fig = plt.figure()
-    CS = plt.imshow(
-        RHO, *args, cmap=plt.cm.jet, origin='lower', **kwargs)
+    CS = plt.imshow(RHO, *args, cmap=plt.cm.jet, origin='lower', **kwargs)
     plt.colorbar()
     # plt.show()
     return fig
 
-def _plane_cut(data,
-              plane,
-              height,
-              grid,
-              rmax=0,
-              return_mesh=False):
+
+def _plane_cut(data, plane, height, grid, rmax=0, return_mesh=False):
     """return_mesh = False : returns a two dimensional cut through 3d data
                      True : instead of data, 2d mesh is returned
 
@@ -44,7 +40,7 @@ def _plane_cut(data,
         mid_grid = (grid / 2).astype(int)
         rmax = mid_grid
 
-    rmin = [0,0,0]
+    rmin = [0, 0, 0]
     # resolve the periodic boundary conditions
     x_pbc = list(range(-rmax[0], -rmin[0])) + list(range(rmin[0], rmax[0]))
     y_pbc = list(range(-rmax[1], -rmin[1])) + list(range(rmin[1], rmax[1]))
