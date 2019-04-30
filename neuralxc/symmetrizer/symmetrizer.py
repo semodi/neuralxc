@@ -240,13 +240,105 @@ class CasimirSymmetrizer(Symmetrizer):
         grad = 2 * c * casimirs_mask
         return grad.reshape(*dEdd_shape[:-1], grad.shape[-1])
 
+class MixedCasimirSymmetrizer(Symmetrizer):
+
+    _registry_name = 'mixed_casimir'
+
+    def __init__(self, symmetrize_instructions):
+        self._attrs = symmetrize_instructions
+
+    @staticmethod
+    def _symmetrize_function(c, n_l, n, *args):
+        """ Returns the casimir invariants with mixed radial channels
+        of the tensors stored in c
+
+        Parameters:
+        -----------
+
+        c: np.ndarray of floats/complex
+            Stores the tensor elements in the order (n,l,m)
+
+        n_l: int
+            number of angular momenta (not equal to maximum ang. momentum!
+                example: if only s-orbitals n_l would be 1)
+
+        n: int
+            number of radial functions
+
+        Returns
+        -------
+        np.ndarray
+            Casimir invariants
+        """
+        c_shape = c.shape
+
+        c = c.reshape(-1,c_shape[-1])
+        c = c.reshape(len(c),n,-1)
+        casimirs = []
+
+        for n1 in range(0, n):
+            for n2 in range(n1,n):
+                idx = 0
+                for l in range(n_l):
+                    casimirs.append(np.sum(c[:,n1,idx:idx+(2*l+1)]*\
+                                           np.conj(c[:,n2,idx:idx+(2*l+1)]),
+                                            axis = -1).real)
+                    idx += 2*l + 1
+
+        casimirs = np.array(casimirs).T
+
+        return casimirs.reshape(*c_shape[:-1], -1)
+
+    @staticmethod
+    def _gradient_function(dEdd, c, n_l, n):
+        """Implements chain rule to obtain dE/dC from dE/dD
+        (unsymmetrized from symmetrized)
+
+        Parameters
+        ------------------
+        dEdD : np.ndarray
+        	dE/dD
+
+        c: np.ndarray
+            Unsymmetrized basis representation
+
+        n_l: int
+            number of angular momenta (not equal to maximum ang. momentum!
+                example: if only s-orbitals n_l would be 1)
+
+        n: int
+            number of radial functions
+
+        Returns
+        -------------
+        dEdC: dict of np.ndarrays
+        """
+        dEdd_shape = dEdd.shape
+        c_shape = c.shape
+        dEdd = dEdd.reshape(-1, dEdd.shape[-1])
+        c = np.conj(c.reshape(-1, c.shape[-1]))
+        c = c.reshape(len(c),n,-1)
+        casimirs_mask = np.zeros_like(c)
+        idx = 0
+        cnt = 0
+        for n1 in range(0, n):
+            for n2 in range(n1, n):
+                idx = 0
+                for l in range(n_l):
+                    casimirs_mask[:,n1, idx:idx + (2 * l + 1)] = dEdd[:, cnt:cnt + 1]
+                    idx += 2 * l + 1
+                    cnt += 1
+
+        grad = 2 * c * casimirs_mask
+        return grad.reshape(*c_shape[:-1], -1)
 
 # class BispectrumSymmetrizer(Symmetrizer):
 #
+#     _registry_name = 'bispectrum'
 #     def __init__(self, attrs):
 #         print('WARNING! This class has not been thoroughly tested yet')
-#         super().__init__(attrs)
-#
+#         # super().__init__(attrs)
+#         self._attrs = attrs
 #         # Create array with Clebsch-Gordon coefficients
 #         basis = attrs['basis']
 #
@@ -315,7 +407,7 @@ class CasimirSymmetrizer(Symmetrizer):
 #                                      c[:,n,start[l2] + m2 + l2]*\
 #                                      cgs[l1,m1,l2,m2,l,m]
 #                                      # cgs[l1,l2,l,m1,m2,m]
-#                         if np.any(abs(b.imag) > 1e-5):
+#                         if np.any(abs(b.imag) > 1e-3):
 #                             raise Exception('Not real')
 #                         bispectrum.append(b.real.round(5))
 #
@@ -359,21 +451,21 @@ def symmetrizer_factory(symmetrize_instructions):
     # return registry[symtype](sym_ins)
 
 
-# def cg_matrix(n_l):
-#     """ Returns the Clebsch-Gordan coefficients for maximum angular momentum n_l-1
-#     """
-#     lmax = n_l - 1
-#     cgs = np.zeros([n_l, 2*lmax+1, n_l, 2*lmax+1, n_l, 2*lmax+1], dtype=complex)
-#
-#     for l in range(n_l):
-#         for l1 in range(n_l):
-#             for l2 in range(n_l):
-#                 for m in range(-n_l, n_l+1):
-#                     for m1 in range(-n_l,n_l+1):
-#                         for m2 in range(-n_l,n_l+1):
-#                             # cgs[l1,l2,l,m1,m2,m] = N(CG(l1,l2,l,m1,m2,m).doit())
-#                             cgs[l1,m1,l2,m2,l,m] = N(CG(l1,m1,l2,m2,l,m).doit())
-#     return cgs
+def cg_matrix(n_l):
+    """ Returns the Clebsch-Gordan coefficients for maximum angular momentum n_l-1
+    """
+    lmax = n_l - 1
+    cgs = np.zeros([n_l, 2*lmax+1, n_l, 2*lmax+1, n_l, 2*lmax+1], dtype=complex)
+
+    for l in range(n_l):
+        for l1 in range(n_l):
+            for l2 in range(n_l):
+                for m in range(-n_l, n_l+1):
+                    for m1 in range(-n_l,n_l+1):
+                        for m2 in range(-n_l,n_l+1):
+                            # cgs[l1,l2,l,m1,m2,m] = N(CG(l1,l2,l,m1,m2,m).doit())
+                            cgs[l1,m1,l2,m2,l,m] = N(CG(l1,m1,l2,m2,l,m).doit())
+    return cgs
 
 # def to_casimirs_mixn(c, n_l, n):
 #     """ Returns the casimir invariants with mixed radial channels

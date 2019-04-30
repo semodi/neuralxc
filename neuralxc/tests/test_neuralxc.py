@@ -111,7 +111,8 @@ def test_density_projector(projector_type):
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type", ['casimir'])
+@pytest.mark.parametrize("symmetrizer_type",[name for name in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
 def test_symmetrizer(symmetrizer_type):
     with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
         C = pickle.load(file)
@@ -126,7 +127,7 @@ def test_symmetrizer(symmetrizer_type):
     if save_test_symmetrizer:
         with open(os.path.join(test_dir, 'h2o_sym_{}.pckl'.format(symmetrizer_type)), 'wb') as file:
             pickle.dump(D, file)
-    else:
+    elif symmetrizer_type == 'casimir':
         with open(os.path.join(test_dir, 'h2o_sym_{}.pckl'.format(symmetrizer_type)), 'rb') as file:
             D_ref = pickle.load(file)
 
@@ -135,7 +136,8 @@ def test_symmetrizer(symmetrizer_type):
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type", ['casimir'])
+@pytest.mark.parametrize("symmetrizer_type",[name for name in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
 def test_symmetrizer_rot_invariance(symmetrizer_type):
     C_list = []
     for i in range(3):
@@ -157,7 +159,8 @@ def test_symmetrizer_rot_invariance(symmetrizer_type):
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type", ['casimir'])
+@pytest.mark.parametrize("symmetrizer_type",[name for name in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
 def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     with open(os.path.join(test_dir, 'rotated_synthetic.pckl'), 'rb') as file:
         C_list = pickle.load(file)

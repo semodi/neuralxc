@@ -34,8 +34,8 @@ setup(
     # Extend/modify the list to include/exclude other items as need be
     package_data={'neuralxc': ["data/*.dat"]
                   },
-    
-    scripts=['./bin/neuralxc-fit','./bin/neuralxc-pre-fit','./bin/neuralxc-basis'],
+
+    scripts=['./bin/neuralxc-fit','./bin/neuralxc-pre-fit','./bin/neuralxc-basis','./bin/neuralxc-data','./bin/neuralxc-hdf5-fit'],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email
     # url='http://www.my_package.com',  # Website

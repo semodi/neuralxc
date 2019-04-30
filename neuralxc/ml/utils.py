@@ -18,19 +18,21 @@ def find_attr_in_tree(file, tree, attr):
             return file[subtree].attrs[attr]
 
 
-def load_data(datafile, baseline, reference, percentile_cutoff=0.0, grouped=False):
+def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, grouped=False,
+                E0 = None):
 
-    data_base = datafile[baseline]
-    data_ref = datafile[reference]
+    data_base = datafile[baseline +'/energy']
+    data_ref = datafile[reference +'/energy']
 
-    E0_base = find_attr_in_tree(datafile, baseline, 'E0')
-    E0_ref = find_attr_in_tree(datafile, reference, 'E0')
+    if E0 == None:
+        E0_base = find_attr_in_tree(datafile, baseline, 'E0')
+        E0_ref = find_attr_in_tree(datafile, reference, 'E0')
+    else:
+        E0_base = E0
+        E0_ref = 0
 
-    n_mol = find_attr_in_tree(datafile, baseline, 'n_mol')
-
-    tar = (data_ref[:, -1] - n_mol * E0_ref) - (data_base[:, -1] - n_mol * E0_base)
+    tar = (data_ref[:] - E0_ref) - (data_base[:] -  E0_base)
     tar = tar.real
-
     # if percentile_cutoff > 0:
     #     lim1 = np.percentile(tar, percentile_cutoff*100)
     #     lim2 = np.percentile(tar, (1 - percentile_cutoff)*100)
@@ -40,9 +42,8 @@ def load_data(datafile, baseline, reference, percentile_cutoff=0.0, grouped=Fals
     #     filter2 = [True]*len(tar)
     #
     # filter = filter2
-
-    data_base = data_base[:, :-1]
-    data_ref = data_ref[:, :-1]
+    data_base = datafile[baseline +'/density/' + basis_key]
+    data_base = data_base[:, :]
 
     feat = {}
     all_species = find_attr_in_tree(datafile, baseline, 'species')
