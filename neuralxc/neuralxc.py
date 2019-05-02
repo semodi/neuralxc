@@ -13,6 +13,8 @@ from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
 from .constants import Rydberg
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ProcessPoolExecutor
 # from mpi4py import MPI
 
 
@@ -169,7 +171,7 @@ class NeuralXC():
         symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
-
+        self.used_before = False
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error
@@ -192,8 +194,24 @@ class NeuralXC():
         self.species = species
         self.projector = DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
 
+
+    def _get_v_thread(self, rho, positions, species, calc_forces=False):
+        # print(positions, species)
+        positions = positions.reshape(-1,3)
+        species = [species]
+        C = self.projector.get_basis_rep(rho, positions, species)
+        assert (len(C) > 0)
+        D = self.symmetrizer.get_symmetrized(C)
+        assert(len(D) > 0)
+        dEdD = self._pipeline.get_gradient(D)
+        assert(len(dEdD) > 0)
+        dEdC = self.symmetrizer.get_gradient(dEdD, C)
+        E = self._pipeline.predict(D)[0]
+        V = self.projector.get_V(dEdC, positions, species, calc_forces, rho)
+        return E, V
+
     @prints_error
-    def get_V(self, rho, calc_forces=False):
+    def get_V(self, rho, calc_forces=False, force_serial=False, max_workers=None):
         """Parameters
         ------------------
         rho, array, float
@@ -215,9 +233,31 @@ class NeuralXC():
         	Machine learned potential
         """
 
-        C = self.projector.get_basis_rep(rho, self.positions, self.species)
-        D = self.symmetrizer.get_symmetrized(C)
-        dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
-        E = self._pipeline.predict(D)[0]
-        V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
-        return E, V
+        E = 0
+        if calc_forces:
+            V = [0,0]
+        else:
+            V = 0
+        if not self.used_before or force_serial:
+            C = self.projector.get_basis_rep(rho, self.positions, self.species)
+            D = self.symmetrizer.get_symmetrized(C)
+            dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
+            E = self._pipeline.predict(D)[0]
+            V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
+            self.used_before = True
+            return E, V
+        else:
+            with ThreadPoolExecutor(max_workers = max_workers) as executor:
+                future_to_rep = {executor.submit(self._get_v_thread, rho, position,
+                    spec, calc_forces): spec for position, spec in zip(self.positions, self.species)}
+
+                for future in future_to_rep:
+                    results = future.result()
+                    E += results[0]
+                    if calc_forces:
+                        V[0] += results[1][0]
+                        V[1] += results[1][1]
+                    else:
+                        V += results[1]
+
+            return E, V

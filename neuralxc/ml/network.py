@@ -20,6 +20,8 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.pipeline import Pipeline
 import pickle
 import shutil
+from .activation import get_activation
+
 Dataset = namedtuple("Dataset", "data species")
 
 
@@ -95,7 +97,7 @@ class NXCPipeline(Pipeline):
                            basis_instructions=self.basis_instructions,
                            symmetrize_instructions=self.symmetrize_instructions)
 
-    def save(self, path, override=False):
+    def save(self, path, override=False, npmodel=False):
         """ Save entire pipeline to disk.
 
         Parameters
@@ -116,20 +118,116 @@ class NXCPipeline(Pipeline):
         else:
             os.mkdir(path)
 
-        network = self.steps[-1][-1]._network
-        self.steps[-1][-1]._network = None
-        pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
-        network.save_model(os.path.join(path, 'network'))
-        self.steps[-1][-1]._network = network
+
+        if npmodel:
+            np_estimator = self.steps[-1][-1].get_np_estimator()
+            pickle.dump(NXCPipeline(self.steps[:-1] + [('estimator', np_estimator)],
+             self.basis_instructions, self.symmetrize_instructions),
+              open(os.path.join(path, 'pipeline.pckl'), 'wb'))
+
+        else:
+            network = self.steps[-1][-1]._network
+            self.steps[-1][-1]._network = None
+            network.save_model(os.path.join(path, 'network'))
+            pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
+            self.steps[-1][-1]._network = network
 
 
 def load_pipeline(path):
     """ Load a NXCPipeline from the directory specified in path
     """
     pipeline = pickle.load(open(os.path.join(path, 'pipeline.pckl'), 'rb'))
-    pipeline.steps[-1][-1].path = os.path.join(path, 'network')
+    if not isinstance(pipeline.steps[-1][-1], NumpyNetworkEstimator):
+        pipeline.steps[-1][-1].path = os.path.join(path, 'network')
     return pipeline
 
+class NumpyNetworkEstimator(BaseEstimator):
+
+    def __init__(self, W, B, activation):
+
+        self.W = W
+        self.B = B
+        self.activation = get_activation(activation)
+
+    def fit(self,*args):
+        pass
+
+    def get_gradient(self, X, *args, **kwargs):
+        made_list = False
+
+        if isinstance(X, tuple):
+            X = X[0]
+        if not isinstance(X, list):
+            X = [X]
+            made_list = True
+
+        X_list = X
+        predictions = [{}] * len(X_list)
+
+        for sys_idx, X in enumerate(X_list):
+            for spec in X:
+                feat = X[spec]
+                if feat.ndim == 3:
+                    old_shape = feat.shape
+                    feat = feat.reshape(-1, feat.shape[-1])
+
+                predictions[sys_idx][spec] = self.gradient(feat, self.W[spec],self.B[spec]).reshape(*old_shape)
+
+        if made_list:
+            predictions = predictions[0]
+        return predictions
+
+
+    def predict(self, X, *args, **kwargs):
+        made_list = False
+        if isinstance(X, tuple):
+            X = X[0]
+
+        if not isinstance(X, list):
+            X = [X]
+            made_list = True
+
+        X_list = X
+        predictions = []
+
+        for X in X_list:
+            prediction = 0
+
+            for spec in X:
+                feat = X[spec]
+                n_sys = len(feat)
+                if feat.ndim == 3:
+                    feat = feat.reshape(-1, feat.shape[-1])
+
+                prediction += np.sum(self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1),
+                                     axis=-1)
+
+            predictions.append(prediction)
+
+        if made_list:
+            predictions = predictions[0]
+        return predictions
+
+    def get_energy(self, x, W, B):
+        for w,b in zip(W[:-1],B[:-1]):
+            x = self.activation.f(x.dot(w) + b)
+
+        return x.dot(W[-1]) + B[-1]
+
+    def gradient(self, x, W, B):
+        gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
+        Z = []
+        for w,b in zip(W[:-1],B[:-1]):
+            x = x.dot(w) + b
+            Z.append(self.activation.df(x))
+            x = self.activation.f(x)
+
+        for w,z in zip(W[:-1],Z):
+            gradient = gradient.dot(w)*z
+
+        gradient = gradient.dot(W[-1])
+
+        return gradient[:,:,0].T
 
 class NetworkEstimator(BaseEstimator):
     def __init__(self,
@@ -319,6 +417,9 @@ class NetworkEstimator(BaseEstimator):
 
         return -np.mean(scores)
 
+    def get_np_estimator(self):
+        W, B = self._network.get_weights()
+        return NumpyNetworkEstimator(W, B, self.activation)
 
 class Energy_Network():
     """ Machine learned correcting functional (MLCF) for energies
@@ -466,6 +567,33 @@ class Energy_Network():
             cost_list.append(cost)
 
         return cost_list
+
+    def get_weights(self):
+        W = {}
+        B = {}
+
+        def load(subnet):
+            w = []
+            b = []
+            species = subnet.species
+            with self.graph.as_default():
+                with tf.variable_scope("", reuse=True):
+                    for l, layer in enumerate(subnet.layers + ['']):
+                        w.append(self.sess.run(tf.get_variable("{}/W{}".format(species, l + 1))))
+                        b.append(self.sess.run(tf.get_variable("{}/b{}".format(species, l + 1))))
+            species = species.upper()
+            if not species in W:
+                W[species] = w
+                B[species] = b
+
+        for subnet in self.subnets:
+            if isinstance(subnet, list):
+                for s in subnet:
+                    load(s)
+            else:
+                load(subnet)
+
+        return W, B
 
     def train(self,
               step_size=0.01,

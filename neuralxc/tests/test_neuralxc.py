@@ -317,3 +317,30 @@ def test_force_correction(use_delta):
             print(forces_fd)
             print(forces[incr_atom, incr_idx])
             assert np.allclose(-forces_fd, forces[incr_atom, incr_idx], atol=incr)
+
+
+
+@pytest.mark.skipif(not ase_found, reason='requires ase')
+@pytest.mark.parallel
+@pytest.mark.parametrize('use_delta', [False, True])
+def test_parallel(use_delta):
+
+    benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
+    positions = benzene_traj.get_positions() / Bohr
+    species = benzene_traj.get_chemical_symbols()
+    if use_delta:
+        drho, _, _ = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
+        benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'dbenzene'))
+        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.projector = xc.projector.DeltaProjector(benzene_nxc.projector)
+        benzene_nxc.projector.set_constant_density(drho, positions, species)
+
+    else:
+        benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+        benzene_nxc.initialize(unitcell, grid, positions, species)
+
+
+    V = benzene_nxc.get_V(rho, calc_forces=False)[1]
+    V = benzene_nxc.get_V(rho, calc_forces=False)[1]
