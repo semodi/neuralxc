@@ -1,0 +1,28 @@
+#!/usr/bin/python3
+
+from neuralxc import NeuralXC
+import argparse
+import numpy as np
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
+    parser.add_argument('tf', action='store', help ='Path to tensorflow model')
+    parser.add_argument('np', action='store', help='Destination for numpy model')
+    parser.add_argument('override', action='store_true', help='Override existing model?')
+    args = parser.parse_args()
+
+    nxc_tf = NeuralXC(args.tf)
+    pipeline = nxc_tf._pipeline
+
+    #Needs to do a fake run to build the tensorflow graph
+
+    unitcell = np.eye(3)*20
+    grid = [40]*3
+    rho = np.zeros(grid)
+
+    species = [key for key in pipeline.get_basis_instructions() if len(key) == 1]
+    positions = np.zeros([len(species),3])
+
+    nxc_tf.initialize(unitcell, grid, positions, species)
+    nxc_tf.get_V(rho)
+
+    nxc_tf._pipeline.save(args.np, args.override, True)

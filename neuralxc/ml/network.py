@@ -143,6 +143,8 @@ def load_pipeline(path):
 
 class NumpyNetworkEstimator(BaseEstimator):
 
+    allows_threading = True
+
     def __init__(self, W, B, activation):
 
         self.W = W
@@ -229,7 +231,12 @@ class NumpyNetworkEstimator(BaseEstimator):
 
         return gradient[:,:,0].T
 
+    def get_np_estimator(self):
+        return self
+
 class NetworkEstimator(BaseEstimator):
+
+    allows_threading = False
     def __init__(self,
                  n_nodes,
                  n_layers,

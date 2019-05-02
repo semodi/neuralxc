@@ -35,7 +35,10 @@ setup(
     package_data={'neuralxc': ["data/*.dat"]
                   },
 
-    scripts=['./bin/neuralxc-fit','./bin/neuralxc-pre-fit','./bin/neuralxc-basis','./bin/neuralxc-data','./bin/neuralxc-hdf5-fit'],
+    scripts=['./bin/neuralxc-fit','./bin/neuralxc-pre-fit',
+        './bin/neuralxc-basis','./bin/neuralxc-data',
+        './bin/neuralxc-hdf5-fit',
+        './bin/neuralxc-tfconverter'],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email
     # url='http://www.my_package.com',  # Website
