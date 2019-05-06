@@ -19,7 +19,6 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.traj_path = traj_path
-        self.target_path = target_path
         self.computed_basis = {}
         self.num_workers = num_workers
 
@@ -28,30 +27,13 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         return self
 
     def transform(self, X=None, y=None):
-        self.filename = self.basis_to_filename(self.basis_instructions)
-        if not self.computed_basis == self.basis_instructions:
-            if os.path.isfile(self.filename):
-                print('Preprocessor: Reusing data stored in ' + self.filename)
-                self.data = np.load(self.filename)
-            else:
-                print('Preprocessor: {} not found Projecting onto basis, with {} workers'.format(
-                    self.filename, self.num_workers))
-                basis_rep = self.get_basis_rep()
-                sys_idx = np.array([0] * len(basis_rep)).reshape(-1, 1)
-                targets = np.load(self.target_path).reshape(-1, 1)
-                self.data = np.concatenate([sys_idx, basis_rep, targets], axis=-1)
-                self.computed_basis = self.basis_instructions
-                np.save(self.filename, self.data)
+        basis_rep = self.get_basis_rep()
+        self.data = basis_rep
+        self.computed_basis = self.basis_instructions
         data = np.array(self.data)
-
         if isinstance(X, list) or isinstance(X, np.ndarray):
             data = data[X]
-
-        return {'data': data, 'basis_instructions': self.basis_instructions}
-
-    @staticmethod
-    def basis_to_filename(basis):
-        return os.path.join('.tmp', hashlib.md5(json.dumps(basis).encode()).hexdigest() + '.npy')
+        return data
 
     def get_basis_rep(self):
 
@@ -98,8 +80,6 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
         rho, unitcell, grid = density_getter.get_density(path)
         projector = DensityProjector(unitcell, grid, self.basis_instructions)
-        # projector = BehlerProjector(unitcell, grid, self.basis_instructions)
-
         basis_rep = projector.get_basis_rep(rho, pos, species)
         del rho
         results = []

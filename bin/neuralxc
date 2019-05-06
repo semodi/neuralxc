@@ -1,0 +1,524 @@
+#!/usr/bin/python3
+import matplotlib.pyplot as plt
+import numpy as np
+import neuralxc as xc
+import sys
+import argparse
+import json
+import glob
+import h5py
+from ase.io import read
+from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
+from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedStandardScaler
+from neuralxc.ml import NetworkEstimator as NetworkWrapper
+from neuralxc.ml import NXCPipeline
+from neuralxc.ml.network import load_pipeline
+from neuralxc.ml.utils import SampleSelector, load_data, find_attr_in_tree
+from neuralxc.preprocessor import Preprocessor
+from sklearn.model_selection import GridSearchCV
+# from dask_ml.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+import pandas as pd
+from pprint import pprint
+from dask.distributed import Client, LocalCluster
+from sklearn.externals.joblib import parallel_backend
+import time
+import os
+import shutil
+from collections import namedtuple
+import hashlib
+def plot_basis(args):
+    """ Plots a set of basis functions specified in .json file"""
+
+    basis_instructions = json.loads(open(args.basis,'r').read())
+    projector = xc.projector.DensityProjector(np.eye(3),np.ones(3),
+        basis_instructions['basis'])
+
+    for spec in basis_instructions['basis']:
+        if not len(spec) == 1: continue
+        basis = basis_instructions['basis'][spec]
+        n = basis_instructions['basis'][spec]['n']
+        W = projector.get_W(basis)
+        r = np.linspace(0,basis['r_o'],500)
+        radials = projector.radials(r,basis,W)
+        for rad in radials:
+            plt.plot(r, rad)
+        plt.show()
+
+
+def convert_tf(args):
+    nxc_tf = xc.NeuralXC(args.tf)
+    pipeline = nxc_tf._pipeline
+
+    #Needs to do a fake run to build the tensorflow graph
+    unitcell = np.eye(3)*20
+    grid = [40]*3
+    rho = np.zeros(grid)
+
+    species = [key for key in pipeline.get_basis_instructions() if len(key) == 1]
+    positions = np.zeros([len(species),3])
+
+    nxc_tf.initialize(unitcell, grid, positions, species)
+    nxc_tf.get_V(rho)
+
+    nxc_tf._pipeline.save(args.np, args.override, True)
+
+
+
+def add_energy(*args, **kwargs):
+    return add_data('energy', *args, **kwargs)
+
+def add_forces(*args, **kwargs):
+    return add_data('forces', *args, **kwargs)
+
+def add_density(key, *args, **kwargs):
+    return add_data(key, *args, **kwargs)
+
+def add_species(file, system, traj_path = ''):
+
+        order = [system]
+        cg = file #Current group
+        for idx, o in enumerate(order):
+            if not o in cg.keys():
+                cg = cg.create_group(o)
+            else:
+                cg = cg[o]
+
+        if not 'species' in cg.attrs:
+            if not traj_path:
+                raise Exception('Must provide a trajectory file to define species')
+            species = ''.join(read(traj_path, 0).get_chemical_symbols())
+            cg.attrs.update({'species' : species})
+
+def add_data(which, file, data, system, method,
+              override= False):
+
+        order = [system, method]
+        if not which in ['energy','forces']:
+            order.append('density')
+
+        cg = file #Current group
+        for idx, o in enumerate(order):
+            if not o in cg.keys():
+                cg = cg.create_group(o)
+            else:
+                cg = cg[o]
+
+        if which =='energy':
+            cg.attrs.update({'E0': min(data)})
+
+        print('{} systems found, adding {}'.format( len(data), which))
+
+        def create_dataset():
+            cg.create_dataset(which,
+                    data = data)
+
+        try:
+            create_dataset()
+        except RuntimeError:
+            if override:
+                del cg[which]
+                create_dataset()
+            else:
+                print('Already exists. Set override=True')
+
+def add_data_driver(args):
+    try:
+        file = h5py.File(args.hdf5 ,'r+')
+    except OSError:
+        file = h5py.File(args.hdf5 ,'w')
+
+    i,j,k = [(None if a == '' else int(a)) for a in args.slice.split(':')] +\
+        [None]*(3-len(args.slice.split(':')))
+
+    ijk = slice(i,j,k)
+
+    def obs(which):
+        if which == 'energy':
+            if args.traj:
+                add_species(file, args.system, args.traj)
+                energies = np.array([a.get_potential_energy()\
+                 for a in read(args.traj,':')])[ijk]
+                add_energy(file, energies, args.system, args.method, args.override)
+            else:
+                raise Exception('Must provide a trajectory file')
+                file.close()
+        elif which == 'forces':
+            if args.traj:
+                add_species(file, args.system, args.traj)
+                forces = np.array([a.get_forces()\
+                 for a in read(args.traj,':')])[ijk]
+                add_forces(file, forces, args.system, args.method, args.override)
+            else:
+                raise Exception('Must provide a trajectory file')
+                file.close()
+        elif which == 'density':
+            add_species(file, args.system, args.traj)
+            species = file[args.system].attrs['species']
+            data = np.load(args.density)[ijk]
+            add_density((args.density.split('/')[-1]).split('.')[0], file, data,
+                args.system, args.method, args.override)
+        else:
+            raise Exception('Option {} not recognized'.format(which))
+
+    if args.density and not 'density' in args.add:
+        args.add.append('density')
+    for observable in args.add:
+        obs(observable)
+
+    file.close()
+
+def match_hyperparameter(hp, parameters):
+    matches = []
+    for par in parameters:
+        if hp == par:
+            matches.append(par)
+    if len(matches) != 1:
+        print(matches)
+        raise ValueError('{} matches found for hyperparameter {}. Must be exactly 1'.format(len(matches),hp))
+    return matches[0]
+
+def to_full_hyperparameters(hp, parameters):
+    full = {}
+    for name in hp:
+        new_key = 'ml__' + match_hyperparameter(name, parameters)
+        full[new_key] = hp[name]
+        if not isinstance(full[new_key], list):
+            full[new_key] = [full[new_key]]
+    return full
+
+
+def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_threshold = 0.999):
+
+    symmetrizer_instructions = {'basis': basis,
+                         'symmetrizer_type': symmetrizer_type}
+
+    spec_group = SpeciesGrouper(basis, [species])
+    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+    var_selector = GroupedVarianceThreshold()
+
+    estimator = NetworkWrapper(4, 1, 0,
+                            alpha=0.001, max_steps = 4001, test_size = 0.0,
+                               valid_size=0, random_seed = None)
+
+    pipeline_list = [('spec_group',  spec_group),
+                     ('symmetrizer', symmetrizer),
+                     ('var_selector', var_selector)]
+
+    if pca_threshold < 1:
+        pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
+        pipeline_list.append(('pca', pca))
+
+    pipeline_list.append(('scaler', GroupedStandardScaler()))
+    pipeline_list.append(('estimator', estimator))
+
+    basis_instructions = basis
+    symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
+
+    return  NXCPipeline(pipeline_list, basis_instructions=basis_instructions,
+                             symmetrize_instructions=symmetrizer_instructions)
+
+def load_sets(datafile, baseline, reference, basis_key):
+
+    all_species = []
+    X, y, basis, species =\
+        load_data(datafile, baseline, reference,basis_key, 0 ,False)
+
+    X = np.concatenate([np.array([0]*len(X)).reshape(-1,1), X],axis = 1)
+
+    data = np.concatenate([X,y.reshape(-1,1)], axis =1)
+    return data, basis, [species]
+
+def get_basis_grid(preprocessor):
+
+    basis = preprocessor['basis']
+
+    from collections import abc
+    def nested_dict_iter(nested):
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                yield from nested_dict_iter(value)
+            else:
+                yield key, value
+
+    def nested_dict_build(nested, i):
+        select_dict = {}
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                select_dict[key] =  nested_dict_build(value,i)
+            else:
+                if isinstance(value, list):
+                    select_dict[key] = value[i]
+                else:
+                    select_dict[key] = value
+        return select_dict
+
+    max_len = 0
+
+    dict_mask = {}
+    #Check for consistency and build dict mask
+    for key, value in nested_dict_iter(basis):
+        if isinstance(value, list):
+            new_len = len(value)
+            if new_len != max_len and max_len != 0:
+                raise ValueError('Inconsistent list lengths in basis sets')
+            else:
+                max_len = new_len
+
+    max_len = max(max_len,1)
+    basis_grid = [nested_dict_build(basis,i) for i in range(max_len)]
+    basis_grid = {'preprocessor__basis_instructions': basis_grid}
+
+    return basis_grid
+
+def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
+    if not mask:
+        inp = json.loads(open(inputfile,'r').read())
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        inp = {}
+        pre = {}
+
+
+    datafile = h5py.File(hdf5[0],'r')
+
+    species =  ''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))
+    datafile.close()
+    if pre:
+        basis = pre['basis']
+    else:
+        basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in species}
+        basis.update({'extension' : 'DRHO'})
+    pipeline = get_default_pipeline(basis, species)
+
+    if mask:
+        params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
+        inp.update({'hyperparameters': params})
+        inp.update({'cv':2,'n_workers':1,'threads_per_worker':1,'n_jobs':1})
+        open(inputfile,'w').write(json.dumps(inp, indent = 4))
+        open(preprocessor,'w').write(json.dumps({'basis': basis}, indent= 4))
+        return None, None
+    else:
+        if 'hyperparameters' in inp:
+            hyper = inp['hyperparameters']
+        else:
+            print('No hyperparameters specified, fitting default pipeline to data')
+            pipeline.fit(data)
+            sys.exit()
+
+        hyper = to_full_hyperparameters(hyper , pipeline.get_params())
+
+        cv = inp.get('cv',2)
+        n_workers = inp.get('n_workers', 1)
+        n_jobs = inp.get('n_jobs', 1)
+        n_threads = inp.get('threads_per_worker', 1)
+        verbose = inp.get('verbose',10)
+
+
+        pipe = Pipeline([('ml', pipeline)])
+        # pprint(hyper.keys())
+        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
+        return grid_cv
+
+def fit_driver(args):
+
+    args = parser.parse_args()
+    inputfile = args.config
+    preprocessor = args.preprocessor
+    hdf5 = args.hdf5
+    mask = args.mask
+
+    if not mask:
+        inp = json.loads(open(inputfile,'r').read())
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        inp = {}
+        pre = {}
+
+    best_model = get_grid_cv(hdf5, preprocessor, inputfile, mask)
+    if not mask:
+        start = time.time()
+        try:
+            os.mkdir('.tmp')
+        except FileExistsError:
+            pass
+
+        datafile = h5py.File(hdf5[0],'r')
+        basis_key = basis_to_hash(pre['basis'])
+        data,_,_ = load_sets(datafile, hdf5[1], hdf5[2], basis_key)
+        cluster = LocalCluster(n_workers = inp.get('n_workers',1),
+        threads_per_worker=inp.get('threads_per_worker',1))
+        # cluster = LocalCluster(processes=False)
+        client = Client(cluster)
+        if inp.get('n_workers',1)==1 and inp.get('threads_per_worker',1)==1:
+            backend = 'loky'
+        else:
+            backend = 'dask'
+        print("BACKEND: ", backend)
+        with parallel_backend(backend):
+            print('======Hyperparameter search======')
+
+            best_model.fit(data)
+        # best_model.fit(list(range(len(atoms))))
+        end = time.time()
+        print('Took {}s'.format(end-start))
+        open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
+        pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
+        best_params_ = best_model.best_params_
+        best_estimator = best_model.best_estimator_.steps[0][1].start_at(2)
+        best_estimator.basis_instructions =  pre['basis']
+        best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
+        best_estimator.save('best_model',True)
+
+def get_preprocessor(preprocessor, mask=False, xyz=''):
+    if not mask:
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        pre = {}
+
+    if 'traj_path' in pre:
+        atoms = read(pre['traj_path'], '0')
+    elif xyz != '':
+        atoms = read(xyz, '0')
+    else:
+        raise ValueError('Must specify path to to xyz file')
+
+    species = ''.join(atoms.get_chemical_symbols())
+    basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in species}
+
+    if mask:
+        open(preprocessor,'w').write(json.dumps({'basis': basis,
+                                'src_path': '',
+                                'traj_path': xyz,
+                                'n_workers': 1}, indent= 4))
+        return None, None
+    else:
+        basis_grid = get_basis_grid(pre)
+
+
+        preprocessor = Preprocessor(basis, pre['src_path'],
+                                           pre['traj_path'],
+                                           pre.get('n_workers',1))
+        return preprocessor
+
+def basis_to_hash(basis):
+    return  hashlib.md5(json.dumps(basis).encode()).hexdigest()
+
+def pre_driver(args):
+
+    preprocessor = args.preprocessor
+    dest = args.dest
+    xyz = args.xyz
+    mask = args.mask
+
+    if not mask:
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        pre = {}
+
+    if 'traj_path' in pre and pre['traj_path'] != '':
+        atoms = read(pre['traj_path'], ':')
+        trajectory_path = pre['traj_path']
+    elif xyz != '':
+        atoms = read(xyz, ':')
+        trajectory_path = xyz
+    else:
+        raise ValueError('Must specify path to to xyz file')
+
+    preprocessor = get_preprocessor(preprocessor, mask, xyz)
+    if not mask:
+        start = time.time()
+
+        if 'hdf5' in dest:
+            dest_split = dest.split('/')
+            file, system, method = dest_split + ['']*(3-len(dest_split))
+            workdir = '.tmp'
+            delete_workdir = True
+        else:
+            workdir = dest
+            delete_workdir = False
+
+        try:
+            os.mkdir(workdir)
+        except FileExistsError:
+            delete_workdir = False
+            pass
+        print('======Projecting onto basis sets======')
+        basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
+
+        for basis_instr in basis_grid:
+            print(basis_instr)
+            preprocessor.basis_instructions = basis_instr
+            filename = os.path.join(workdir,basis_to_hash(basis_instr) + '.npy')
+            data = preprocessor.fit_transform(list(range(len(atoms))))
+            np.save(filename, data)
+            if 'hdf5' in dest:
+                data_args = namedtuple(\
+                'data_ns','hdf5 system method density slice add traj override')(\
+                file,system,method,filename, ':',[],trajectory_path, True)
+                add_data_driver(data_args)
+
+
+        if delete_workdir:
+            shutil.rmtree(workdir)
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Add data to hdf5 file')
+    subparser = parser.add_subparsers()
+
+    #================ Plot Basis Set ================
+    basis = subparser.add_parser('basis', description='Plot radial basis functions')
+    basis.add_argument('basis', action='store', type=str, help='Path to .json file \
+        containing the basis to plot')
+    basis.set_defaults(func=plot_basis)
+
+    #================ Tensorflow model converter ==========
+
+    tfcon = subparser.add_parser('convert-tf', description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
+    tfcon.add_argument('tf', action='store', help ='Path to tensorflow model')
+    tfcon.add_argument('np', action='store', help='Destination for numpy model')
+    tfcon.add_argument('override', action='store_true', help='Override existing model?')
+    tfcon.set_defaults(func=convert_tf)
+
+    #================ Data adder ================
+
+    adddat = subparser.add_parser('add-data', description='Add data to hdf5 file')
+    adddat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
+    adddat.add_argument('system', action='store',type=str, help ='System')
+    adddat.add_argument('method', action='store',type=str, help ='Method')
+    adddat.add_argument('add', action='store',type=str, nargs='*',
+        help='Which quantities to add (energy, forces, density)')
+    adddat.add_argument('-traj', metavar='traj',
+        type=str, default='', help='Path to .xyz/.traj file')
+    adddat.add_argument('-density', metavar='density',
+        type=str, default='', help='Path to basis representation file')
+    adddat.add_argument('-override', action=('store_true'), help='If exists, override?')
+    adddat.add_argument('-slice', metavar='slice',
+        type=str, default=':', help='Only add slice of dataset')
+    adddat.set_defaults(func=add_data_driver)
+
+    # =============== Fitter =====================
+
+    fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
+    fit.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    fit.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    fit.set_defaults(func=fit_driver)
+
+    # ============== Preprocessor =================
+
+    pre = subparser.add_parser('pre', description='Preprocess electron density')
+    pre.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    pre.add_argument('-dest', metavar='dest', type=str, default = '.tmp/', help ='Destination where to store data,\
+                                                                        can be either a directory or an .hdf5 file (with groups)')
+    pre.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    pre.add_argument('-xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
+    pre.set_defaults(func=pre_driver)
+
+    args = parser.parse_args()
+
+    args.func(args)
