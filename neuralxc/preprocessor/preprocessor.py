@@ -62,7 +62,8 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                  system.get_positions() / Bohr,
                  system.get_chemical_symbols()])
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
-        futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)])
+        futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)],
+            len(jobs)*[self.basis_instructions])
         results = [f.result() for f in futures]
         return results
 
@@ -72,14 +73,14 @@ class Preprocessor(TransformerMixin, BaseEstimator):
     def id(self, *args):
         return 1
 
-    def transform_one(self, path, pos, species):
+    def transform_one(self, path, pos, species, basis_instructions):
 
         density_getter = density_getter_factory(\
-            self.basis_instructions.get('application', 'siesta'),
-            binary = self.basis_instructions.get('binary', True))
+            basis_instructions.get('application', 'siesta'),
+            binary = basis_instructions.get('binary', True))
 
         rho, unitcell, grid = density_getter.get_density(path)
-        projector = DensityProjector(unitcell, grid, self.basis_instructions)
+        projector = DensityProjector(unitcell, grid, basis_instructions)
         basis_rep = projector.get_basis_rep(rho, pos, species)
         del rho
         results = []

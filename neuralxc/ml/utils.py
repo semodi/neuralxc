@@ -18,7 +18,7 @@ def find_attr_in_tree(file, tree, attr):
             return file[subtree].attrs[attr]
 
 
-def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, grouped=False,
+def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
                 E0 = None):
 
     data_base = datafile[baseline +'/energy']
@@ -31,6 +31,12 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, g
         E0_base = E0
         E0_ref = 0
 
+    if E0_base == None:
+        print('Warning: E0 for baseline data not found, setting to 0')
+        E0_base = 0
+    if E0_ref == None:
+        print('Warning: E0 for reference data not found, setting to 0')
+        E0_ref = 0
     tar = (data_ref[:] - E0_ref) - (data_base[:] -  E0_base)
     tar = tar.real
     # if percentile_cutoff > 0:
@@ -45,32 +51,32 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, g
     data_base = datafile[baseline +'/density/' + basis_key]
     data_base = data_base[:, :]
 
-    feat = {}
-    all_species = find_attr_in_tree(datafile, baseline, 'species')
-    all_species = [c for c in all_species]
-    unique_species = np.unique(all_species)
-    attrs = {}
+    # feat = {}
+    # all_species = find_attr_in_tree(datafile, baseline, 'species')
+    # all_species = [c for c in all_species]
+    # unique_species = np.unique(all_species)
+    # attrs = {}
 
-    for spec in unique_species:
-        attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
-             for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
+    # for spec in unique_species:
+        # attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
+             # for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
 
-    if grouped:
-        for spec in unique_species:
-            feat[spec] = []
-
-        current_loc = 0
-        for spec in all_species:
-            len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
-            feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
-            current_loc += len_descr
-
-        for spec in unique_species:
-            feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
-
-        return feat, tar, attrs, ''.join(all_species)
-    else:
-        return data_base, tar, attrs, ''.join(all_species)
+# if grouped:
+#     for spec in unique_species:
+#         feat[spec] = []
+#
+#     current_loc = 0
+#     for spec in all_species:
+#         len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
+#         feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
+#         current_loc += len_descr
+#
+#     for spec in unique_species:
+#         feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
+#
+#     return feat, tar, attrs, ''.join(all_species)
+# else:
+    return data_base, tar
 
 
 class SampleSelector(BaseEstimator):

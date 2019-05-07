@@ -105,6 +105,8 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             X = X['data']
             made_dict = True
 
+        print(self._attrs)
+        print(self._sys_species)
         y = X[:, -1].real
         X = X[:, :-1]
 
@@ -127,9 +129,9 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
         for this_sys, _ in enumerate(self._sys_species):
             this_species = self._sys_species[this_sys]
+
             X_sys = X[system == this_sys]
             y_sys = y[system == this_sys]
-
             feat_dict = {}
 
             idx = 0
@@ -138,13 +140,16 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
                     feat_dict[spec] = []
 
                 vec_len = self._attrs[spec]['n'] * sum([2 * l + 1 for l in range(self._attrs[spec]['l'])])
-
-                feat_dict[spec].append(X_sys[:, idx:idx + vec_len])
+                x_atm = X_sys[:, idx:idx + vec_len]
+                print(x_atm.shape)
+                feat_dict[spec].append(x_atm)
                 idx += vec_len
 
             for spec in feat_dict:
+                print(spec)
+                print(feat_dict[spec][0].shape)
                 feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
-
+                print(spec)
             features.append(feat_dict)
             targets.append(y_sys)
         if made_dict:
