@@ -238,10 +238,13 @@ def split_data_driver(args):
     for new_path in split_sets:
         file.create_dataset(new_path, data = split_sets[new_path])
 
+    for new_path, path in zip(split_sets, all_sets):
+        file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
     if comp_sets:
         for comp_path in comp_sets:
             file.create_dataset(comp_path, data = comp_sets[comp_path])
-
+        for new_path, path in zip(comp_sets, all_sets):
+                file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
     # print(split_sets)
 
 def delete_data_driver(args):
@@ -302,7 +305,7 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
 def load_sets(datafile, baseline, reference, basis_key):
 
     X, y =\
-        load_data(datafile, baseline, reference,basis_key, 0 ,False)
+        load_data(datafile, baseline, reference,basis_key, 0)
 
     X = np.concatenate([np.array([0]*len(X)).reshape(-1,1), X],axis = 1)
 
@@ -425,6 +428,10 @@ def fit_driver(args):
         datafile = h5py.File(hdf5[0],'r')
         basis_key = basis_to_hash(pre['basis'])
         data = load_sets(datafile, hdf5[1], hdf5[2], basis_key)
+        if args.sample != '':
+            sample = np.load(args.sample)
+            data = data[sample]
+            print("Using sample of size {}".format(len(sample))) 
         cluster = LocalCluster(n_workers = inp.get('n_workers',1),
         threads_per_worker=inp.get('threads_per_worker',1))
         # cluster = LocalCluster(processes=False)
@@ -449,6 +456,61 @@ def fit_driver(args):
         best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
         best_estimator.save('best_model',True)
 
+def sample_driver(args):
+
+    args = parser.parse_args()
+    preprocessor = args.preprocessor
+    hdf5 = args.hdf5
+
+    pre = json.loads(open(preprocessor,'r').read())
+
+    datafile = h5py.File(hdf5[0],'r')
+    basis_key = basis_to_hash(pre['basis'])
+    data = load_sets(datafile, hdf5[1], hdf5[1], basis_key)
+    basis = pre['basis']
+    symmetrizer_instructions = {'symmetrizer_type' :'casimir'}
+    symmetrizer_instructions.update({'basis' : basis})
+    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
+    spec_group = SpeciesGrouper(basis, species)
+    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+
+    sampler_pipeline = Pipeline([('spec_group', spec_group),('symmetrizer',symmetrizer),
+        ('sampler', SampleSelector(args.size))])
+    sample = sampler_pipeline.predict(data)
+    np.save(args.dest, np.array(sample))
+
+def eval_driver(args):
+
+    args = parser.parse_args()
+    preprocessor = args.preprocessor
+    hdf5 = args.hdf5
+
+    pre = json.loads(open(preprocessor,'r').read())
+
+    datafile = h5py.File(hdf5[0],'r')
+    basis_key = basis_to_hash(pre['basis'])
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key)
+
+    model = xc.NeuralXC(args.model)._pipeline
+    basis = model.get_basis_instructions()
+    symmetrizer_instructions = model.get_symmetrize_instructions()
+    symmetrizer_instructions.update({'basis' : basis})
+    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
+    spec_group = SpeciesGrouper(basis, species)
+    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+    print('Symmetrizer instructions', symmetrizer_instructions)
+    pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)
+        ] + model.steps, basis_instructions=basis,
+         symmetrize_instructions=symmetrizer_instructions)
+
+    targets = data[:,-1].real
+    predictions = pipeline.predict(data)
+    dev = (predictions - targets)
+    dev0 = np.abs(dev - np.mean(dev))
+    results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
+               'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
+
+    pprint(results)
 def get_preprocessor(preprocessor, mask=False, xyz=''):
     if not mask:
         pre = json.loads(open(preprocessor,'r').read())
@@ -603,6 +665,12 @@ if __name__ == '__main__':
     deldat.add_argument('group', action='store',type=str, help ='Which group to apply slicing to')
     deldat.set_defaults(func=delete_data_driver)
 
+    sampledat = datsub.add_parser('sample')
+    sampledat.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    sampledat.add_argument('size', action='store',type=int, help ='Sample size')
+    sampledat.add_argument('-dest', action='store',type=str,default='sample.npy', help ='Save to')
+    sampledat.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
+    sampledat.set_defaults(func=sample_driver)
     # =============== Fitter =====================
 
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
@@ -610,7 +678,18 @@ if __name__ == '__main__':
     fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
     fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
     fit.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
     fit.set_defaults(func=fit_driver)
+
+    # =============== Evaluate =====================
+
+    eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
+    eval.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    eval.add_argument('model', action='store', help ='Path to NeuralXC model')
+    eval.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    eval.add_argument('-plot', action='store_true', help ='Create scatterplot?')
+    eval.add_argument('-savefig', action='store',type=str, default='', help ='Save scatterplot?')
+    eval.set_defaults(func=eval_driver)
 
     # ============== Preprocessor =================
 

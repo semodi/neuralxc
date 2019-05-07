@@ -141,15 +141,11 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
                 vec_len = self._attrs[spec]['n'] * sum([2 * l + 1 for l in range(self._attrs[spec]['l'])])
                 x_atm = X_sys[:, idx:idx + vec_len]
-                print(x_atm.shape)
                 feat_dict[spec].append(x_atm)
                 idx += vec_len
 
             for spec in feat_dict:
-                print(spec)
-                print(feat_dict[spec][0].shape)
                 feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
-                print(spec)
             features.append(feat_dict)
             targets.append(y_sys)
         if made_dict:

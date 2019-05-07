@@ -30,13 +30,15 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
     else:
         E0_base = E0
         E0_ref = 0
-
     if E0_base == None:
         print('Warning: E0 for baseline data not found, setting to 0')
         E0_base = 0
     if E0_ref == None:
         print('Warning: E0 for reference data not found, setting to 0')
         E0_ref = 0
+
+    print('E0 base', E0_base)
+    print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] -  E0_base)
     tar = tar.real
     # if percentile_cutoff > 0:
@@ -103,7 +105,7 @@ class SampleSelector(BaseEstimator):
                                                self._n_instances,
                                                picked=picks[idx],
                                                random_state=self._random_state)
-        return picks
+        return picks[0][:self._n_instances]
 
     @staticmethod
     def sample_clusters(data,
@@ -111,7 +113,7 @@ class SampleSelector(BaseEstimator):
                         n_samples,
                         picked=[],
                         cluster_method=KMeans,
-                        pca_threshold=0.99,
+                        pca_threshold=0.999,
                         random_state=None):
 
         pca = PCA(n_components=pca_threshold, svd_solver='full')
