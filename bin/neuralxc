@@ -277,7 +277,7 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
     symmetrizer_instructions = {'basis': basis,
                          'symmetrizer_type': symmetrizer_type}
 
-    spec_group = SpeciesGrouper(basis, [species])
+    spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
     var_selector = GroupedVarianceThreshold()
 
@@ -302,14 +302,39 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
     return  NXCPipeline(pipeline_list, basis_instructions=basis_instructions,
                              symmetrize_instructions=symmetrizer_instructions)
 
-def load_sets(datafile, baseline, reference, basis_key):
+def load_sets(datafile, baseline, reference, basis_key, percentile_cutoff=0):
+    if not isinstance(baseline ,list):
+        baseline = [baseline]
 
-    X, y =\
-        load_data(datafile, baseline, reference,basis_key, 0)
+    if not isinstance(reference ,list):
+        reference = [reference]
 
-    X = np.concatenate([np.array([0]*len(X)).reshape(-1,1), X],axis = 1)
+    if not isinstance(percentile_cutoff ,list):
+        percentile_cutoff = [percentile_cutoff]*len(baseline)
 
+    Xs = []
+    ys = []
+    max_width = 0
+
+    for sysidx, (bl, ref, perc) in enumerate(zip(baseline, reference, percentile_cutoff)):
+        X, y =\
+            load_data(datafile, bl, ref, basis_key, perc)
+        X = np.concatenate([np.array([sysidx]*len(X)).reshape(-1,1), X],axis = 1)
+        max_width = max(max_width, X.shape[1])
+        Xs.append(X)
+        ys.append(y)
+
+    #pad datasets
+    if len(Xs) > 1:
+        for i,X in enumerate(Xs):
+            if X.shape[1] < max_width:
+                Xs[i] = np.concatenate([X, np.zeros([len(X),
+                    max_width - X.shape[1]])],axis = 1)
+
+    X = np.concatenate(Xs, axis = 0)
+    y = np.concatenate(ys, axis = 0)
     data = np.concatenate([X,y.reshape(-1,1)], axis =1)
+    np.random.shuffle(data)
     return data
 
 def get_basis_grid(preprocessor):
@@ -365,14 +390,20 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
 
     datafile = h5py.File(hdf5[0],'r')
 
-    species =  ''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))
+    if not isinstance(hdf5[1],list):
+        hdf5[1] = [hdf5[1]]
+
+    all_species = []
+    for set in hdf5[1]:
+        all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
+
     datafile.close()
     if pre:
         basis = pre['basis']
     else:
-        basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in species}
+        basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in ''.join(all_species)}
         basis.update({'extension' : 'DRHO'})
-    pipeline = get_default_pipeline(basis, species)
+    pipeline = get_default_pipeline(basis, all_species)
 
     if mask:
         params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
@@ -402,12 +433,30 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
         grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
         return grid_cv
 
+def parse_sets_input(path):
+    hdf5=['',[],[]]
+    with open(path, 'r') as setsfile:
+        line = setsfile.readline().rstrip()
+        hdf5[0] = line #datafile location
+        line = setsfile.readline().rstrip()
+        while(line):
+            split = line.split()
+            hdf5[1].append(split[0])
+            hdf5[2].append(split[1])
+            line = setsfile.readline().rstrip()
+    return hdf5
+
 def fit_driver(args):
 
     args = parser.parse_args()
     inputfile = args.config
     preprocessor = args.preprocessor
-    hdf5 = args.hdf5
+
+    if args.sets != '':
+        hdf5 = parse_sets_input(args.sets)
+    else:
+        hdf5 = args.hdf5
+
     mask = args.mask
 
     if not mask:
@@ -427,11 +476,11 @@ def fit_driver(args):
 
         datafile = h5py.File(hdf5[0],'r')
         basis_key = basis_to_hash(pre['basis'])
-        data = load_sets(datafile, hdf5[1], hdf5[2], basis_key)
+        data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
         if args.sample != '':
             sample = np.load(args.sample)
             data = data[sample]
-            print("Using sample of size {}".format(len(sample))) 
+            print("Using sample of size {}".format(len(sample)))
         cluster = LocalCluster(n_workers = inp.get('n_workers',1),
         threads_per_worker=inp.get('threads_per_worker',1))
         # cluster = LocalCluster(processes=False)
@@ -466,7 +515,7 @@ def sample_driver(args):
 
     datafile = h5py.File(hdf5[0],'r')
     basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[1], basis_key)
+    data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, args.cutoff)
     basis = pre['basis']
     symmetrizer_instructions = {'symmetrizer_type' :'casimir'}
     symmetrizer_instructions.update({'basis' : basis})
@@ -489,28 +538,37 @@ def eval_driver(args):
 
     datafile = h5py.File(hdf5[0],'r')
     basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key)
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
 
-    model = xc.NeuralXC(args.model)._pipeline
-    basis = model.get_basis_instructions()
-    symmetrizer_instructions = model.get_symmetrize_instructions()
-    symmetrizer_instructions.update({'basis' : basis})
-    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
-    spec_group = SpeciesGrouper(basis, species)
-    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-    print('Symmetrizer instructions', symmetrizer_instructions)
-    pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)
-        ] + model.steps, basis_instructions=basis,
-         symmetrize_instructions=symmetrizer_instructions)
+    if not args.model == '':
+        model = xc.NeuralXC(args.model)._pipeline
+        basis = model.get_basis_instructions()
+        symmetrizer_instructions = model.get_symmetrize_instructions()
+        symmetrizer_instructions.update({'basis' : basis})
+        species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
+        spec_group = SpeciesGrouper(basis, species)
+        symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+        print('Symmetrizer instructions', symmetrizer_instructions)
+        pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)
+            ] + model.steps, basis_instructions=basis,
+             symmetrize_instructions=symmetrizer_instructions)
 
-    targets = data[:,-1].real
-    predictions = pipeline.predict(data)
-    dev = (predictions - targets)
+        targets = data[:,-1].real
+        predictions = pipeline.predict(data)[0]
+        print(predictions.shape)
+        print(targets.shape)
+        dev = (predictions - targets)
+    else:
+        dev = data[:,-1].real
     dev0 = np.abs(dev - np.mean(dev))
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
 
     pprint(results)
+    if args.plot:
+        plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
+        plt.show()
+
 def get_preprocessor(preprocessor, mask=False, xyz=''):
     if not mask:
         pre = json.loads(open(preprocessor,'r').read())
@@ -670,6 +728,7 @@ if __name__ == '__main__':
     sampledat.add_argument('size', action='store',type=int, help ='Sample size')
     sampledat.add_argument('-dest', action='store',type=str,default='sample.npy', help ='Save to')
     sampledat.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
+    sampledat.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
     # =============== Fitter =====================
 
@@ -678,17 +737,20 @@ if __name__ == '__main__':
     fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
     fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
     fit.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+    fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     fit.set_defaults(func=fit_driver)
 
     # =============== Evaluate =====================
 
     eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
     eval.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
-    eval.add_argument('model', action='store', help ='Path to NeuralXC model')
+    eval.add_argument('-model',metavar='model',default='', help ='Path to NeuralXC model')
     eval.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
     eval.add_argument('-plot', action='store_true', help ='Create scatterplot?')
     eval.add_argument('-savefig', action='store',type=str, default='', help ='Save scatterplot?')
+    eval.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     eval.set_defaults(func=eval_driver)
 
     # ============== Preprocessor =================

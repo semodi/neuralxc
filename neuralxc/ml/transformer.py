@@ -176,7 +176,7 @@ class GroupedPCA(GroupedTransformer, PCA):
         if self.n_components == 1:
             return X
         else:
-            print(self._initkwargs)
+            print('PCA: ',self.get_kwargs())
             return super().transform(X, y, **fit_params)
 
     def _gradient_function(self, X):

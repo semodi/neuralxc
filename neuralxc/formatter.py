@@ -148,6 +148,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
                 feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
             features.append(feat_dict)
             targets.append(y_sys)
+
         if made_dict:
             return {'data': (features, targets), 'basis_instructions': basis_instructions}
         else:

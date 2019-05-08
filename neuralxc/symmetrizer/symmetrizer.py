@@ -93,7 +93,8 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
             X = X['data']
 
         if isinstance(X, tuple):
-            return self.get_symmetrized(X[0]), X[1]
+            symmetrized = self.get_symmetrized(X[0])
+            return symmetrized, X[1]
         else:
             return self.get_symmetrized(X)
 
@@ -114,11 +115,12 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
         """
         self.C = C
         basis = self._attrs['basis']
-
-        results = [{}] * len(C)
+        results = []
 
         for idx, key, data in expand(C):
+            results.append({})
             results[idx][key] = self._symmetrize_function(*data, basis[key]['l'], basis[key]['n'], self._cgs)
+
         if not isinstance(C, list):
             return results[0]
         else:

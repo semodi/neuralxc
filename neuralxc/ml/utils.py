@@ -41,18 +41,17 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
     print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] -  E0_base)
     tar = tar.real
-    # if percentile_cutoff > 0:
-    #     lim1 = np.percentile(tar, percentile_cutoff*100)
-    #     lim2 = np.percentile(tar, (1 - percentile_cutoff)*100)
-    #     min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
-    #     filter2 = (tar > min_lim) & (tar < max_lim)
-    # else:
-    #     filter2 = [True]*len(tar)
-    #
-    # filter = filter2
-    data_base = datafile[baseline +'/density/' + basis_key]
-    data_base = data_base[:, :]
+    if percentile_cutoff > 0:
+        lim1 = np.percentile(tar, percentile_cutoff*100)
+        lim2 = np.percentile(tar, (1 - percentile_cutoff)*100)
+        min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+        filter = (tar > min_lim) & (tar < max_lim)
+    else:
+        filter = [True]*len(tar)
 
+    data_base = datafile[baseline +'/density/' + basis_key][:,:]
+    data_base = data_base[filter]
+    tar = tar[filter]
     # feat = {}
     # all_species = find_attr_in_tree(datafile, baseline, 'species')
     # all_species = [c for c in all_species]
