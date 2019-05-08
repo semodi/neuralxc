@@ -65,7 +65,7 @@ class GroupedTransformer(ABC):
             for spec in X:
                 self._spec_dict[spec] =\
                  type(self)(*self._initargs,
-                  **self._initkwargs)
+                  **self.get_kwargs())
                 self._spec_dict[spec].__dict__.update(self.get_params())
                 self._spec_dict[spec].fit(self._before_fit(atomic_shape(X[spec])))
             return self
@@ -114,8 +114,11 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
         """
         self._before_fit = identity  # lambdas can't be pickled
         self._initargs = []
-        self._initkwargs = dict(threshold=threshold)
-        super().__init__(**self._initkwargs)
+        self.treshold = threshold
+        super().__init__(**self.get_kwargs())
+
+    def get_kwargs(self):
+        return dict(threshold = self.treshold)
 
     def _gradient_function(self, X):
         X_shape = X.shape
@@ -140,17 +143,41 @@ class GroupedPCA(GroupedTransformer, PCA):
         """ GroupedTransformer version of sklearn principal component analysis.
             See their documentation for more information
         """
-        self._initkwargs = dict(n_components=n_components,
-                                copy=copy,
-                                whiten=whiten,
-                                svd_solver=svd_solver,
-                                tol=tol,
-                                iterated_power=iterated_power,
-                                random_state=random_state)
+
+        self.n_components=n_components
+        self.copy=copy
+        self.whiten=whiten
+        self.svd_solver=svd_solver
+        self.tol=tol
+        self.iterated_power=iterated_power
+        self.random_state=random_state
 
         self._before_fit = StandardScaler().fit_transform
         self._initargs = []
-        super().__init__(**self._initkwargs)
+        super().__init__(**self.get_kwargs())
+
+    def get_kwargs(self):
+        return dict(n_components=self.n_components,
+                                copy=self.copy,
+                                whiten=self.whiten,
+                                svd_solver=self.svd_solver,
+                                tol=self.tol,
+                                iterated_power=self.iterated_power,
+                                random_state=self.random_state)
+
+    def fit(self, *args,**kwargs):
+        if self.n_components == 1:
+            print('------------> PCA deactivated')
+            return self
+        else:
+            return super().fit(*args, **kwargs)
+
+    def transform(self, X, y=None, **fit_params):
+        if self.n_components == 1:
+            return X
+        else:
+            print(self._initkwargs)
+            return super().transform(X, y, **fit_params)
 
     def _gradient_function(self, X):
         X_shape = X.shape
@@ -170,6 +197,8 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler):
         self._initkwargs = {}
         super().__init__()
 
+    def get_kwargs(self):
+        return {}
     def _gradient_function(self, X):
         X_shape = X.shape
         if not X.ndim == 2:
