@@ -178,7 +178,7 @@ class NeuralXC():
         symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
-        self.max_workers = 2
+        self.max_workers = 1
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error
