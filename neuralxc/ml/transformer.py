@@ -58,19 +58,28 @@ class GroupedTransformer(ABC):
             X = X[0]
 
         if isinstance(X, list):
-            X = X[0]
+            super_X = {}
+            for x in X:
+                for spec in x:
+                    if not spec in super_X:
+                        super_X[spec] = []
+                    super_X[spec].append(atomic_shape(x[spec]))
+            for spec in super_X:
+                super_X[spec] = np.concatenate(super_X[spec])
+        else:
+            super_X = X
 
-        if isinstance(X, dict):
+        if isinstance(super_X, dict):
             self._spec_dict = {}
-            for spec in X:
+            for spec in super_X:
                 self._spec_dict[spec] =\
                  type(self)(*self._initargs,
                   **self.get_kwargs())
                 self._spec_dict[spec].__dict__.update(self.get_params())
-                self._spec_dict[spec].fit(self._before_fit(atomic_shape(X[spec])))
+                self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])))
             return self
         else:
-            return super().fit(atomic_shape(X))
+            return super().fit(atomic_shape(super_X))
 
     def get_gradient(self, X, y=None, **fit_params):
         was_tuple = False

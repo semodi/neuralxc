@@ -236,11 +236,12 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
                      ('symmetrizer', symmetrizer),
                      ('var_selector', var_selector)]
 
+    pipeline_list.append(('scaler', GroupedStandardScaler()))
+
     if pca_threshold < 1:
         pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
         pipeline_list.append(('pca', pca))
 
-    pipeline_list.append(('scaler', GroupedStandardScaler()))
     pipeline_list.append(('estimator', estimator))
 
     basis_instructions = basis

@@ -193,7 +193,10 @@ class NumpyNetworkEstimator(BaseEstimator):
         predictions = []
 
         for X in X_list:
-            prediction = 0
+            if kwargs.get('partial', False):
+                prediction = {}
+            else:
+                prediction = 0
 
             for spec in X:
                 feat = X[spec]
@@ -201,7 +204,14 @@ class NumpyNetworkEstimator(BaseEstimator):
                 if feat.ndim == 3:
                     feat = feat.reshape(-1, feat.shape[-1])
 
-                prediction += np.sum(self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1),
+                if kwargs.get('partial', False):
+                    fit_kwargs = dict(kwargs)
+                    fit_kwargs.pop('partial')
+
+                    prediction[spec] = self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1)
+
+                else:
+                    prediction += np.sum(self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1),
                                      axis=-1)
 
             predictions.append(prediction)
@@ -381,7 +391,11 @@ class NetworkEstimator(BaseEstimator):
         predictions = []
 
         for X in X_list:
-            prediction = 0
+            if kwargs.get('partial', False):
+                prediction = {}
+            else:
+                prediction = 0
+
 
             for spec in X:
                 feat = X[spec]
@@ -389,9 +403,15 @@ class NetworkEstimator(BaseEstimator):
                 if feat.ndim == 3:
                     feat = feat.reshape(-1, feat.shape[-1])
 
-                prediction += np.sum(self._network.predict(feat, species=spec.lower(), *args,
-                                                           **kwargs).reshape(n_sys, -1),
-                                     axis=-1)
+                if kwargs.get('partial', False):
+                    fit_kwargs = dict(kwargs)
+                    fit_kwargs.pop('partial')
+                    prediction[spec] = self._network.predict(feat, species=spec.lower(), *args,
+                                                               **fit_kwargs).reshape(n_sys, -1)
+                else:
+                    prediction += np.sum(self._network.predict(feat, species=spec.lower(), *args,
+                                                               **kwargs).reshape(n_sys, -1),
+                                         axis=-1)
 
             predictions.append(prediction)
 
