@@ -267,10 +267,14 @@ class DensityProjector(BaseProjector):
         drads = self.dradials(R, basis, W)
         rads = self.radials(R, basis, W)
         radsr = np.array(rads)
-        # radsr[R==0] = 0
+        # radsr[R<1e-15] = 0
         radsr = radsr / R
+        print(radsr.shape)
+        print(R.shape)
+        radsr[:,R<1e-15] = 0
 
-        rhat = [X / R, Y / R, Z / R]
+        rhat = np.array([X / R, Y / R, Z / R])
+        rhat[:,R<1e-15] = 0
 
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
@@ -282,10 +286,12 @@ class DensityProjector(BaseProjector):
                 idx_l = 0
                 for l in range(n_l):
                     for m in range(2 * l + 1):
+                        v2 = (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])
+                        v2[R<1e-15] = 0
                         v += coeffs[idx_coeff] *\
                         (\
                         (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
-                        (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])\
+                        v2\
                         )
                         idx_l += 1
                         idx_coeff += 1
@@ -466,8 +472,8 @@ class DensityProjector(BaseProjector):
         R = np.sqrt(X**2 + Y**2 + Z**2)
 
         Phi = np.arctan2(Y, X)
-        Theta = np.arccos(Z / R, where=(R != 0))
-        Theta[R == 0] = 0
+        Theta = np.arccos(Z / R, where=(R > 1e-15))
+        Theta[R < 1e-15] = 0
 
         return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
 

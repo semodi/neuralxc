@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-import tensorflow as tf
 import pandas as pd
 import os
 import sys
@@ -22,7 +21,8 @@ import pickle
 import shutil
 from .activation import get_activation
 import copy
-
+import tensorflow as tf
+# import tensorflow
 Dataset = namedtuple("Dataset", "data species")
 
 
@@ -761,7 +761,7 @@ class Energy_Network():
 
             self.initialized = True
 
-            train_writer = tf.summary.FileWriter('./log/', self.graph)
+            # train_writer = tf.summary.FileWriter('./log/', self.graph)
             old_cost = 1e8
             if batch_size > 0:
                 batch_generator = BatchGenerator(batch_size)
