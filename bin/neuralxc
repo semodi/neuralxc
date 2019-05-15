@@ -71,7 +71,19 @@ if __name__ == '__main__':
     sampledat.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
     sampledat.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
+
     # =============== Fitter =====================
+
+    fit = subparser.add_parser('hyperopt', description='Fit a NeuralXC model and optimize hyperparameters with GridSearchCV ')
+    fit.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    fit.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+    fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    fit.set_defaults(func=hyperopt_driver)
+
 
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
     fit.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
@@ -81,6 +93,7 @@ if __name__ == '__main__':
     fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
     fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    fit.add_argument('-model', metavar='model', type=str, default='', help='Continue training model found at this location')
     fit.set_defaults(func=fit_driver)
 
     # =============== Evaluate =====================

@@ -246,14 +246,14 @@ class NeuralXC():
         if not self._pipeline.steps[-1][1].allows_threading or self.max_workers ==1:
             print('Serial computation in python')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
-            # for spec in C:
-            #     try:
-            #         descr = np.load('descriptors_{}.npy'.format(spec))
-            #         descr = np.concatenate([descr, C[spec]])
-            #     except FileNotFoundError:
-            #         print("FILENOTFOUND")
-            #         descr = C[spec]
-            #     np.save('descriptors_{}.npy'.format(spec),descr)
+            for spec in C:
+                try:
+                    descr = np.load('descriptors_{}.npy'.format(spec))
+                    descr = np.concatenate([descr, C[spec]])
+                except FileNotFoundError:
+                    print("FILENOTFOUND")
+                    descr = C[spec]
+                np.save('descriptors_{}.npy'.format(spec),descr)
 
             D = self.symmetrizer.get_symmetrized(C)
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))

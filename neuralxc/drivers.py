@@ -14,6 +14,7 @@ from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 import pandas as pd
 from pprint import pprint
 from dask.distributed import Client, LocalCluster
@@ -28,6 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import neuralxc as xc
 import sys
+import copy
 
 def plot_basis(args):
     """ Plots a set of basis functions specified in .json file"""
@@ -201,7 +203,7 @@ def parse_sets_input(path):
             line = setsfile.readline().rstrip()
     return hdf5
 
-def fit_driver(args):
+def hyperopt_driver(args):
     """ Fits a NXCPipeline to the provided data
     """
     inputfile = args.config
@@ -259,6 +261,52 @@ def fit_driver(args):
         best_estimator.basis_instructions =  pre['basis']
         best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
         best_estimator.save('best_model',True)
+
+def fit_driver(args):
+    """ Fits a NXCPipeline to the provided data
+    """
+    inputfile = args.config
+    preprocessor = args.preprocessor
+
+    if args.sets != '':
+        hdf5 = parse_sets_input(args.sets)
+    else:
+        hdf5 = args.hdf5
+
+    mask = args.mask
+
+    if not mask:
+        inp = json.loads(open(inputfile,'r').read())
+        pre = json.loads(open(preprocessor,'r').read())
+    else:
+        inp = {}
+        pre = {}
+
+    best_model = get_grid_cv(hdf5, preprocessor, inputfile, mask)
+    estimator = best_model.estimator
+    param_grid = best_model.param_grid
+    param_grid = {key: param_grid[key][0] for key in param_grid}
+    estimator.set_params(**param_grid)
+
+    if args.model:
+        estimator.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
+    best_model = estimator
+
+    if not mask:
+        datafile = h5py.File(hdf5[0],'r')
+        basis_key = basis_to_hash(pre['basis'])
+        data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
+        if args.sample != '':
+            sample = np.load(args.sample)
+            data = data[sample]
+            print("Using sample of size {}".format(len(sample)))
+        best_model.fit(data)
+        # best_model.fit(list(range(len(atoms))))
+        best_model = best_model.steps[-1][1]
+
+        # best_model.basis_instructions =  pre['basis']
+        # best_model.symmetrize_instructions = {'symmetrizer_type':'casimir'}
+        best_model.start_at(2).save('best_model',True)
 
 def sample_driver(args):
     """ Given a dataset, perform sampling in feature space"""

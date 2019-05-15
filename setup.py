@@ -2,8 +2,11 @@
 neuralxc
 Implementation of a machine learned density functional
 """
-from setuptools import setup
+#from setuptools import setup
+from numpy.distutils.core import setup, Extension
 import versioneer
+
+spher_grad = Extension('spher_grad',['src/spher_harm.f90',])
 
 short_description = __doc__.split("\n")
 
@@ -36,6 +39,7 @@ setup(
                   },
 
     scripts=['./bin/neuralxc'],
+    ext_modules=[spher_grad],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email
     # url='http://www.my_package.com',  # Website

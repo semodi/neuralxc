@@ -20,7 +20,7 @@ try:
 except ModuleNotFoundError:
     ase_found = False
 
-from neuralxc.projector.spher_grad import rlylm, grlylm
+from spher_grad import rlylm, grlylm
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -122,7 +122,7 @@ def test_dspher():
 
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
             print(r)
-            vecspher = xc.projector.spher_grad.grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
+            vecspher = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
             for il, vs in enumerate(vecspher.T):
                 dangs[il][ir] = vs
 

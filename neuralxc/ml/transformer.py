@@ -23,6 +23,11 @@ class GroupedTransformer(ABC):
 
     #TODO: make _get_gradient abstractmethod and _before_fit an abstractparameter
 
+    def __init__(self, *args, **kwargs):
+
+        self.is_fit = False
+        super().__init__(*args, **kwargs)
+
     def transform(self, X, y=None, **fit_params):
         was_tuple = False
         if isinstance(X, tuple):
@@ -53,33 +58,36 @@ class GroupedTransformer(ABC):
             return results
 
     def fit(self, X, y=None):
-
-        if isinstance(X, tuple):
-            X = X[0]
-
-        if isinstance(X, list):
-            super_X = {}
-            for x in X:
-                for spec in x:
-                    if not spec in super_X:
-                        super_X[spec] = []
-                    super_X[spec].append(atomic_shape(x[spec]))
-            for spec in super_X:
-                super_X[spec] = np.concatenate(super_X[spec])
-        else:
-            super_X = X
-
-        if isinstance(super_X, dict):
-            self._spec_dict = {}
-            for spec in super_X:
-                self._spec_dict[spec] =\
-                 type(self)(*self._initargs,
-                  **self.get_kwargs())
-                self._spec_dict[spec].__dict__.update(self.get_params())
-                self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])))
+        if self.is_fit:
             return self
         else:
-            return super().fit(atomic_shape(super_X))
+            self.is_fit = True
+            if isinstance(X, tuple):
+                X = X[0]
+
+            if isinstance(X, list):
+                super_X = {}
+                for x in X:
+                    for spec in x:
+                        if not spec in super_X:
+                            super_X[spec] = []
+                        super_X[spec].append(atomic_shape(x[spec]))
+                for spec in super_X:
+                    super_X[spec] = np.concatenate(super_X[spec])
+            else:
+                super_X = X
+
+            if isinstance(super_X, dict):
+                self._spec_dict = {}
+                for spec in super_X:
+                    self._spec_dict[spec] =\
+                     type(self)(*self._initargs,
+                      **self.get_kwargs())
+                    self._spec_dict[spec].__dict__.update(self.get_params())
+                    self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])))
+                return self
+            else:
+                return super().fit(atomic_shape(super_X))
 
     def get_gradient(self, X, y=None, **fit_params):
         was_tuple = False

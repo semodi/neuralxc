@@ -21,6 +21,7 @@ from sklearn.pipeline import Pipeline
 import pickle
 import shutil
 from .activation import get_activation
+import copy
 
 Dataset = namedtuple("Dataset", "data species")
 
@@ -128,6 +129,8 @@ class NXCPipeline(Pipeline):
         else:
             network = self.steps[-1][-1]._network
             self.steps[-1][-1]._network = None
+            for istep, step in enumerate(self.steps[:-1]):
+                self.steps[istep] = (self.steps[istep][0], copy.copy(self.steps[istep][1]))
             network.save_model(os.path.join(path, 'network'))
             pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
             self.steps[-1][-1]._network = network
