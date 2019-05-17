@@ -107,6 +107,15 @@ if __name__ == '__main__':
     eval.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     eval.set_defaults(func=eval_driver)
 
+    # =============== Evaluate =====================
+
+    pred = subparser.add_parser('predict', description='Predict energies with NeuralXC model')
+    pred.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    pred.add_argument('-model',metavar='model', help ='Path to NeuralXC model')
+    pred.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data, reference data')
+    pred.add_argument('-dest', metavar='dest', type=str, default = 'prediction', help ='Destination where to store data')
+    pred.set_defaults(func=predict_driver)
+
     # ============== Preprocessor =================
 
     pre = subparser.add_parser('pre', description='Preprocess electron density')

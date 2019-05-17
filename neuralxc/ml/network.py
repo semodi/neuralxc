@@ -127,13 +127,9 @@ class NXCPipeline(Pipeline):
               open(os.path.join(path, 'pipeline.pckl'), 'wb'))
 
         else:
-            network = self.steps[-1][-1]._network
-            self.steps[-1][-1]._network = None
-            for istep, step in enumerate(self.steps[:-1]):
-                self.steps[istep] = (self.steps[istep][0], copy.copy(self.steps[istep][1]))
-            network.save_model(os.path.join(path, 'network'))
+            ns_chunk = self.steps[-1][-1]._make_serializable(os.path.join(path, 'network'))
             pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
-            self.steps[-1][-1]._network = network
+            self.steps[-1][-1]._restore_after_pickling(ns_chunk)
 
 
 def load_pipeline(path):
@@ -141,7 +137,7 @@ def load_pipeline(path):
     """
     pipeline = pickle.load(open(os.path.join(path, 'pipeline.pckl'), 'rb'))
     if not isinstance(pipeline.steps[-1][-1], NumpyNetworkEstimator):
-        pipeline.steps[-1][-1].path = os.path.join(path, 'network')
+        pipeline.steps[-1][-1].load_network(os.path.join(path, 'network'))
     return pipeline
 
 class NumpyNetworkEstimator(BaseEstimator):
@@ -256,7 +252,7 @@ class NetworkEstimator(BaseEstimator):
                  b,
                  alpha=0.01,
                  max_steps=20001,
-                 test_size=0.2,
+                 test_size=0.0,
                  valid_size=0.2,
                  random_seed=None,
                  batch_size=0,
@@ -321,7 +317,7 @@ class NetworkEstimator(BaseEstimator):
                 nets.append(Subnet())
                 nets[-1].layers = [self.n_nodes] * self.n_layers
                 nets[-1].activations = [getattr(tf.nn, self.activation)] * self.n_layers
-                nets[-1].add_dataset(Dataset(feat[spec], spec.lower()), tar, test_size=self.test_size)
+                nets[-1].add_dataset(Dataset(feat[spec], spec.lower()), tar, test_size=0)
             subnets.append(nets)
 
         self._network = Energy_Network(subnets)
@@ -446,6 +442,20 @@ class NetworkEstimator(BaseEstimator):
             scores.append(metric_function(self.predict(X_) - y_))
 
         return -np.mean(scores)
+
+    def _make_serializable(self, path):
+
+        network = self._network
+        network.save_model(path)
+        self._network = None
+        return network
+
+    def _restore_after_pickling(self, network):
+        self._network = network
+
+
+    def load_network(self, path):
+        self.path = path
 
     def get_np_estimator(self):
         W, B = self._network.get_weights()
@@ -767,12 +777,6 @@ class Energy_Network():
                 batch_generator = BatchGenerator(batch_size)
             for _ in range(0, max_steps):
 
-                if batch_size > 0:
-                    for batch_feed_dict in batch_generator.get_batch_feed(train_feed_dict):
-                        sess.run(train_step, feed_dict=batch_feed_dict)
-                else:
-                    sess.run(train_step, feed_dict=train_feed_dict)
-
                 if _ % int(max_steps / 10) == 0 and verbose:
                     print('Step: ' + str(_))
                     print('Training set loss:')
@@ -791,6 +795,12 @@ class Energy_Network():
                     print('Total: {}'.format(sess.run(tf.sqrt(cost), feed_dict=valid_feed_dict)))
                     print('--------------------')
                     print('L2-loss: {}'.format(sess.run(loss, feed_dict=train_feed_dict)))
+
+                if batch_size > 0:
+                    for batch_feed_dict in batch_generator.get_batch_feed(train_feed_dict):
+                        sess.run(train_step, feed_dict=batch_feed_dict)
+                else:
+                    sess.run(train_step, feed_dict=train_feed_dict)
 
     def predict(self, features, species, return_gradient=False):
         """ Get predicted energies

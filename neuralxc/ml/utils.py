@@ -100,7 +100,6 @@ def load_sets(datafile, baseline, reference, basis_key, percentile_cutoff=0):
     X = np.concatenate(Xs, axis = 0)
     y = np.concatenate(ys, axis = 0)
     data = np.concatenate([X,y.reshape(-1,1)], axis =1)
-    np.random.shuffle(data)
     return data
 
 def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,

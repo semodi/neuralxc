@@ -234,6 +234,7 @@ def hyperopt_driver(args):
         datafile = h5py.File(hdf5[0],'r')
         basis_key = basis_to_hash(pre['basis'])
         data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
+        np.random.shuffle(data)
         if args.sample != '':
             sample = np.load(args.sample)
             data = data[sample]
@@ -296,10 +297,12 @@ def fit_driver(args):
         datafile = h5py.File(hdf5[0],'r')
         basis_key = basis_to_hash(pre['basis'])
         data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
+        np.random.shuffle(data)
         if args.sample != '':
             sample = np.load(args.sample)
             data = data[sample]
             print("Using sample of size {}".format(len(sample)))
+
         best_model.fit(data)
         # best_model.fit(list(range(len(atoms))))
         best_model = best_model.steps[-1][1]
@@ -358,19 +361,48 @@ def eval_driver(args):
 
         targets = data[:,-1].real
         predictions = pipeline.predict(data)[0]
-        print(predictions.shape)
-        print(targets.shape)
         dev = (predictions - targets)
     else:
         dev = data[:,-1].real
     dev0 = np.abs(dev - np.mean(dev))
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
-
+    np.save('predictions2.npy', predictions)
     pprint(results)
     if args.plot:
         plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
         plt.show()
+
+def predict_driver(args):
+    """ Evaluate fitted NXCPipeline on dataset and report statistics
+    """
+    preprocessor = args.preprocessor
+    hdf5 = args.hdf5
+
+    pre = json.loads(open(preprocessor,'r').read())
+
+    hdf5.append(hdf5[1])
+
+    print(hdf5)
+    datafile = h5py.File(hdf5[0],'r')
+    basis_key = basis_to_hash(pre['basis'])
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, 0)
+
+    model = xc.NeuralXC(args.model)._pipeline
+    basis = model.get_basis_instructions()
+    symmetrizer_instructions = model.get_symmetrize_instructions()
+    symmetrizer_instructions.update({'basis' : basis})
+    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
+    spec_group = SpeciesGrouper(basis, species)
+    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
+    print('Symmetrizer instructions', symmetrizer_instructions)
+    pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)
+        ] + model.steps, basis_instructions=basis,
+         symmetrize_instructions=symmetrizer_instructions)
+
+    targets = data[:,-1].real
+    predictions = pipeline.predict(data)[0]
+    np.save(args.dest, predictions)
 
 def pre_driver(args):
     """ Preprocess electron densities obtained from electronic structure
