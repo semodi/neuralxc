@@ -2,7 +2,7 @@ from sklearn.base import BaseEstimator
 import numpy as np
 
 class StackedEstimator(BaseEstimator):
-
+    allows_threading = False
     def __init__(self, estimators, operation = 'sum'):
 
         self.estimators = estimators
@@ -19,23 +19,39 @@ class StackedEstimator(BaseEstimator):
 
     def predict(self, X, *args, **kwargs):
 
-        predictions = []
-        for estimator in self.estimators:
-            predictions.append(estimator.predict(X, *args, **kwargs))
+        if kwargs.get('partial', False):
 
-        return self.operation(np.array(predictions), axis =0)
+            predictions = {}
+
+            for estimator in self.estimators:
+                pred = estimator.predict(X, *args, **kwargs)[0]
+                assert isinstance(pred, dict)
+                for species in pred:
+                    if not species in predictions:
+                        predictions[species] = []
+                    predictions[species].append(pred[species])
+
+            for species in predictions:
+                predictions[species] = self.operation(np.array(predictions[species]), axis = 0)
+            return [predictions]
+        else:
+            predictions = []
+            for estimator in self.estimators:
+                predictions.append(estimator.predict(X, *args, **kwargs))
+
+            return self.operation(np.array(predictions), axis =0)
 
 
     def load_network(self, path):
         for idx, estimator in enumerate(self.estimators):
-            self.estimators[idx].load_network(path _ '_e{}'.format(i))
+            self.estimators[idx].load_network(path + '_e{}'.format(idx))
 
 
     def _make_serializable(self, path):
 
         container = []
         for i, estimator in enumerate(self.estimators):
-            container.append(networks._make_serializable(path + '_e{}'.format(i)))
+            container.append(estimator._make_serializable(path + '_e{}'.format(i)))
 
         return container
 
@@ -44,3 +60,17 @@ class StackedEstimator(BaseEstimator):
         assert len(container) == len(self.estimators)
         for c, estimator in zip(container, self.estimators):
             estimator._restore_after_pickling(c)
+
+    def get_gradient(self, X, *args, **kwargs):
+        gradients = {}
+
+        for estimator in self.estimators:
+            grad = estimator.get_gradient(X, *args, **kwargs)
+            for species in grad:
+                if not species in gradients:
+                    gradients[species] = []
+                gradients[species].append(grad[species])
+
+        for species in gradients:
+            gradients[species] = self.operation(np.array(gradients[species]), axis = 0)
+        return gradients

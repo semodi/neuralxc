@@ -8,6 +8,7 @@ from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
+from neuralxc.ml.ensemble import StackedEstimator
 from neuralxc.ml.network import load_pipeline
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.datastructures.hdf5 import *
@@ -30,6 +31,7 @@ import numpy as np
 import neuralxc as xc
 import sys
 import copy
+import pickle
 
 def plot_basis(args):
     """ Plots a set of basis functions specified in .json file"""
@@ -283,6 +285,13 @@ def fit_driver(args):
         inp = {}
         pre = {}
 
+    apply_to = []
+    if args.ensemble:
+        for pidx, path in enumerate(hdf5[1]):
+            if path[0] == '*':
+                apply_to.append(pidx)
+                hdf5[1][pidx] = path[1:]
+
     best_model = get_grid_cv(hdf5, preprocessor, inputfile, mask)
     estimator = best_model.estimator
     param_grid = best_model.param_grid
@@ -290,13 +299,26 @@ def fit_driver(args):
     estimator.set_params(**param_grid)
 
     if args.model:
-        estimator.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
+        if args.ensemble:
+            old_model = clone(estimator)
+            old_model.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
+            estimator.steps[-1][1].steps[2:-1] =  xc.ml.network.load_pipeline(args.model).steps[:-1]
+        else:
+            estimator.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
+
     best_model = estimator
 
     if not mask:
         datafile = h5py.File(hdf5[0],'r')
         basis_key = basis_to_hash(pre['basis'])
         data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
+
+        for set in apply_to:
+            selection = (data[:,0] == set)
+            prediction = old_model.predict(data)[set]
+            print('Dataset {} old STD: {}'.format(set, np.std(data[selection][:,-1])))
+            data[selection,-1] -= prediction
+            print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:,-1])))
         np.random.shuffle(data)
         if args.sample != '':
             sample = np.load(args.sample)
@@ -361,16 +383,22 @@ def eval_driver(args):
 
         targets = data[:,-1].real
         predictions = pipeline.predict(data)[0]
-        dev = (predictions - targets)
+        np.save('predictions', predictions.flatten())
+        np.save('targets', targets.flatten())
+        dev = (predictions.flatten() - targets.flatten())
     else:
         dev = data[:,-1].real
     dev0 = np.abs(dev - np.mean(dev))
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
-    np.save('predictions2.npy', predictions)
     pprint(results)
+    targets -= np.mean(targets)
+    predictions -= np.mean(predictions)
+    maxlim = np.max([np.max(targets),np.max(predictions)])
+    minlim = np.min([np.max(targets),np.min(predictions)])
     if args.plot:
         plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
+        plt.plot([minlim,maxlim],[minlim,maxlim],ls ='-',marker='',color = 'grey')
         plt.show()
 
 def predict_driver(args):
@@ -403,6 +431,27 @@ def predict_driver(args):
     targets = data[:,-1].real
     predictions = pipeline.predict(data)[0]
     np.save(args.dest, predictions)
+
+def ensemble_driver(args):
+
+    all_pipelines = []
+    for model_path in args.models:
+        all_pipelines.append(xc.ml.network.load_pipeline(model_path))
+
+    #Check for consistency
+    # for pidx, pipeline in enumerate(all_pipelines):
+        # for step0, step1 in zip(all_pipelines[0].steps[:-1], pipeline.steps[:-1]):
+            # if not pickle.dumps(step0[1]) == pickle.dumps(step1[1]):
+                # raise Exception('Parameters for {} in model {} inconsistent'.format(type(step0[1]), pidx))
+
+    all_networks = [pipeline.steps[-1][1] for pipeline in all_pipelines]
+    ensemble = StackedEstimator(all_networks, operation = args.operation)
+    pipeline = all_pipelines[0]
+    pipeline.steps[-1] = ('estimator', ensemble)
+
+    pipeline.save(args.dest, override=True)
+
+
 
 def pre_driver(args):
     """ Preprocess electron densities obtained from electronic structure

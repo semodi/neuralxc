@@ -74,15 +74,15 @@ if __name__ == '__main__':
 
     # =============== Fitter =====================
 
-    fit = subparser.add_parser('hyperopt', description='Fit a NeuralXC model and optimize hyperparameters with GridSearchCV ')
-    fit.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
-    fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
-    fit.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
-    fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
-    fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
-    fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
-    fit.set_defaults(func=hyperopt_driver)
+    hyper = subparser.add_parser('hyperopt', description='Fit a NeuralXC model and optimize hyperparameters with GridSearchCV ')
+    hyper.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    hyper.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    hyper.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    hyper.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    hyper.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    hyper.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+    hyper.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    hyper.set_defaults(func=hyperopt_driver)
 
 
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
@@ -94,7 +94,17 @@ if __name__ == '__main__':
     fit.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
     fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     fit.add_argument('-model', metavar='model', type=str, default='', help='Continue training model found at this location')
+    fit.add_argument('-ensemble', action='store_true', help='Derive pipeline from -model and only fit final estimator, to be able to build\
+    an ensemble of estimators later on')
     fit.set_defaults(func=fit_driver)
+
+    # ============= Ensemble ================
+
+    ens = subparser.add_parser('ensemble', description='Fit a NeuralXC model')
+    ens.add_argument('-operation', metavar='operation', type=str, default='sum', help='Operation to combine estimator outputs')
+    ens.add_argument('-dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
+    ens.add_argument('models', action='store',type=str, nargs='+', help='Paths to models to combine')
+    ens.set_defaults(func=ensemble_driver)
 
     # =============== Evaluate =====================
 

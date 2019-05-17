@@ -240,6 +240,15 @@ class NumpyNetworkEstimator(BaseEstimator):
 
         return gradient[:,:,0].T
 
+    def _make_serializable(self, path):
+        return None
+
+    def _restore_after_pickling(self, *args):
+        pass
+
+    def load_network(self, *args):
+        pass
+        
     def get_np_estimator(self):
         return self
 
