@@ -392,11 +392,11 @@ def eval_driver(args):
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
     pprint(results)
-    targets -= np.mean(targets)
-    predictions -= np.mean(predictions)
-    maxlim = np.max([np.max(targets),np.max(predictions)])
-    minlim = np.min([np.max(targets),np.min(predictions)])
     if args.plot:
+        targets -= np.mean(targets)
+        predictions -= np.mean(predictions)
+        maxlim = np.max([np.max(targets),np.max(predictions)])
+        minlim = np.min([np.max(targets),np.min(predictions)])
         plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
         plt.plot([minlim,maxlim],[minlim,maxlim],ls ='-',marker='',color = 'grey')
         plt.show()
