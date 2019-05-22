@@ -144,11 +144,18 @@ class NumpyNetworkEstimator(BaseEstimator):
 
     allows_threading = True
 
-    def __init__(self, W, B, activation):
+    def __init__(self, W, B, activation, trunc=False):
 
         self.W = W
         self.B = B
         self.activation = get_activation(activation)
+        self.trunc = trunc
+
+    def trunc_after(self, n):
+        if n == -1:
+            return NumpyNetworkEstimator(self.W[:-1], self.b[:-1], self.activation , True)
+        else:
+            return NumpyNetworkEstimator(self.W[:n+1], self.b[:n+1], self.activation) , True
 
     def fit(self,*args):
         pass
@@ -223,9 +230,15 @@ class NumpyNetworkEstimator(BaseEstimator):
         for w,b in zip(W[:-1],B[:-1]):
             x = self.activation.f(x.dot(w) + b)
 
-        return x.dot(W[-1]) + B[-1]
+        if not self.trunc:
+            return x.dot(W[-1]) + B[-1]
+        else:
+            return self.activation.f(x.dot(W[-1]) + B[-1])
+
 
     def gradient(self, x, W, B):
+        if self.trunc:
+            raise Exception('Gradient not implemented for trunctated network')
         gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
         Z = []
         for w,b in zip(W[:-1],B[:-1]):
@@ -248,7 +261,7 @@ class NumpyNetworkEstimator(BaseEstimator):
 
     def load_network(self, *args):
         pass
-        
+
     def get_np_estimator(self):
         return self
 

@@ -98,13 +98,23 @@ if __name__ == '__main__':
     an ensemble of estimators later on')
     fit.set_defaults(func=fit_driver)
 
-    # ============= Ensemble ================
+    # ============= Stack ================
 
-    ens = subparser.add_parser('ensemble', description='Fit a NeuralXC model')
+    ens = subparser.add_parser('stack', description='Stack mutltiple NeuralXC models')
     ens.add_argument('-operation', metavar='operation', type=str, default='sum', help='Operation to combine estimator outputs')
     ens.add_argument('-dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
     ens.add_argument('models', action='store',type=str, nargs='+', help='Paths to models to combine')
     ens.set_defaults(func=ensemble_driver)
+
+    # ============= Chain ================
+
+    chain = subparser.add_parser('chain', description='Chain NeuralXC models')
+    chain.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    chain.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    chain.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    chain.add_argument('-model', metavar='model', type=str, help='Continue training model found at this location')
+    chain.add_argument('-dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
+    chain.set_defaults(func=chain_driver)
 
     # =============== Evaluate =====================
 

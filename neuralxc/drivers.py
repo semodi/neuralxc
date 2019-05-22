@@ -333,6 +333,37 @@ def fit_driver(args):
         # best_model.symmetrize_instructions = {'symmetrizer_type':'casimir'}
         best_model.start_at(2).save('best_model',True)
 
+def chain_driver(args):
+
+    inputfile = args.config
+    preprocessor = args.preprocessor
+
+    hdf5 = args.hdf5
+
+    inp = json.loads(open(inputfile,'r').read())
+    pre = json.loads(open(preprocessor,'r').read())
+
+    best_model = get_grid_cv(hdf5, preprocessor, inputfile, False)
+    estimator = best_model.estimator
+    param_grid = best_model.param_grid
+    param_grid = {key: param_grid[key][0] for key in param_grid}
+    estimator.set_params(**param_grid)
+
+    old_model = xc.ml.network.load_pipeline(args.model)
+    estimator.steps[-1][1].steps[2:-1] = old_model.steps[:-1]
+
+    if not isinstance(old_model, xc.ml.network.NumpyNetworkEstimator):
+        raise Exception('Currently only supported if saved model is NumpyNetworkEstimator')
+
+    old_estimator = old_model.steps[-1][1].trunc_after(-1)
+    new_estimator = estimator.steps[-1][1].steps[-1][1]
+
+    estimator = xc.ml.ensemble.ChainedEstimator([old_estimator, new_estimator])
+
+    best_model = best_model.steps[-1][1]
+
+    best_model.start_at(2).save(args.dest, True)
+
 def sample_driver(args):
     """ Given a dataset, perform sampling in feature space"""
 
@@ -383,8 +414,6 @@ def eval_driver(args):
 
         targets = data[:,-1].real
         predictions = pipeline.predict(data)[0]
-        np.save('predictions', predictions.flatten())
-        np.save('targets', targets.flatten())
         dev = (predictions.flatten() - targets.flatten())
     else:
         dev = data[:,-1].real
