@@ -17,6 +17,8 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import os
 import time
+import traceback
+from periodictable import elements as element_dict
 # from concurrent.futures import ProcessPoolExecutor
 # from mpi4py import MPI
 
@@ -30,6 +32,7 @@ def prints_error(method):
         try:
             return method(*args, **kwargs)
         except Exception as e:
+            print(''.join(traceback.format_tb(e.__traceback__)))
             print('NeuralXC: ', e)
             raise (e)
 
@@ -78,19 +81,27 @@ class NXCAdapter(ABC):
 
 class SiestaNXC(NXCAdapter):
 
-    #TODO: Find library that takes care of this
+    # TODO: Find library that takes care of this
     element_dict = {8: 'O', 1: 'H', 6: 'C'}
 
     @prints_error
     def initialize(self, rho, unitcell, grid, positions, elements):
-        elements = np.array([self.element_dict[e] for e in elements])
+        elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
+        print("NEURALXC: UNITCELL")
+        print(unitcell)
         positions = positions.T
         model_elements = [key for key in  self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
         rho_reshaped = rho.reshape(*grid).T
+
+        # fig = plot_density_cut(rho_reshaped)
+        # fig.savefig('density.pdf')
+        # print(grid)
+        # rho_reshaped = rho.reshape(*grid)
+        print(rho_reshaped.shape)
         self._adaptee.initialize(unitcell, grid, positions, elements)
         use_drho = False
         if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
@@ -138,7 +149,7 @@ class SiestaNXC(NXCAdapter):
         -----
         Arrays should be provided in Fortran order
         """
-        elements = [self.element_dict[e] for e in elements]
+        elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
         positions = positions.T
         rho_reshaped = rho.reshape(*grid).T
@@ -253,13 +264,13 @@ class NeuralXC():
         if not self._pipeline.steps[-1][1].allows_threading or self.max_workers ==1:
             print('Serial computation in python')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
-            for spec in C:
+            # for spec in C:
                 # try:
                 #     descr = np.load('descriptors_{}.npy'.format(spec))
                 #     descr = np.concatenate([descr, C[spec]])
                 # except FileNotFoundError:
                 #     descr = C[spec]
-                np.save('descriptors_{}.npy'.format(spec),descr)
+                # np.save('descriptors_{}.npy'.format(spec),descr)
 
             D = self.symmetrizer.get_symmetrized(C)
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
