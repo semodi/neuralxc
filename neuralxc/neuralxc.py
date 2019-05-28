@@ -82,7 +82,7 @@ class NXCAdapter(ABC):
 class SiestaNXC(NXCAdapter):
 
     # TODO: Find library that takes care of this
-    element_dict = {8: 'O', 1: 'H', 6: 'C'}
+    # element_dict = {8: 'O', 1: 'H', 6: 'C'}
 
     @prints_error
     def initialize(self, rho, unitcell, grid, positions, elements):
@@ -95,11 +95,15 @@ class SiestaNXC(NXCAdapter):
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
-        rho_reshaped = rho.reshape(*grid).T
+        rho_reshaped = rho.reshape(*grid[::-1]).T
 
-        # fig = plot_density_cut(rho_reshaped)
-        # fig.savefig('density.pdf')
-        # print(grid)
+        fig = plot_density_cut(rho_reshaped)
+        fig.savefig('density2.pdf')
+        fig = plot_density_cut(rho_reshaped,plane = 0)
+        fig.savefig('density0.pdf')
+        fig = plot_density_cut(rho_reshaped,plane = 1)
+        fig.savefig('density1.pdf')
+        print(grid)
         # rho_reshaped = rho.reshape(*grid)
         print(rho_reshaped.shape)
         self._adaptee.initialize(unitcell, grid, positions, elements)
@@ -152,7 +156,7 @@ class SiestaNXC(NXCAdapter):
         elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
         positions = positions.T
-        rho_reshaped = rho.reshape(*grid).T
+        rho_reshaped = rho.reshape(*grid[::-1]).T
         # np.save('rho.npy',rho_reshaped)
         if not self.initialized:
             raise Exception('Must call initialize before calling get_V')
