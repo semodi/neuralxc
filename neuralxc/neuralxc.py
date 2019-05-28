@@ -88,24 +88,12 @@ class SiestaNXC(NXCAdapter):
     def initialize(self, rho, unitcell, grid, positions, elements):
         elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
-        print("NEURALXC: UNITCELL")
-        print(unitcell)
         positions = positions.T
         model_elements = [key for key in  self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
         rho_reshaped = rho.reshape(*grid[::-1]).T
-
-        fig = plot_density_cut(rho_reshaped)
-        fig.savefig('density2.pdf')
-        fig = plot_density_cut(rho_reshaped,plane = 0)
-        fig.savefig('density0.pdf')
-        fig = plot_density_cut(rho_reshaped,plane = 1)
-        fig.savefig('density1.pdf')
-        print(grid)
-        # rho_reshaped = rho.reshape(*grid)
-        print(rho_reshaped.shape)
         self._adaptee.initialize(unitcell, grid, positions, elements)
         use_drho = False
         if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
@@ -157,7 +145,6 @@ class SiestaNXC(NXCAdapter):
         unitcell = unitcell.T
         positions = positions.T
         rho_reshaped = rho.reshape(*grid[::-1]).T
-        # np.save('rho.npy',rho_reshaped)
         if not self.initialized:
             raise Exception('Must call initialize before calling get_V')
 
