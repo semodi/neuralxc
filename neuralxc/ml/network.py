@@ -227,7 +227,9 @@ class NumpyNetworkEstimator(BaseEstimator):
         return predictions
 
     def get_energy(self, x, W, B):
-        if not hasattr(self, trunc): self.trunc = False
+        # For backwards compatibility
+        if not hasattr(self, 'trunc'): self.trunc = False
+
         for w,b in zip(W[:-1],B[:-1]):
             x = self.activation.f(x.dot(w) + b)
 
@@ -238,7 +240,10 @@ class NumpyNetworkEstimator(BaseEstimator):
 
 
     def gradient(self, x, W, B):
-        if not hasattr(self, trunc): self.trunc = False
+        # For backwards compatibility
+        if not hasattr(self, 'trunc'):
+            self.trunc = False
+
         if self.trunc:
             raise Exception('Gradient not implemented for trunctated network')
         gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
