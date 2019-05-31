@@ -242,6 +242,9 @@ class NumpyNetworkEstimator(BaseEstimator):
         return predictions
 
     def get_energy(self, x, W, B):
+        # For backwards compatibility
+        if not hasattr(self, 'trunc'): self.trunc = False
+
         for w,b in zip(W[:-1],B[:-1]):
             x = self.activation.f(x.dot(w) + b)
 
@@ -252,20 +255,31 @@ class NumpyNetworkEstimator(BaseEstimator):
 
 
     def gradient(self, x, W, B):
+        # For backwards compatibility
+        if not hasattr(self, 'trunc'):
+            self.trunc = False
+
+        # del z_1/ del x_i
         gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
+
         Z = []
-        for w,b in zip(W[:-1],B[:-1]):
+        for w,b in zip(W[:],B[:]):
             x = x.dot(w) + b
             Z.append(self.activation.df(x))
             x = self.activation.f(x)
 
-        for w,z in zip(W[:-1],Z):
-            gradient = gradient.dot(w)*z
-
         if not self.trunc:
-            gradient = gradient.dot(W[-1])
+            for w,z in zip(W[:-1],Z[:-1]):
+                gradient = gradient.dot(w)*z
 
-        return gradient[:,:,0].T
+            gradient = gradient.dot(W[-1])
+            return gradient[:,:,0].T
+        else:
+            for w,z in zip(W,Z):
+                gradient = gradient.dot(w)*z
+
+            # Output will be (n_samples, n_layerout, n_features)
+            return gradient.swapaxes(0,1).swapaxes(1,2)
 
     def _make_serializable(self, path):
         return None

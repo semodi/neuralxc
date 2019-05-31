@@ -269,8 +269,6 @@ class DensityProjector(BaseProjector):
         radsr = np.array(rads)
         # radsr[R<1e-15] = 0
         radsr = radsr / R
-        print(radsr.shape)
-        print(R.shape)
         radsr[:,R<1e-15] = 0
 
         rhat = np.array([X / R, Y / R, Z / R])
