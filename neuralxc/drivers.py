@@ -343,26 +343,28 @@ def chain_driver(args):
     inp = json.loads(open(inputfile,'r').read())
     pre = json.loads(open(preprocessor,'r').read())
 
-    best_model = get_grid_cv(hdf5, preprocessor, inputfile, False)
-    estimator = best_model.estimator
-    param_grid = best_model.param_grid
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, False)
+    new_model = grid_cv.estimator
+    param_grid = grid_cv.param_grid
     param_grid = {key: param_grid[key][0] for key in param_grid}
-    estimator.set_params(**param_grid)
+    new_model.set_params(**param_grid)
 
     old_model = xc.ml.network.load_pipeline(args.model)
-    estimator.steps[-1][1].steps[2:-1] = old_model.steps[:-1]
+    new_model.steps[-1][1].steps[2:-1] = old_model.steps[:-1]
 
-    if not isinstance(old_model, xc.ml.network.NumpyNetworkEstimator):
-        raise Exception('Currently only supported if saved model is NumpyNetworkEstimator')
 
-    old_estimator = old_model.steps[-1][1].trunc_after(-1)
-    new_estimator = estimator.steps[-1][1].steps[-1][1]
+    old_estimator = old_model.steps[-1][1]
+    if not isinstance(old_estimator, xc.ml.network.NumpyNetworkEstimator):
+        raise Exception('Currently only supported if saved model is NumpyNetworkEstimator,\
+        but is ', type(old_estimator))
+    old_estimator = old_estimator.trunc_after(-1)
+    new_estimator = new_model.steps[-1][1].steps[-1][1]
 
     estimator = xc.ml.ensemble.ChainedEstimator([old_estimator, new_estimator])
 
-    best_model = best_model.steps[-1][1]
+    new_model.steps[-1][1].steps[-1] = ('ml__estimator', estimator)
 
-    best_model.start_at(2).save(args.dest, True)
+    new_model.steps[-1][1].start_at(2).save(args.dest, True)
 
 def sample_driver(args):
     """ Given a dataset, perform sampling in feature space"""
@@ -444,7 +446,6 @@ def predict_driver(args):
     datafile = h5py.File(hdf5[0],'r')
     basis_key = basis_to_hash(pre['basis'])
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, 0)
-
     model = xc.NeuralXC(args.model)._pipeline
     basis = model.get_basis_instructions()
     symmetrizer_instructions = model.get_symmetrize_instructions()

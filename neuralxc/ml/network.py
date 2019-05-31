@@ -148,14 +148,26 @@ class NumpyNetworkEstimator(BaseEstimator):
 
         self.W = W
         self.B = B
-        self.activation = get_activation(activation)
+        if isinstance(activation, str):
+            self.activation = get_activation(activation)
+        else:
+            self.activation = activation
         self.trunc = trunc
 
     def trunc_after(self, n):
         if n == -1:
-            return NumpyNetworkEstimator(self.W[:-1], self.b[:-1], self.activation , True)
+            uidx = -1
         else:
-            return NumpyNetworkEstimator(self.W[:n+1], self.b[:n+1], self.activation) , True
+            uidx = n+1
+
+        W_trunc = {}
+        b_trunc = {}
+
+        for spec in self.W:
+            W_trunc[spec] = self.W[spec][:uidx]
+            b_trunc[spec] = self.B[spec][:uidx]
+
+        return NumpyNetworkEstimator(W_trunc, b_trunc, self.activation ,True)
 
     def fit(self,*args):
         pass
@@ -199,6 +211,8 @@ class NumpyNetworkEstimator(BaseEstimator):
         predictions = []
 
         for X in X_list:
+            #TODO: workaround for now
+            if not len(X): continue
             if kwargs.get('partial', False):
                 prediction = {}
             else:
@@ -208,13 +222,14 @@ class NumpyNetworkEstimator(BaseEstimator):
                 feat = X[spec]
                 n_sys = len(feat)
                 if feat.ndim == 3:
+                    old_shape = feat.shape
                     feat = feat.reshape(-1, feat.shape[-1])
 
                 if kwargs.get('partial', False):
                     fit_kwargs = dict(kwargs)
                     fit_kwargs.pop('partial')
 
-                    prediction[spec] = self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1)
+                    prediction[spec] = self.get_energy(feat, self.W[spec],self.B[spec]).reshape(*old_shape[:-1],-1)
 
                 else:
                     prediction += np.sum(self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1),
@@ -237,8 +252,6 @@ class NumpyNetworkEstimator(BaseEstimator):
 
 
     def gradient(self, x, W, B):
-        if self.trunc:
-            raise Exception('Gradient not implemented for trunctated network')
         gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
         Z = []
         for w,b in zip(W[:-1],B[:-1]):
@@ -249,7 +262,8 @@ class NumpyNetworkEstimator(BaseEstimator):
         for w,z in zip(W[:-1],Z):
             gradient = gradient.dot(w)*z
 
-        gradient = gradient.dot(W[-1])
+        if not self.trunc:
+            gradient = gradient.dot(W[-1])
 
         return gradient[:,:,0].T
 
@@ -345,6 +359,7 @@ class NetworkEstimator(BaseEstimator):
         self._network = Energy_Network(subnets)
         if not self.path is None:
             self._network.restore_model(self.path)
+
 
     def fit(self, X, y=None, *args, **kwargs):
 
@@ -468,7 +483,8 @@ class NetworkEstimator(BaseEstimator):
     def _make_serializable(self, path):
 
         network = self._network
-        network.save_model(path)
+        if network:
+            network.save_model(path)
         self._network = None
         return network
 
@@ -917,17 +933,22 @@ class Energy_Network():
             path = path[:-5]
 
         self.checkpoint_path = path + '.ckpt'
-        g = tf.Graph()
-        with g.as_default():
-            sess = tf.Session()
-            self.construct_network()
-            b = tf.placeholder(tf.float32, name='b')
-            saver = tf.train.Saver()
-            saver.restore(sess, path + '.ckpt')
-            self.model_loaded = True
-            self.sess = sess
-            self.graph = g
-            self.initialized = True
+
+        if os.path.isfile(self.checkpoint_path +'.meta'):
+            g = tf.Graph()
+            with g.as_default():
+                sess = tf.Session()
+                self.construct_network()
+                b = tf.placeholder(tf.float32, name='b')
+                saver = tf.train.Saver()
+                saver.restore(sess, path + '.ckpt')
+                self.model_loaded = True
+                self.sess = sess
+                self.graph = g
+                self.initialized = True
+        else:
+            self.checkpoint_path = None
+            print('Model not found, starting over...')
 
 
 class Subnet():
