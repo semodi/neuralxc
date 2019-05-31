@@ -8,6 +8,7 @@ import sys
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.base import BaseEstimator
+from neuralxc.formatter import atomic_shape
 from matplotlib import pyplot as plt
 import math
 import pickle
@@ -175,6 +176,8 @@ class NumpyNetworkEstimator(BaseEstimator):
     def get_gradient(self, X, *args, **kwargs):
         made_list = False
 
+        if not hasattr(self, 'trunc'):
+            self.trunc = False
         if isinstance(X, tuple):
             X = X[0]
         if not isinstance(X, list):
@@ -189,9 +192,15 @@ class NumpyNetworkEstimator(BaseEstimator):
                 feat = X[spec]
                 if feat.ndim == 3:
                     old_shape = feat.shape
-                    feat = feat.reshape(-1, feat.shape[-1])
+                    feat = atomic_shape(feat)
 
-                predictions[sys_idx][spec] = self.gradient(feat, self.W[spec],self.B[spec]).reshape(*old_shape)
+                if not self.trunc:
+                    predictions[sys_idx][spec] = self.gradient(feat,
+                        self.W[spec],self.B[spec]).reshape(*old_shape)
+                else:
+                    predictions[sys_idx][spec] = self.gradient(feat,
+                        self.W[spec],self.B[spec]).reshape(old_shape[0],old_shape[1],
+                                                    -1,old_shape[2])
 
         if made_list:
             predictions = predictions[0]

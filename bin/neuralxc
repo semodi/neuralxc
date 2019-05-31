@@ -116,6 +116,13 @@ if __name__ == '__main__':
     chain.add_argument('-dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
     chain.set_defaults(func=chain_driver)
 
+    #================ Tensorflow model converter ==========
+
+    merge = subparser.add_parser('merge', description='Merges a chained NumpyNetworkEstimator into one model')
+    merge.add_argument('chained', action='store', help ='Path to chained model')
+    merge.add_argument('merged', action='store', help='Destination for numpy model')
+    merge.add_argument('override', action='store_true', help='Override existing model?')
+    merge.set_defaults(func=merge_driver)
     # =============== Evaluate =====================
 
     eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')

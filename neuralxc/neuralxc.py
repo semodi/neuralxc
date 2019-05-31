@@ -81,9 +81,6 @@ class NXCAdapter(ABC):
 
 class SiestaNXC(NXCAdapter):
 
-    # TODO: Find library that takes care of this
-    # element_dict = {8: 'O', 1: 'H', 6: 'C'}
-
     @prints_error
     def initialize(self, rho, unitcell, grid, positions, elements):
         elements = np.array([str(element_dict[e]) for e in elements])
@@ -163,9 +160,6 @@ class SiestaNXC(NXCAdapter):
     @prints_error
     def correct_forces(self, forces):
         if hasattr(self, 'force_correction'):
-            print(self.element_filter)
-            print(forces.shape)
-            print(self.force_correction.shape)
             forces[:,self.element_filter] = forces[:,self.element_filter] + self.force_correction
         else:
             raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
@@ -217,9 +211,9 @@ class NeuralXC():
         species = [species]
         C = self.projector.get_basis_rep(rho, positions, species)
         D = self.symmetrizer.get_symmetrized(C)
+        E = self._pipeline.predict(D)[0]
         dEdD = self._pipeline.get_gradient(D)
         dEdC = self.symmetrizer.get_gradient(dEdD, C)
-        E = self._pipeline.predict(D)[0]
         V = self.projector.get_V(dEdC, positions, species, calc_forces, rho)
         return E, V
 
@@ -264,8 +258,8 @@ class NeuralXC():
                 # np.save('descriptors_{}.npy'.format(spec),descr)
 
             D = self.symmetrizer.get_symmetrized(C)
-            dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
             E = self._pipeline.predict(D)[0]
+            dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
             V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
         else:
             with ThreadPoolExecutor(max_workers = self.max_workers) as executor:

@@ -71,6 +71,17 @@ def convert_tf(args):
 
     nxc_tf._pipeline.save(args.np, args.override, True)
 
+def merge_driver(args):
+    """ Converts the tensorflow estimator inside a NXCPipeline to a simple
+    numpy base estimator"""
+
+    nxc_tf = xc.NeuralXC(args.chained)
+    pipeline = nxc_tf._pipeline
+
+    label, estimator = pipeline.steps[-1]
+    pipeline.steps[-1] = (label, estimator.merge())
+    nxc_tf._pipeline.save(args.merged, args.override, True)
+
 def add_data_driver(args):
     """ Adds data to hdf5 file"""
     try:

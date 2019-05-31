@@ -1,4 +1,5 @@
 from sklearn.base import BaseEstimator
+from neuralxc.ml.network import NumpyNetworkEstimator
 import numpy as np
 
 class EnsembleEstimator(BaseEstimator):
@@ -7,11 +8,14 @@ class EnsembleEstimator(BaseEstimator):
 
         allows_threading = False
         self.estimators = estimators
-        if hasattr(np, operation):
-            self.operation = getattr(np, operation)
+        if isinstance(operation, str):
+            if hasattr(np, operation):
+                self.operation = getattr(np, operation)
+            else:
+                raise Exception('Operation must be available in numpy, numpy.' + \
+                    operation +' unknown')
         else:
-            raise Exception('Operation must be available in numpy, numpy.' + \
-                operation +' unknown')
+            self.operation = operation
         self.path = None
         self.models_loaded = False
 
@@ -19,6 +23,12 @@ class EnsembleEstimator(BaseEstimator):
         for idx, estimator in enumerate(self.estimators):
             self.estimators[idx].load_network(path + '_e{}'.format(idx))
 
+
+    def get_np_estimator(self):
+        np_estimators = []
+        for est in self.estimators:
+            np_estimators.append(est.get_np_estimator())
+        return type(self)(np_estimators,self.operation)
 
     def _make_serializable(self, path):
 
@@ -47,7 +57,6 @@ class ChainedEstimator(EnsembleEstimator):
         return self.estimators[-1].fit(X, y, **fit_kwargs)
 
     def predict(self, X, *args, **kwargs):
-        print("Using chained estimator")
         for estimator in self.estimators[:-1]:
             X = estimator.predict(X, *args, partial=True)
 
@@ -59,6 +68,7 @@ class ChainedEstimator(EnsembleEstimator):
 
         for estimator in self.estimators:
             grad = estimator.get_gradient(X, *args, **kwargs)
+            X = estimator.predict(X, *args, partial=True)
             for species in grad:
                 if not species in gradients:
                     gradients[species] = []
@@ -67,11 +77,40 @@ class ChainedEstimator(EnsembleEstimator):
         for species in gradients:
             grad = gradients[species][0]
             for g in gradients[species][1:-1]:
-                grad = np.einsum('ikj, ijl -> ikl', g, grad)
-            grad = np.einsum('ij,ijl -> il', gradients[species][-1], grad)
+                grad = np.einsum('imkj, imjl -> imkl', g, grad)
+            grad = np.einsum('imj,imjl -> iml', gradients[species][-1], grad)
             gradients[species] = grad
 
         return gradients
+
+    def merge(self):
+
+        W = {}
+        B = {}
+        act = self.estimators[0].activation
+        for estimator in self.estimators:
+            if not isinstance(estimator, NumpyNetworkEstimator):
+                raise Exception('Merging only possible if all estimators are numpy based')
+
+            w = estimator.W
+            b = estimator.B
+            if not isinstance(estimator.activation,type(act)):
+                raise Exception('Activations not consistent across layers.\
+                        Merging not supported')
+            act = estimator.activation
+
+            for spec in w:
+                print(spec)
+                if not spec in W:
+                    W[spec] = []
+                    B[spec] = []
+                for ws, bs in zip(w[spec],b[spec]):
+                    W[spec].append(ws)
+                    B[spec].append(bs)
+                    print(ws.shape)
+                    print(bs.shape)
+
+        return NumpyNetworkEstimator(W, B, act)
 
 class StackedEstimator(EnsembleEstimator):
     allows_threading = False
