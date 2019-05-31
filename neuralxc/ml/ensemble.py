@@ -64,6 +64,10 @@ class ChainedEstimator(EnsembleEstimator):
 
 
     def get_gradient(self, X, *args, **kwargs):
+
+        raise NotImplementedError('ChainedEstimators can currently not be used for DFT calculations' +\
+        ' as the get_gradient() method has not been thoroughly tested. Use merge() to convert' +\
+        ' this ChainedEstimator into a single NumpyNetworkEstimator')
         gradients = {}
 
         for estimator in self.estimators:
