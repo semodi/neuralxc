@@ -148,7 +148,10 @@ class NumpyNetworkEstimator(BaseEstimator):
 
         self.W = W
         self.B = B
-        self.activation = get_activation(activation)
+        if isinstance(activation, str):
+            self.activation = get_activation(activation)
+        else:
+            self.activation = activation
         self.trunc = trunc
 
     def trunc_after(self, n):
@@ -244,21 +247,29 @@ class NumpyNetworkEstimator(BaseEstimator):
         if not hasattr(self, 'trunc'):
             self.trunc = False
 
-        if self.trunc:
-            raise Exception('Gradient not implemented for trunctated network')
+        # del z_1/ del x_i
         gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
+
         Z = []
-        for w,b in zip(W[:-1],B[:-1]):
+        for w,b in zip(W[:],B[:]):
             x = x.dot(w) + b
             Z.append(self.activation.df(x))
             x = self.activation.f(x)
 
-        for w,z in zip(W[:-1],Z):
-            gradient = gradient.dot(w)*z
+        if not self.trunc:
+            for w,z in zip(W[:-1],Z[:-1]):
+                gradient = gradient.dot(w)*z
 
-        gradient = gradient.dot(W[-1])
+            gradient = gradient.dot(W[-1])
+            return gradient[:,:,0].T
+        else:
+            for w,z in zip(W,Z):
+                gradient = gradient.dot(w)*z
 
-        return gradient[:,:,0].T
+            # Output will be (n_samples, n_layerout, n_features)
+            return gradient.swapaxes(0,1).swapaxes(1,2)
+
+
 
     def _make_serializable(self, path):
         return None

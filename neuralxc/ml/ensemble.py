@@ -38,16 +38,40 @@ class ChainedEstimator(EnsembleEstimator):
     allows_threading = False
 
     def fit(self, X, y=None, **fit_kwargs):
+        if isinstance(X, tuple):
+            y = X[1]
+
         for estimator in self.estimators[:-1]:
             X = estimator.predict(X, partial=True)
 
         return self.estimators[-1].fit(X, y, **fit_kwargs)
 
     def predict(self, X, *args, **kwargs):
+        print("Using chained estimator")
         for estimator in self.estimators[:-1]:
             X = estimator.predict(X, *args, partial=True)
 
         return self.estimators[-1].predict(X, *args, **kwargs)
+
+
+    def get_gradient(self, X, *args, **kwargs):
+        gradients = {}
+
+        for estimator in self.estimators:
+            grad = estimator.get_gradient(X, *args, **kwargs)
+            for species in grad:
+                if not species in gradients:
+                    gradients[species] = []
+                gradients[species].append(grad[species])
+
+        for species in gradients:
+            grad = gradients[species][0]
+            for g in gradients[species][1:-1]:
+                grad = np.einsum('ikj, ijl -> ikl', g, grad)
+            grad = np.einsum('ij,ijl -> il', gradients[species][-1], grad)
+            gradients[species] = grad
+
+        return gradients
 
 class StackedEstimator(EnsembleEstimator):
     allows_threading = False
