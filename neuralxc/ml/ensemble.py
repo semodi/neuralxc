@@ -44,6 +44,31 @@ class EnsembleEstimator(BaseEstimator):
         for c, estimator in zip(container, self.estimators):
             estimator._restore_after_pickling(c)
 
+    def score(self, X, y=None, metric='mae'):
+
+        if isinstance(X, tuple):
+            y = X[1]
+            X = X[0]
+
+        if metric == 'mae':
+            metric_function = (lambda x: np.mean(np.abs(x)))
+        elif metric == 'rmse':
+            metric_function = (lambda x: np.sqrt(np.mean(x**2)))
+        else:
+            raise Exception('Metric unknown or not implemented')
+
+
+    #         metric_function = (lambda x: np.mean(np.abs(x)))
+        scores = []
+        if not isinstance(X, list):
+            X = [X]
+            y = [y]
+
+        for X_, y_ in zip(X, y):
+            scores.append(metric_function(self.predict(X_) - y_))
+
+        return -np.mean(scores)
+
 class ChainedEstimator(EnsembleEstimator):
     allows_threading = False
 
@@ -62,6 +87,12 @@ class ChainedEstimator(EnsembleEstimator):
 
         return self.estimators[-1].predict(X, *args, **kwargs)
 
+
+    def set_params(self, **kwargs):
+        self.estimators[-1].set_params(**kwargs)
+
+    def get_params(self, *args, **kwargs):
+        return self.estimators[-1].get_params(*args, **kwargs)
 
     def get_gradient(self, X, *args, **kwargs):
 
@@ -104,16 +135,12 @@ class ChainedEstimator(EnsembleEstimator):
             act = estimator.activation
 
             for spec in w:
-                print(spec)
                 if not spec in W:
                     W[spec] = []
                     B[spec] = []
                 for ws, bs in zip(w[spec],b[spec]):
                     W[spec].append(ws)
                     B[spec].append(bs)
-                    print(ws.shape)
-                    print(bs.shape)
-
         return NumpyNetworkEstimator(W, B, act)
 
 class StackedEstimator(EnsembleEstimator):

@@ -215,7 +215,7 @@ def to_full_hyperparameters(hp, parameters):
     return full
 
 
-def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_threshold = 0.999):
+def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_threshold = 1):
     """
     Get the default pipeline containing symmetrizer, variance selector, pca, and
     the final NetworkEstimator
@@ -225,7 +225,7 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
 
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-    var_selector = GroupedVarianceThreshold()
+    var_selector = GroupedVarianceThreshold(threshold = 1e-5)
 
     estimator = NetworkWrapper(4, 1, 0,
                             alpha=0.001, max_steps = 4001, test_size = 0.0,
@@ -237,9 +237,8 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
 
     pipeline_list.append(('scaler', GroupedStandardScaler()))
 
-    if pca_threshold < 1:
-        pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
-        pipeline_list.append(('pca', pca))
+    pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
+    pipeline_list.append(('pca', pca))
 
     pipeline_list.append(('estimator', estimator))
 

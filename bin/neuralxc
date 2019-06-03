@@ -17,7 +17,6 @@ if __name__ == '__main__':
     tfcon = subparser.add_parser('convert-tf', description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
     tfcon.add_argument('tf', action='store', help ='Path to tensorflow model')
     tfcon.add_argument('np', action='store', help='Destination for numpy model')
-    tfcon.add_argument('override', action='store_true', help='Override existing model?')
     tfcon.set_defaults(func=convert_tf)
 
     #================ Data routines ================
@@ -96,6 +95,7 @@ if __name__ == '__main__':
     fit.add_argument('-model', metavar='model', type=str, default='', help='Continue training model found at this location')
     fit.add_argument('-ensemble', action='store_true', help='Derive pipeline from -model and only fit final estimator, to be able to build\
     an ensemble of estimators later on')
+    fit.add_argument('-hyperopt', action='store_true', help='Do a hyperparameter optimzation')
     fit.set_defaults(func=fit_driver)
 
     # ============= Stack ================
@@ -109,19 +109,16 @@ if __name__ == '__main__':
     # ============= Chain ================
 
     chain = subparser.add_parser('chain', description='Chain NeuralXC models')
-    chain.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
     chain.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    chain.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
     chain.add_argument('-model', metavar='model', type=str, help='Continue training model found at this location')
     chain.add_argument('-dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
     chain.set_defaults(func=chain_driver)
 
-    #================ Tensorflow model converter ==========
+    #================ Merge ==========
 
     merge = subparser.add_parser('merge', description='Merges a chained NumpyNetworkEstimator into one model')
     merge.add_argument('chained', action='store', help ='Path to chained model')
     merge.add_argument('merged', action='store', help='Destination for numpy model')
-    merge.add_argument('override', action='store_true', help='Override existing model?')
     merge.set_defaults(func=merge_driver)
     # =============== Evaluate =====================
 

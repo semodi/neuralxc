@@ -170,8 +170,25 @@ class NumpyNetworkEstimator(BaseEstimator):
 
         return NumpyNetworkEstimator(W_trunc, b_trunc, self.activation ,True)
 
+    def transform(self, X, *args, **kwargs):
+
+        if not hasattr(self, 'trunc'): self.trunc = False
+        if not self.trunc:
+            print('Warning: NumpyNetworkEstimator was not truncated but is being used inside a Pipeline.'\
+            + ' Truncating neural network after last hidden layer...')
+            self = self.trunc_after(-1)
+            return self.transform(X, *args, **kwargs)
+        else:
+            if isinstance(X, tuple):
+                y = X[1]
+            else:
+                y = 0
+            print('Called transform')
+            return self.predict(X,*args, **kwargs, partial = True), y
+
+
     def fit(self,*args):
-        pass
+        return self
 
     def get_gradient(self, X, *args, **kwargs):
         made_list = False
@@ -836,30 +853,44 @@ class Energy_Network():
             old_cost = 1e8
             if batch_size > 0:
                 batch_generator = BatchGenerator(batch_size)
-            for _ in range(0, max_steps):
 
-                if _ % int(max_steps / 10) == 0 and verbose:
-                    print('Step: ' + str(_))
-                    print('Training set loss:')
-                    if len(cost_list) > 1:
-                        for i, c in enumerate(cost_list):
-                            training_loss = sess.run(tf.sqrt(c), feed_dict=train_feed_dict)
-                            print('{}: {}'.format(i, training_loss))
-                    training_loss = sess.run(tf.sqrt(cost - loss), feed_dict=train_feed_dict)
-                    print('Total: {}'.format(training_loss))
-                    if training_loss <= target_loss:
+            def check_progress(istep):
+                print('Training set loss:')
+                if len(cost_list) > 1:
+                    for i, c in enumerate(cost_list):
+                        training_loss = sess.run(tf.sqrt(c), feed_dict=train_feed_dict)
+                        print('{}: {}'.format(i, training_loss))
+                training_loss = sess.run(tf.sqrt(cost - loss), feed_dict=train_feed_dict)
+                print('Total: {}'.format(training_loss))
+                if training_loss <= target_loss:
+                    return -1
+                print('Validation set loss:')
+                if len(cost_list) > 1:
+                    for i, c in enumerate(cost_list):
+                        print('{}: {}'.format(i, sess.run(tf.sqrt(c), feed_dict=valid_feed_dict)))
+                print('Total: {}'.format(sess.run(tf.sqrt(cost), feed_dict=valid_feed_dict)))
+                print('--------------------')
+                print('L2-loss: {}'.format(sess.run(loss, feed_dict=train_feed_dict)))
+                return 0
+
+            update_cnt = 0
+            for istep in range(0, max_steps):
+
+                if (istep % int(max_steps / 10) == 0 and update_cnt == 0) and verbose:
+                    print('Epoch: ' + str(istep))
+                    if check_progress(istep) == -1:
                         return 0
-                    print('Validation set loss:')
-                    if len(cost_list) > 1:
-                        for i, c in enumerate(cost_list):
-                            print('{}: {}'.format(i, sess.run(tf.sqrt(c), feed_dict=valid_feed_dict)))
-                    print('Total: {}'.format(sess.run(tf.sqrt(cost), feed_dict=valid_feed_dict)))
-                    print('--------------------')
-                    print('L2-loss: {}'.format(sess.run(loss, feed_dict=train_feed_dict)))
 
                 if batch_size > 0:
                     for batch_feed_dict in batch_generator.get_batch_feed(train_feed_dict):
                         sess.run(train_step, feed_dict=batch_feed_dict)
+                        update_cnt += 1
+                        if (update_cnt % int(max_steps / 10) == 0) and verbose:
+                            print('Step: ' + str(update_cnt))
+                            if check_progress(update_cnt) == -1:
+                                return 0
+
+                    if update_cnt > max_steps: break
                 else:
                     sess.run(train_step, feed_dict=train_feed_dict)
 
