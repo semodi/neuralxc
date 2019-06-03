@@ -242,65 +242,9 @@ def parse_sets_input(path):
             line = setsfile.readline().rstrip()
     return hdf5
 
-def hyperopt_driver(args):
-    """ Fits a NXCPipeline to the provided data
-    """
-    inputfile = args.config
-    preprocessor = args.preprocessor
 
-    if args.sets != '':
-        hdf5 = parse_sets_input(args.sets)
-    else:
-        hdf5 = args.hdf5
-
-    mask = args.mask
-
-    if not mask:
-        inp = json.loads(open(inputfile,'r').read())
-        pre = json.loads(open(preprocessor,'r').read())
-    else:
-        inp = {}
-        pre = {}
-
-    best_model = get_grid_cv(hdf5, preprocessor, inputfile, mask)
-    if not mask:
-        start = time.time()
-        try:
-            os.mkdir('.tmp')
-        except FileExistsError:
-            pass
-
-        datafile = h5py.File(hdf5[0],'r')
-        basis_key = basis_to_hash(pre['basis'])
-        data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
-        if args.sample != '':
-            sample = np.load(args.sample)
-            data = data[sample]
-            print("Using sample of size {}".format(len(sample)))
-        np.random.shuffle(data)
-        cluster = LocalCluster(n_workers = inp.get('n_workers',1),
-        threads_per_worker=inp.get('threads_per_worker',1))
-        # cluster = LocalCluster(processes=False)
-        client = Client(cluster)
-        if inp.get('n_workers',1)==1 and inp.get('threads_per_worker',1)==1:
-            backend = 'loky'
-        else:
-            backend = 'dask'
-        print("BACKEND: ", backend)
-        with parallel_backend(backend):
-            print('======Hyperparameter search======')
-
-            best_model.fit(data)
-        # best_model.fit(list(range(len(atoms))))
-        end = time.time()
-        print('Took {}s'.format(end-start))
-        open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
-        pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
-        best_params_ = best_model.best_params_
-        best_estimator = best_model.best_estimator_.steps[0][1].start_at(2)
-        best_estimator.basis_instructions =  pre['basis']
-        best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
-        best_estimator.save('best_model',True)
+def model_driver(args):
+    pass
 
 
 def fit_driver(args):
@@ -324,68 +268,102 @@ def fit_driver(args):
         pre = {}
 
     apply_to = []
-    if args.ensemble:
-        for pidx, path in enumerate(hdf5[1]):
-            if path[0] == '*':
-                apply_to.append(pidx)
-                hdf5[1][pidx] = path[1:]
+    for pidx, path in enumerate(hdf5[1]):
+        if path[0] == '*':
+            apply_to.append(pidx)
+            hdf5[1][pidx] = path[1:]
 
-    best_model = get_grid_cv(hdf5, preprocessor, inputfile, mask)
-    estimator = best_model.estimator
-    param_grid = best_model.param_grid
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask)
+    if mask: return 0
+
+    new_model = grid_cv.estimator
+    param_grid = grid_cv.param_grid
     param_grid = {key: param_grid[key][0] for key in param_grid}
-    estimator.set_params(**param_grid)
+    new_model.set_params(**param_grid)
 
     if args.model:
         if args.ensemble:
-            estimator.steps[-1][1].steps[2:-1] =  xc.ml.network.load_pipeline(args.model).steps[:-1]
+            new_model.steps[-1][1].steps[2:-1] =  xc.ml.network.load_pipeline(args.model).steps[:-1]
         else:
-            estimator.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
+            new_model.steps[-1][1].steps[2:] =  xc.ml.network.load_pipeline(args.model).steps
 
+    datafile = h5py.File(hdf5[0],'r')
+    basis_key = basis_to_hash(pre['basis'])
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
 
-    print(type(estimator.steps[-1][1].steps[-1][1]))
-    if args.hyperopt:
-        if estimator.steps[-1][1].steps[-1][1]._network == None:
-            new_param_grid = {key: value for key,value in  best_model.param_grid.items()\
-                if 'ml__estimator' in key}
-            print(new_param_grid)
-            estimator = GridSearchCV(estimator, new_param_grid, cv=inp.get('cv',2))
-            print(estimator.estimator.get_params().keys())
-
-    best_model = estimator
-
-    if not mask:
-        datafile = h5py.File(hdf5[0],'r')
-        basis_key = basis_to_hash(pre['basis'])
-        data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
-
+    if args.model:
+        if new_model.steps[-1][1].steps[-1][1]._network == None:
+            pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
+        else:
+            pipeline = new_model
         for set in apply_to:
             selection = (data[:,0] == set)
-            prediction = old_model.predict(data)[set]
+            prediction = pipeline.predict(data)[set]
             print('Dataset {} old STD: {}'.format(set, np.std(data[selection][:,-1])))
-            data[selection,-1] -= prediction
+            data[selection,-1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:,-1])))
-        if args.sample != '':
-            sample = np.load(args.sample)
-            data = data[sample]
-            print("Using sample of size {}".format(len(sample)))
+    if args.sample != '':
+        sample = np.load(args.sample)
+        data = data[sample]
+        print("Using sample of size {}".format(len(sample)))
 
-        np.random.shuffle(data)
-        best_model.fit(data)
-        # best_model.fit(list(range(len(atoms))))
-        if args.hyperopt:
-            open('best_params.json','w').write(json.dumps(best_model.best_params_, indent=4))
-            pd.DataFrame(best_model.cv_results_).to_csv('cv_results.csv')
-            best_params_ = best_model.best_params_
-            best_estimator = best_model.best_estimator_.steps[0][1].start_at(2)
-            # best_estimator.basis_instructions =  pre['basis']
-            # best_estimator.symmetrize_instructions = {'symmetrizer_type':'casimir'}
-            best_estimator.save('best_model',True)
+    class FilePipeline():
+        def __init__(self, path):
+            self.path = path
+            self.pipeline = pickle.load(open(self.path,'rb'))
+
+        def predict(self, X, *args, **kwargs):
+            return self.pipeline.predict(X, *args, **kwargs)
+
+        def fit(self, X, y=None):
+            return self
+
+        def transform(self, X, y=None, **fit_params):
+            return self.pipeline.transform(X, **fit_params)
+
+        def fit_transform(self, X, y=None):
+            return self.pipeline.transform(X)
+
+    np.random.shuffle(data)
+    if args.hyperopt:
+        if args.model:
+            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator):
+                new_param_grid = {key[len('ml__'):]: value for key,value in  grid_cv.param_grid.items()\
+                    if 'ml__estimator' in key}
+
+
+                pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]),open('.tmp.pckl','wb'))
+                estimator = GridSearchCV(Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
+                                                    ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                                                    new_param_grid, cv=inp.get('cv',2))
+
+
+                new_model.steps[-1][1].steps = new_model.steps[-1][1].steps[:-1]
+                do_concat = True
+            else:
+                raise Exception('Cannot optimize hyperparameters for fitted model')
         else:
-            best_model = best_model.steps[-1][1]
-            # best_model.basis_instructions =  pre['basis']
-            # best_model.symmetrize_instructions = {'symmetrizer_type':'casimir'}
-            best_model.start_at(2).save('best_model',True)
+            estimator = grid_cv
+            do_concat = False
+    else:
+        estimator = new_model
+
+    estimator.fit(data)
+
+    if args.hyperopt:
+        open('best_params.json','w').write(json.dumps(estimator.best_params_, indent=4))
+        pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
+        best_params_ = estimator.best_params_
+        if do_concat:
+            os.remove('.tmp.pckl')
+            new_model.steps[-1][1].steps.append(estimator.best_estimator_.steps[-1])
+            new_model.steps[-1][1].start_at(2).save('best_model',True)
+        else:
+            best_estimator = estimator.best_estimator_.steps[-1][1].start_at(2)
+            best_estimator.save('best_model',True)
+    else:
+        estimator = estimator.steps[-1][1]
+        estimator.start_at(2).save('best_model',True)
 
 def chain_driver(args):
 
@@ -405,7 +383,6 @@ def chain_driver(args):
 
     old_model.steps[-1] = ('frozen_estimator', old_model.steps[-1][1])
     old_model.steps += [('estimator', new_model)]
-    print(old_model.steps)
     old_model.save(args.dest, True)
 
 def sample_driver(args):
@@ -434,18 +411,25 @@ def sample_driver(args):
 def eval_driver(args):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
-    preprocessor = args.preprocessor
     hdf5 = args.hdf5
 
-    pre = json.loads(open(preprocessor,'r').read())
-
+    if args.predict:
+        hdf5.append(hdf5[1])
+        cutoff = 0
+    else:
+        cutoff = args.cutoff
     datafile = h5py.File(hdf5[0],'r')
-    basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
 
     if not args.model == '':
         model = xc.NeuralXC(args.model)._pipeline
         basis = model.get_basis_instructions()
+        basis_key = basis_to_hash(basis)
+    else:
+        basis_key = ''
+
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
+
+    if not args.model == '':
         symmetrizer_instructions = model.get_symmetrize_instructions()
         symmetrizer_instructions.update({'basis' : basis})
         species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
@@ -458,51 +442,33 @@ def eval_driver(args):
 
         targets = data[:,-1].real
         predictions = pipeline.predict(data)[0]
+        if args.predict:
+            np.save(args.dest, predictions)
+            return 0
         dev = (predictions.flatten() - targets.flatten())
     else:
+        if args.predict:
+            raise Exception('Must provide a model to make predictions')
         dev = data[:,-1].real
     dev0 = np.abs(dev - np.mean(dev))
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
     pprint(results)
     if args.plot:
-        targets -= np.mean(targets)
-        predictions -= np.mean(predictions)
-        maxlim = np.max([np.max(targets),np.max(predictions)])
-        minlim = np.min([np.max(targets),np.min(predictions)])
-        plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
-        plt.plot([minlim,maxlim],[minlim,maxlim],ls ='-',marker='',color = 'grey')
-        plt.show()
-
-def predict_driver(args):
-    """ Evaluate fitted NXCPipeline on dataset and report statistics
-    """
-    preprocessor = args.preprocessor
-    hdf5 = args.hdf5
-
-    pre = json.loads(open(preprocessor,'r').read())
-
-    hdf5.append(hdf5[1])
-
-    print(hdf5)
-    datafile = h5py.File(hdf5[0],'r')
-    basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, 0)
-    model = xc.NeuralXC(args.model)._pipeline
-    basis = model.get_basis_instructions()
-    symmetrizer_instructions = model.get_symmetrize_instructions()
-    symmetrizer_instructions.update({'basis' : basis})
-    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
-    spec_group = SpeciesGrouper(basis, species)
-    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-    print('Symmetrizer instructions', symmetrizer_instructions)
-    pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)
-        ] + model.steps, basis_instructions=basis,
-         symmetrize_instructions=symmetrizer_instructions)
-
-    targets = data[:,-1].real
-    predictions = pipeline.predict(data)[0]
-    np.save(args.dest, predictions)
+        if args.model =='':
+            plt.hist(dev.flatten())
+            plt.xlabel('Target energies [eV]')
+            plt.show()
+        else:
+            targets -= np.mean(targets)
+            predictions -= np.mean(predictions)
+            maxlim = np.max([np.max(targets),np.max(predictions)])
+            minlim = np.min([np.max(targets),np.min(predictions)])
+            plt.plot(targets.flatten(),predictions.flatten(),ls ='',marker='.')
+            plt.plot([minlim,maxlim],[minlim,maxlim],ls ='-',marker='',color = 'grey')
+            plt.xlabel('$E_{ref}[eV]$')
+            plt.ylabel('$E_{pred}[eV]$')
+            plt.show()
 
 def ensemble_driver(args):
 
@@ -580,6 +546,10 @@ def pre_driver(args):
                 file,system,method,filename, ':',[],trajectory_path, True)
                 add_data_driver(data_args)
 
+                data_args = namedtuple(\
+                'data_ns','hdf5 system method density slice add traj override')(\
+                file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
+                add_data_driver(data_args)
 
         if delete_workdir:
             shutil.rmtree(workdir)

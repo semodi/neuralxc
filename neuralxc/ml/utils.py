@@ -46,7 +46,7 @@ def find_attr_in_tree(file, tree, attr):
             return file[subtree].attrs[attr]
 
 
-def load_sets(datafile, baseline, reference, basis_key, percentile_cutoff=0):
+def load_sets(datafile, baseline, reference, basis_key='', percentile_cutoff=0):
     """
     Load multiple datasets from hdf5 file
 
@@ -158,8 +158,10 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
         filter = (tar > min_lim) & (tar < max_lim)
     else:
         filter = [True]*len(tar)
-
-    data_base = datafile[baseline +'/density/' + basis_key][:,:]
+    if basis_key == '':
+        data_base = np.zeros([len(tar),0])
+    else:
+        data_base = datafile[baseline +'/density/' + basis_key][:,:]
     data_base = data_base[filter]
     tar = tar[filter]
     # feat = {}

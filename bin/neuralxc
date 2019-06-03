@@ -12,18 +12,13 @@ if __name__ == '__main__':
         containing the basis to plot')
     basis.set_defaults(func=plot_basis)
 
-    #================ Tensorflow model converter ==========
-
-    tfcon = subparser.add_parser('convert-tf', description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
-    tfcon.add_argument('tf', action='store', help ='Path to tensorflow model')
-    tfcon.add_argument('np', action='store', help='Destination for numpy model')
-    tfcon.set_defaults(func=convert_tf)
-
-    #================ Data routines ================
-
+    # =======================================================
+    # =============== Data routines =========================
+    # =======================================================
     dat = subparser.add_parser('data', description='Add data to hdf5 file')
     datsub = dat.add_subparsers()
 
+    #================ Add data ================
     adddat =  datsub.add_parser('add')
     adddat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     adddat.add_argument('system', action='store',type=str, help ='System')
@@ -43,11 +38,13 @@ if __name__ == '__main__':
     def inspectdat_driver(args):
         subprocess.Popen('h5dump -n ' + args.hdf5, shell=True)
 
+    #================ Inspect data ================
     inspectdat = datsub.add_parser('inspect')
     inspectdat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     inspectdat.set_defaults(func=inspectdat_driver)
 
 
+    #================ Split data ================
     splitdat = datsub.add_parser('split')
     splitdat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     splitdat.add_argument('group', action='store',type=str, help ='Which group to apply slicing to')
@@ -58,11 +55,13 @@ if __name__ == '__main__':
         type=str, help='')
     splitdat.set_defaults(func=split_data_driver)
 
+    #================ Delete data ================
     deldat = datsub.add_parser('delete')
     deldat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     deldat.add_argument('group', action='store',type=str, help ='Which group to apply slicing to')
     deldat.set_defaults(func=delete_data_driver)
 
+    #================ Sample data ================
     sampledat = datsub.add_parser('sample')
     sampledat.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
     sampledat.add_argument('size', action='store',type=int, help ='Sample size')
@@ -71,18 +70,11 @@ if __name__ == '__main__':
     sampledat.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
 
+    # =======================================================
+    # =============== Model routines ========================
+    # =======================================================
+
     # =============== Fitter =====================
-
-    hyper = subparser.add_parser('hyperopt', description='Fit a NeuralXC model and optimize hyperparameters with GridSearchCV ')
-    hyper.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
-    hyper.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    hyper.add_argument('-mask', action=('store_true'), help='Create a config file mask')
-    hyper.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
-    hyper.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
-    hyper.add_argument('-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
-    hyper.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
-    hyper.set_defaults(func=hyperopt_driver)
-
 
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
     fit.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
@@ -97,6 +89,26 @@ if __name__ == '__main__':
     an ensemble of estimators later on')
     fit.add_argument('-hyperopt', action='store_true', help='Do a hyperparameter optimzation')
     fit.set_defaults(func=fit_driver)
+
+    # =============== Evaluate =====================
+
+    eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
+    eval.add_argument('-model',metavar='model',default='', help ='Path to NeuralXC model')
+    eval.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    eval.add_argument('-plot', action='store_true', help ='Create scatterplot?')
+    eval.add_argument('-savefig', action='store',type=str, default='', help ='Save scatterplot?')
+    eval.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    eval.set_defaults(predict=False)
+    eval.set_defaults(func=eval_driver)
+
+    # =============== Predict =====================
+
+    pred = subparser.add_parser('predict', description='Predict energies with NeuralXC model')
+    pred.add_argument('-model',metavar='model', help ='Path to NeuralXC model')
+    pred.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data, reference data')
+    pred.add_argument('-dest', metavar='dest', type=str, default = 'prediction', help ='Destination where to store data')
+    pred.set_defaults(predict=True)
+    pred.set_defaults(func=eval_driver)
 
     # ============= Stack ================
 
@@ -120,28 +132,17 @@ if __name__ == '__main__':
     merge.add_argument('chained', action='store', help ='Path to chained model')
     merge.add_argument('merged', action='store', help='Destination for numpy model')
     merge.set_defaults(func=merge_driver)
-    # =============== Evaluate =====================
 
-    eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
-    eval.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
-    eval.add_argument('-model',metavar='model',default='', help ='Path to NeuralXC model')
-    eval.add_argument('-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
-    eval.add_argument('-plot', action='store_true', help ='Create scatterplot?')
-    eval.add_argument('-savefig', action='store',type=str, default='', help ='Save scatterplot?')
-    eval.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
-    eval.set_defaults(func=eval_driver)
+    #================ Tensorflow model converter ==========
 
-    # =============== Evaluate =====================
+    tfcon = subparser.add_parser('convert-tf', description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
+    tfcon.add_argument('tf', action='store', help ='Path to tensorflow model')
+    tfcon.add_argument('np', action='store', help='Destination for numpy model')
+    tfcon.set_defaults(func=convert_tf)
 
-    pred = subparser.add_parser('predict', description='Predict energies with NeuralXC model')
-    pred.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
-    pred.add_argument('-model',metavar='model', help ='Path to NeuralXC model')
-    pred.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data, reference data')
-    pred.add_argument('-dest', metavar='dest', type=str, default = 'prediction', help ='Destination where to store data')
-    pred.set_defaults(func=predict_driver)
-
-    # ============== Preprocessor =================
-
+    # =======================================================
+    # =============== Preprocessor ========================
+    # =======================================================
     pre = subparser.add_parser('pre', description='Preprocess electron density')
     pre.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
     pre.add_argument('-dest', metavar='dest', type=str, default = '.tmp/', help ='Destination where to store data,\
