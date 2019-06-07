@@ -90,6 +90,17 @@ if __name__ == '__main__':
     fit.add_argument('-hyperopt', action='store_true', help='Do a hyperparameter optimzation')
     fit.set_defaults(func=fit_driver)
 
+    # ============= Workflow ====================
+    wf = subparser.add_parser('workflow', description='Fit a NeuralXC model')
+    wf.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
+    wf.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('engine', action='store', type=str, help='Cut off extreme datapoints')
+    wf.add_argument('-data', metavar='data', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+    wf.add_argument('-config2',metavar='config2',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-maxit', metavar='maxit',type=int, default = '5', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-tol', metavar='maxit',type=float, default = '0.0005', help='Path to .json configuration file setting hyperparameters')
+    wf.set_defaults(func=workflow_driver)
+
     # =============== Evaluate =====================
 
     eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')

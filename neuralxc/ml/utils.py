@@ -15,6 +15,7 @@ from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.neighbors import NearestNeighbors
 import h5py
 
 def find_attr_in_tree(file, tree, attr):
@@ -227,7 +228,7 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
 
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-    var_selector = GroupedVarianceThreshold(threshold = 1e-5)
+    var_selector = GroupedVarianceThreshold(threshold = 1e-10)
 
     estimator = NetworkWrapper(4, 1, 0,
                             alpha=0.001, max_steps = 4001, test_size = 0.0,
@@ -346,7 +347,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
 
 
         pipe = Pipeline([('ml', pipeline)])
-        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=10)
+        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=4)
         return grid_cv
 
 def get_preprocessor(preprocessor, mask=False, xyz=''):
@@ -404,7 +405,9 @@ class SampleSelector(BaseEstimator):
                                                self._n_instances,
                                                picked=picks[idx],
                                                random_state=self._random_state)
-        return picks[0][:self._n_instances]
+        picks = picks[0]
+        np.random.shuffle(picks)
+        return picks[:self._n_instances]
 
     @staticmethod
     def sample_clusters(data,
@@ -415,24 +418,17 @@ class SampleSelector(BaseEstimator):
                         pca_threshold=0.999,
                         random_state=None):
 
-        pca = PCA(n_components=pca_threshold, svd_solver='full')
-        pca_results = pca.fit_transform(data)
-
-        clustering = cluster_method(n_samples, random_state=random_state).fit(pca_results)
+        clustering = cluster_method(n_samples, random_state=random_state).fit(data)
         labels = clustering.labels_
+        centers = clustering.cluster_centers_
 
         sampled = []
-
+        nbrs = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(data)
         np.random.seed(random_state)
-        for label in np.unique(labels):  # Loop over clusters
-            n = sum(labels == label)
-            contained = False
-            for i in indices[labels == label]:
-                if i in picked:
-                    contained = True  # Was a representative of this cluster already picked?
-                    break
-            if not contained:
-                choice = np.random.choice(range(n), size=1, replace=False)
-                sampled.append(indices[labels == label][choice[0]])
+        for center, label in zip(centers, np.unique(labels)):  # Loop over clusters
+            _, idx = nbrs.kneighbors(center.reshape(1,-1))
+            choice = idx[0]
+            if not choice in picked:
+                sampled.append(indices[choice])
 
         return sampled

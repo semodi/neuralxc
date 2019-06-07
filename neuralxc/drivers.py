@@ -32,7 +32,10 @@ import neuralxc as xc
 import sys
 import copy
 import pickle
-
+from types import SimpleNamespace as SN
+os.environ['KMP_AFFINITY'] = 'none'
+os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 def plot_basis(args):
     """ Plots a set of basis functions specified in .json file"""
 
@@ -247,6 +250,106 @@ def model_driver(args):
     pass
 
 
+def mkdir(dirname):
+    try:
+        os.mkdir(dirname)
+    except FileExistsError:
+        pass
+
+
+def workflow_driver(args):
+
+    if args.data:
+        mkdir('it0')
+        shutil.copy(args.data, 'it0/data.hdf5')
+        shutil.copy(args.preprocessor, 'it0/pre.json')
+        shutil.copy(args.config, 'it0/hyper.json')
+        os.chdir('it0')
+        open('sets.inp','w').write('data.hdf5 \n system/base \t system/ref')
+
+        statistics_sc = \
+        eval_driver(SN(model = '',hdf5=['data.hdf5','system/base',
+                'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+        open('statistics_sc','w').write(json.dumps(statistics_sc))
+        statistics_fit = fit_driver(SN(preprocessor='pre.json',config='hyper.json',mask=False, sample='',
+                    cutoff=0.0, model = '',ensemble=False,
+                    sets='sets.inp', hyperopt=True))
+        open('statistics_fit','w').write(json.dumps(statistics_fit))
+        convert_tf(SN(tf='best_model',np='merged_new'))
+        os.chdir('../')
+    else:
+        iteration = 0
+        print('====== Iteration {} ======'.format(iteration))
+        mkdir('it{}'.format(iteration))
+        shutil.copy(args.preprocessor, 'it{}/pre.json'.format(iteration))
+        shutil.copy(args.config, 'it{}/hyper.json'.format(iteration))
+        os.chdir('it{}'.format(iteration))
+        open('sets.inp','w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
+        mkdir('workdir')
+        subprocess.Popen(open('../' + args.engine,'r').read(), shell=True).wait()
+        pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
+                        mask = False, xyz=False))
+        add_data_driver(SN(hdf5='data.hdf5',system='system',method='ref',add=['energy','forces'],
+                        traj ='../sampled.traj', density='',override=True, slice=':'))
+        statistics_sc = \
+        eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
+                'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+        open('statistics_sc','w').write(json.dumps(statistics_sc))
+        statistics_fit = fit_driver(SN(preprocessor='pre.json',config='hyper.json',mask=False, sample='',
+                    cutoff=0.0, model = '',ensemble=False,
+                    sets='sets.inp', hyperopt=True))
+
+        open('statistics_fit','w').write(json.dumps(statistics_fit))
+        convert_tf(SN(tf='best_model',np='merged_new'))
+
+        os.chdir('../')
+    open('siesta.fdf','a').write('\nNeuralXC ../../merged\n')
+    for iteration in range(1, args.maxit +1):
+        print('====== Iteration {} ======'.format(iteration))
+        mkdir('it{}'.format(iteration))
+        shutil.copy('it{}/data.hdf5'.format(iteration - 1),'it{}/data.hdf5'.format(iteration))
+        shutil.copy(args.preprocessor, 'it{}/pre.json'.format(iteration))
+        if args.config2:
+            shutil.copy(args.config2, 'it{}/hyper.json'.format(iteration))
+        else:
+            shutil.copy(args.config, 'it{}/hyper.json'.format(iteration))
+        shutil.copytree('it{}/merged_new'.format(iteration - 1),'it{}/merged'.format(iteration))
+        os.chdir('it{}'.format(iteration))
+        open('sets.inp','w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+        mkdir('workdir')
+        subprocess.Popen(open('../' + args.engine,'r').read(), shell=True).wait()
+        pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
+                        mask = False, xyz=False))
+
+        old_statistics = dict(statistics_sc)
+        statistics_sc = \
+        eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
+                'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+        open('statistics_sc','w').write(json.dumps(statistics_sc))
+
+        if old_statistics['mae'] - statistics_sc['mae'] < args.tol:
+            print('Iterative traning converged: dMAE = {} eV'.format(old_statistics['mae'] - statistics_sc['mae']))
+            os.chdir('../')
+            break
+        chain_driver(SN(config='hyper.json', model ='merged',dest ='chained'))
+        statistics_fit = fit_driver(SN(preprocessor='pre.json',config='hyper.json',mask=False, sample='',
+                    cutoff=0.0, model = 'chained',ensemble=False,
+                    sets='sets.inp', hyperopt=True))
+
+        open('statistics_fit','w').write(json.dumps(statistics_fit))
+        if statistics_fit['mae'] > statistics_sc['mae'] + args.tol:
+            print('Stopping iterative training because fitting error is larger than self-consistent error')
+            os.chdir('../')
+            break
+        merge_driver(SN(chained='best_model',merged='merged_new'))
+
+        os.chdir('../')
+
+
+
 def fit_driver(args):
     """ Fits a NXCPipeline to the provided data
     """
@@ -350,6 +453,11 @@ def fit_driver(args):
 
     estimator.fit(data)
 
+    dev = estimator.predict(data)[0].flatten() - data[:,-1].real.flatten()
+    dev0 = np.abs(dev - np.mean(dev))
+    results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
+               'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
+
     if args.hyperopt:
         open('best_params.json','w').write(json.dumps(estimator.best_params_, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
@@ -364,6 +472,7 @@ def fit_driver(args):
     else:
         estimator = estimator.steps[-1][1]
         estimator.start_at(2).save('best_model',True)
+    return results
 
 def chain_driver(args):
 
@@ -403,10 +512,12 @@ def sample_driver(args):
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
 
-    sampler_pipeline = Pipeline([('spec_group', spec_group),('symmetrizer',symmetrizer),
-        ('sampler', SampleSelector(args.size))])
+    sampler_pipeline = get_default_pipeline(basis, species, pca_threshold = 1)
+    sampler_pipeline = Pipeline(sampler_pipeline.steps)
+    sampler_pipeline.steps[-1] = ('sampler', SampleSelector(args.size))
+    sampler_pipeline.fit(data)
     sample = sampler_pipeline.predict(data)
-    np.save(args.dest, np.array(sample))
+    np.save(args.dest, np.array(sample).flatten())
 
 def eval_driver(args):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
@@ -469,6 +580,7 @@ def eval_driver(args):
             plt.xlabel('$E_{ref}[eV]$')
             plt.ylabel('$E_{pred}[eV]$')
             plt.show()
+    return results
 
 def ensemble_driver(args):
 

@@ -183,7 +183,6 @@ class NumpyNetworkEstimator(BaseEstimator):
                 y = X[1]
             else:
                 y = 0
-            print('Called transform')
             return self.predict(X,*args, **kwargs, partial = True), y
 
 
@@ -352,6 +351,7 @@ class NetworkEstimator(BaseEstimator):
         self.activation = activation
         self.optimizer = optimizer
         self.target_loss = target_loss
+        self.verbose = False
 
     def get_params(self, *args, **kwargs):
         return {
@@ -405,9 +405,6 @@ class NetworkEstimator(BaseEstimator):
 
         #TODO: Currently does not allow to continue training
         self.build_network(X, y)
-        print('\n=========Parameters==========\n')
-        print(self.get_params())
-        print('\n')
         self._network.train(step_size=self.alpha,
                             max_steps=self.max_steps,
                             b_=self.b,
@@ -571,7 +568,7 @@ class Energy_Network():
         self.species_nets = {}
         self.species_nets_names = {}
         self.species_gradients_names = {}
-
+        self.verbose = False
     # ========= Network operations ============ #
 
     def __add__(self, other):
@@ -752,7 +749,7 @@ class Energy_Network():
             --------
             None
         """
-
+        verbose=self.verbose
         self.model_loaded = True
         if self.graph is None:
             self.graph = tf.Graph()
@@ -802,7 +799,6 @@ class Energy_Network():
             cost = 0
             if not isinstance(multiplier, list):
                 multiplier = [1.0] * len(cost_list)
-            print('multipliers: {}'.format(multiplier))
             for c, m in zip(cost_list, multiplier):
                 cost += c * m
 

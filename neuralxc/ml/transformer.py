@@ -184,7 +184,6 @@ class GroupedPCA(GroupedTransformer, PCA):
 
     def fit(self, *args,**kwargs):
         if self.n_components == 1:
-            print('------------> PCA deactivated')
             return self
         else:
             return super().fit(*args, **kwargs)
