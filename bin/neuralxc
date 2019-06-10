@@ -32,6 +32,8 @@ if __name__ == '__main__':
     adddat.add_argument('-override', action=('store_true'), help='If exists, override?')
     adddat.add_argument('-slice', metavar='slice',
         type=str, default=':', help='Only add slice of dataset')
+    adddat.add_argument('-zero', metavar='zero',
+        type=int, default=None, help='Set energy origin to this value, if not set use minimum of dataset')
     adddat.set_defaults(func=add_data_driver)
 
 
@@ -100,6 +102,8 @@ if __name__ == '__main__':
     wf.add_argument('-maxit', metavar='maxit',type=int, default = '5', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('-tol', metavar='maxit',type=float, default = '0.0005', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('-hotstart', metavar='hotstart',type=int, default = '0', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-sets', metavar='sets',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================

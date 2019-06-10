@@ -41,7 +41,7 @@ def add_species(file, system, traj_path = ''):
         cg.attrs.update({'species' : species})
 
 def add_data(which, file, data, system, method,
-              override= False):
+              override= False, E0 = None):
     """
     Add data to hdf5 file.
 
@@ -76,7 +76,10 @@ def add_data(which, file, data, system, method,
             cg = cg[o]
 
     if which =='energy':
-        cg.attrs.update({'E0': min(data)})
+        if E0 == None:
+            cg.attrs.update({'E0': min(data)})
+        else:
+            cg.attrs.update({'E0': E0})
 
     print('{} systems found, adding {}'.format( len(data), which))
 

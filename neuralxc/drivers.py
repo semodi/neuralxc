@@ -129,7 +129,7 @@ def add_data_driver(args):
                 add_species(file, args.system, args.traj)
                 energies = np.array([a.get_potential_energy()\
                  for a in read(args.traj,':')])[ijk]
-                add_energy(file, energies, args.system, args.method, args.override)
+                add_energy(file, energies, args.system, args.method, args.override, E0=args.zero)
             else:
                 raise Exception('Must provide a trajectory file')
                 file.close()
@@ -270,6 +270,13 @@ def shcopytree(src, dest):
 
 def workflow_driver(args):
     statistics_sc = {'mae': 1000}
+    if args.sets:
+        args.sets = os.path.abspath(args.sets)
+    if args.nozero:
+        E0 = 0
+    else:
+        E0 = None
+
     if args.hotstart == 0:
         if args.data:
             mkdir('it0')
@@ -278,7 +285,8 @@ def workflow_driver(args):
             shcopy(args.config, 'it0/hyper.json')
             os.chdir('it0')
             open('sets.inp','w').write('data.hdf5 \n system/base \t system/ref')
-
+            if args.sets:
+                open('sets.inp','a').write('\n' + open(args.sets,'r').read())
             statistics_sc = \
             eval_driver(SN(model = '',hdf5=['data.hdf5','system/base',
                     'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
@@ -298,12 +306,16 @@ def workflow_driver(args):
             shcopy(args.config, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp','w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
+            if args.sets:
+                open('sets.inp','a').write('\n' + open(args.sets,'r').read())
             mkdir('workdir')
             subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../sampled.traj', shell=True).wait()
             pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
                             mask = False, xyz=False))
+            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it0',add=['energy','forces'],
+                            traj ='workdir/results.traj', density='',override=True, slice=':', zero=E0))
             add_data_driver(SN(hdf5='data.hdf5',system='system',method='ref',add=['energy','forces'],
-                            traj ='../sampled.traj', density='',override=True, slice=':'))
+                            traj ='../sampled.traj', density='',override=True, slice=':', zero = E0))
             statistics_sc = \
             eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
@@ -332,11 +344,15 @@ def workflow_driver(args):
             shcopytree('it{}/merged_new'.format(iteration - 1),'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp','w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+            if args.sets:
+                open('sets.inp','a').write('\n' + open(args.sets,'r').read())
             mkdir('workdir')
             subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../sampled.traj', shell=True).wait()
             pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
                             mask = False, xyz=False))
 
+            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it{}'.format(iteration),add=['energy','forces'],
+                            traj ='workdir/results.traj', density='',override=True, slice=':', zero = E0))
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -382,9 +398,9 @@ def workflow_driver(args):
     subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../testing.traj', shell=True).wait()
 
     add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/ref',add=['energy','forces'],
-                    traj ='../testing.traj', density='',override=True, slice=':'))
+                    traj ='../testing.traj', density='',override=True, slice=':', zero = E0))
     add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/nxc',add=['energy','forces'],
-                    traj ='workdir/results.traj', density='',override=True, slice=':'))
+                    traj ='workdir/results.traj', density='',override=True, slice=':', zero = E0))
 
     statistics_test = eval_driver(SN(model = '',hdf5=['data.hdf5','system/testing/nxc',
             'system/testing/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
@@ -698,10 +714,10 @@ def pre_driver(args):
                 file,system,method,filename, ':',[],trajectory_path, True)
                 add_data_driver(data_args)
 
-                data_args = namedtuple(\
-                'data_ns','hdf5 system method density slice add traj override')(\
-                file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
-                add_data_driver(data_args)
+                # data_args = namedtuple(\
+                # 'data_ns','hdf5 system method density slice add traj override')(\
+                # file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
+                # add_data_driver(data_args)
 
         if delete_workdir:
             shutil.rmtree(workdir)
