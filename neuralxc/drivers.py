@@ -350,7 +350,7 @@ def workflow_driver(args):
                     iteration -= 1
                     os.chdir('../')
                 else:
-                    print('Iterative traning converged: dMAE = {} eV'.format(old_statistics['mae'] - statistics_sc['mae']))
+                    print('Iterative training converged: dMAE = {} eV'.format(old_statistics['mae'] - statistics_sc['mae']))
                     os.chdir('../')
                 break
 
@@ -376,7 +376,7 @@ def workflow_driver(args):
     mkdir('testing')
 
     shcopy('it{}/data.hdf5'.format(iteration),'testing/data.hdf5')
-    shcopytree('it{}/merged'.format(iteration - 1),'testing/merged')
+    shcopytree('it{}/merged'.format(iteration),'testing/merged')
     os.chdir('testing')
     mkdir('workdir')
     subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../testing.traj', shell=True).wait()
