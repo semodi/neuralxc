@@ -99,6 +99,7 @@ if __name__ == '__main__':
     wf.add_argument('-config2',metavar='config2',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('-maxit', metavar='maxit',type=int, default = '5', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('-tol', metavar='maxit',type=float, default = '0.0005', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-hotstart', metavar='hotstart',type=int, default = '0', help='Path to .json configuration file setting hyperparameters')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================
