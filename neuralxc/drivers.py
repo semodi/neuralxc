@@ -272,6 +272,13 @@ def workflow_driver(args):
     statistics_sc = {'mae': 1000}
     if args.sets:
         args.sets = os.path.abspath(args.sets)
+
+    if args.model0:
+        args.model0 = os.path.abspath(args.model0)
+        ensemble = True
+    else:
+        ensemble = False
+
     if args.nozero:
         E0 = 0
     else:
@@ -293,7 +300,7 @@ def workflow_driver(args):
 
             open('statistics_sc','w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(SN(preprocessor='pre.json',config='hyper.json',mask=False, sample='',
-                        cutoff=0.0, model = '',ensemble=False,
+                        cutoff=0.0, model = args.model0,ensemble=ensemble,
                         sets='sets.inp', hyperopt=True))
             open('statistics_fit','w').write(json.dumps(statistics_fit))
             convert_tf(SN(tf='best_model',np='merged_new'))
@@ -322,7 +329,7 @@ def workflow_driver(args):
 
             open('statistics_sc','w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(SN(preprocessor='pre.json',config='hyper.json',mask=False, sample='',
-                        cutoff=0.0, model = '',ensemble=False,
+                        cutoff=0.0, model = args.model0,ensemble=ensemble,
                         sets='sets.inp', hyperopt=True))
 
             open('statistics_fit','w').write(json.dumps(statistics_fit))
@@ -461,6 +468,7 @@ def fit_driver(args):
             print('Dataset {} old STD: {}'.format(set, np.std(data[selection][:,-1])))
             data[selection,-1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:,-1])))
+
     if args.sample != '':
         sample = np.load(args.sample)
         data = data[sample]
@@ -486,7 +494,7 @@ def fit_driver(args):
     np.random.shuffle(data)
     if args.hyperopt:
         if args.model:
-            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator):
+            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator) or args.ensemble:
                 new_param_grid = {key[len('ml__'):]: value for key,value in  grid_cv.param_grid.items()\
                     if 'ml__estimator' in key}
 
