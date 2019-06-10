@@ -386,6 +386,10 @@ def workflow_driver(args):
     add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/nxc',add=['energy','forces'],
                     traj ='workdir/results.traj', density='',override=True, slice=':'))
 
+    statistics_test = eval_driver(SN(model = '',hdf5=['data.hdf5','system/testing/nxc',
+            'system/testing/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+    open('statistics_test','w').write(json.dumps(statistics_test))
+
 def fit_driver(args):
     """ Fits a NXCPipeline to the provided data
     """
