@@ -82,6 +82,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
 
 
 @pytest.mark.pipeline
+@pytest.mark.pipeline_gradient
 @pytest.mark.parametrize('random_seed', [41, 42])
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
     xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
@@ -97,7 +98,7 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-10)
 
     estimator = xc.ml.NetworkEstimator(
-        4, 1, 1e-5, alpha=0.001, max_steps=1001, test_size=0.0, valid_size=0.1, random_seed=random_seed, batch_size=50)
+        4, 1, 1e-3, alpha=0.001, max_steps=1001, test_size=0.0, valid_size=0.1, random_seed=random_seed, batch_size=0)
 
     pipeline_list = [('spec_group', spec_group), ('symmetrizer', symmetrizer), ('var_selector', var_selector)]
 
@@ -115,10 +116,11 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     grad_analytic = ml_pipeline.get_gradient(x)
 
     grad_fd = np.zeros_like(grad_analytic, dtype=complex)
+    incr = 0.0001
     for ix in range(1, 20):
         for im in [1, 1j]:
             xp = np.array(x)
-            incr = np.mean(np.abs(xp[:, ix])) / 1000
+            # incr = np.mean(np.abs(xp[:, ix])) / 1000
             xp[:, ix] += incr * im
             xm = np.array(x)
             xm[:, ix] -= incr * im

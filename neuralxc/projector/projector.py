@@ -782,9 +782,8 @@ class DeltaProjector():
 
     def get_basis_rep(self, rho, positions, species):
         basis_rep = self.projector.get_basis_rep(rho, positions, species)
-
         if positions.shape != self.positions.shape:
-            index = np.where(self.positions[species[0] == np.array(self.species)] == positions[0])[0][0]
+            index = np.where(np.all(self.positions[species[0] == np.array(self.species)] == positions[0], axis = -1))
             basis_rep[species[0]] -= self.constant_basis_rep[species[0]][index]
         else:
             for spec in basis_rep:

@@ -325,20 +325,30 @@ def test_force_correction(use_delta):
 def test_parallel(use_delta):
 
     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+    # Break symmetry
+    positions = benzene_traj.get_positions()
+    positions[0,1] += 0.05
+    positions[3,1] += 0.05
+    benzene_traj.set_positions(positions)
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
-    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
     positions = benzene_traj.get_positions() / Bohr
     species = benzene_traj.get_chemical_symbols()
     if use_delta:
         drho, _, _ = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
+        rho_const = (rho - drho)
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'dbenzene'))
         benzene_nxc.initialize(unitcell, grid, positions, species)
         benzene_nxc.projector = xc.projector.DeltaProjector(benzene_nxc.projector)
-        benzene_nxc.projector.set_constant_density(drho, positions, species)
+        benzene_nxc.projector.set_constant_density(rho_const, positions, species)
 
     else:
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
         benzene_nxc.initialize(unitcell, grid, positions, species)
 
-    V = benzene_nxc.get_V(rho, calc_forces=False)[1]
-    V = benzene_nxc.get_V(rho, calc_forces=False)[1]
+    V_serial= benzene_nxc.get_V(rho, calc_forces=False)[1]
+    benzene_nxc.max_workers = 4
+    V_parallel = benzene_nxc.get_V(rho, calc_forces=False)[1]
+
+    print(np.max(np.abs(V_serial - V_parallel)))
+    assert np.allclose(V_serial, V_parallel, atol = 1e-6, rtol = 1e-5)

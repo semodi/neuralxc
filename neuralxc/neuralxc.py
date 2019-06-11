@@ -239,14 +239,12 @@ class NeuralXC():
         	Machine learned potential
         """
 
-        start = time.time()
         E = 0
         if calc_forces:
             V = [0, np.zeros_like(self.positions)]
         else:
             V = 0
         if not self._pipeline.steps[-1][1].allows_threading or self.max_workers == 1:
-            print('Serial computation in python')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
             # for spec in C:
             # try:
@@ -275,9 +273,4 @@ class NeuralXC():
                         V[1][i:i + 1] += results[1][1]
                     else:
                         V += results[1]
-
-        end = time.time()
-        with open("TIME_PYTHON", 'a') as file:
-            file.write('{}\n'.format(end - start))
-
         return E, V
