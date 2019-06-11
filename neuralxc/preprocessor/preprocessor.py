@@ -41,6 +41,14 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         print(cluster)
         client = Client(cluster)
 
+        class FakeClient():
+
+            def map(self, *args):
+                return map(*args)
+
+        if self.num_workers == 1:
+            client = FakeClient()
+
         atoms = read(self.traj_path, ':')
         extension = self.basis_instructions.get('extension', 'RHOXC')
         if extension[0] != '.':
@@ -64,7 +72,10 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
         futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)],
             len(jobs)*[self.basis_instructions])
-        results = [f.result() for f in futures]
+        if self.num_workers == 1:
+            results = list(futures)
+        else:
+            results = [f.result() for f in futures]
         return results
 
     def score(self, *args, **kwargs):

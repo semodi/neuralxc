@@ -322,9 +322,9 @@ def workflow_driver(args):
             subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../sampled.traj', shell=True).wait()
             pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
                             mask = False, xyz=False))
-            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it0',add=['energy','forces'],
+            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it0',add=['energy'],
                             traj ='workdir/results.traj', density='',override=True, slice=':', zero=E0))
-            add_data_driver(SN(hdf5='data.hdf5',system='system',method='ref',add=['energy','forces'],
+            add_data_driver(SN(hdf5='data.hdf5',system='system',method='ref',add=['energy'],
                             traj ='../sampled.traj', density='',override=True, slice=':', zero = E0))
             statistics_sc = \
             eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -366,7 +366,7 @@ def workflow_driver(args):
             pre_driver(SN(preprocessor='pre.json',dest='data.hdf5/system/it{}'.format(iteration),
                             mask = False, xyz=False))
 
-            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it{}'.format(iteration),add=['energy','forces'],
+            add_data_driver(SN(hdf5='data.hdf5',system='system',method='it{}'.format(iteration),add=['energy'],
                             traj ='workdir/results.traj', density='',override=True, slice=':', zero = E0))
             old_statistics = dict(statistics_sc)
             statistics_sc = \
@@ -412,9 +412,9 @@ def workflow_driver(args):
     mkdir('workdir')
     subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../testing.traj', shell=True).wait()
 
-    add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/ref',add=['energy','forces'],
+    add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/ref',add=['energy'],
                     traj ='../testing.traj', density='',override=True, slice=':', zero = E0))
-    add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/nxc',add=['energy','forces'],
+    add_data_driver(SN(hdf5='data.hdf5',system='system',method='testing/nxc',add=['energy'],
                     traj ='workdir/results.traj', density='',override=True, slice=':', zero = E0))
 
     statistics_test = eval_driver(SN(model = '',hdf5=['data.hdf5','system/testing/nxc',
@@ -491,6 +491,7 @@ def fit_driver(args):
             return self.pipeline.predict(X, *args, **kwargs)
 
         def fit(self, X, y=None):
+            print('Fitting...')
             return self
 
         def transform(self, X, y=None, **fit_params):
@@ -523,9 +524,23 @@ def fit_driver(args):
     else:
         estimator = new_model
 
-    estimator.fit(data)
+    # Test if every fold contains at least one sample from every dataset
+    passed_test = False
+    n_sets = len(np.unique(data[:,0]))
+    n_splits = inp.get('cv',2)
+    while(not passed_test):
+        groups = data[:int(np.floor(len(data)/n_splits)*n_splits)].reshape(n_splits,
+         int(np.floor(len(data)/n_splits)), data.shape[-1])[:,:,0]
+        n_unique = np.array([len(np.unique(g)) for g in groups])
+        if not np.all(n_unique == n_sets):
+            print(np.all(n_unique == n_sets))
+            np.random.shuffle(data)
+        else:
+            passed_test = True
 
-    dev = estimator.predict(data)[0].flatten() - data[:,-1].real.flatten()
+    estimator.fit(data)
+    set_selection = (data[:,0] == 0)
+    dev = estimator.predict(data)[0].flatten() - data[set_selection,-1].real.flatten()
     dev0 = np.abs(dev - np.mean(dev))
     results = {'mean deviation' : np.mean(dev).round(4), 'rmse': np.std(dev).round(4),
                'mae' : np.mean(dev0).round(4),'max': np.max(dev0).round(4)}
