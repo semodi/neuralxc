@@ -15,11 +15,11 @@ if __name__ == '__main__':
     # =======================================================
     # =============== Data routines =========================
     # =======================================================
-    dat = subparser.add_parser('data', description='Add data to hdf5 file')
+    dat = subparser.add_parser('data', description='Routines to manipulate datasets')
     datsub = dat.add_subparsers()
 
     #================ Add data ================
-    adddat =  datsub.add_parser('add')
+    adddat =  datsub.add_parser('add', description='Add data to hdf5 file')
     adddat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     adddat.add_argument('system', action='store',type=str, help ='System')
     adddat.add_argument('method', action='store',type=str, help ='Method')
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     adddat.add_argument('-slice', metavar='slice',
         type=str, default=':', help='Only add slice of dataset')
     adddat.add_argument('-zero', metavar='zero',
-        type=int, default=None, help='Set energy origin to this value, if not set use minimum of dataset')
+        type=int, default=None, help='Shift energies by this value, if not set, use minimum of dataset')
     adddat.set_defaults(func=add_data_driver)
 
 
@@ -41,30 +41,30 @@ if __name__ == '__main__':
         subprocess.Popen('h5dump -n ' + args.hdf5, shell=True)
 
     #================ Inspect data ================
-    inspectdat = datsub.add_parser('inspect')
+    inspectdat = datsub.add_parser('inspect', description='Inspect data in hdf5 file')
     inspectdat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     inspectdat.set_defaults(func=inspectdat_driver)
 
 
     #================ Split data ================
-    splitdat = datsub.add_parser('split')
+    splitdat = datsub.add_parser('split', description='Split dataset (e.g. into training and test set)')
     splitdat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
     splitdat.add_argument('group', action='store',type=str, help ='Which group to apply slicing to')
     splitdat.add_argument('label', action='store',type=str, help ='New label for slice')
     splitdat.add_argument('-slice', metavar='slice', default=':',
-        type=str, help='')
+        type=str, help='Slice in numpy notation')
     splitdat.add_argument('-comp', metavar='comp', default='',
-        type=str, help='')
+        type=str, help='Store complementary slice under this group')
     splitdat.set_defaults(func=split_data_driver)
 
     #================ Delete data ================
-    deldat = datsub.add_parser('delete')
+    deldat = datsub.add_parser('delete', description='Delete group inside hdf5 file')
     deldat.add_argument('hdf5', action='store',type=str, help ='Path to hdf5 file')
-    deldat.add_argument('group', action='store',type=str, help ='Which group to apply slicing to')
+    deldat.add_argument('group', action='store',type=str, help ='Which group to delete')
     deldat.set_defaults(func=delete_data_driver)
 
     #================ Sample data ================
-    sampledat = datsub.add_parser('sample')
+    sampledat = datsub.add_parser('sample', description='Sample the data for a given basis set using KMeans cluster in feature-space')
     sampledat.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
     sampledat.add_argument('size', action='store',type=int, help ='Sample size')
     sampledat.add_argument('-dest', action='store',type=str,default='sample.npy', help ='Save to')
@@ -93,18 +93,18 @@ if __name__ == '__main__':
     fit.set_defaults(func=fit_driver)
 
     # ============= Workflow ====================
-    wf = subparser.add_parser('workflow', description='Fit a NeuralXC model')
+    wf = subparser.add_parser('workflow', description='Fit a NeuralXC model iteratively')
     wf.add_argument('preprocessor', action='store', help ='Path to configuration file for preprocessor')
     wf.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument('engine', action='store', type=str, help='Cut off extreme datapoints')
-    wf.add_argument('-data', metavar='data', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
-    wf.add_argument('-config2',metavar='config2',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument('-maxit', metavar='maxit',type=int, default = '5', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument('-tol', metavar='maxit',type=float, default = '0.0005', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument('-hotstart', metavar='hotstart',type=int, default = '0', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument('-sets', metavar='sets',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('engine', action='store', type=str, help='Command to start engine')
+    wf.add_argument('-data', metavar='data', type=str, default='', help='Start from this dataset instead of computing iteration 0')
+    wf.add_argument('-config2',metavar='config2',type=str, default = '', help='Path to .json configuration file setting hyperparameters used for iteration > 0')
+    wf.add_argument('-maxit', metavar='maxit',type=int, default = '5', help='Maximum number of iterations')
+    wf.add_argument('-tol', metavar='maxit',type=float, default = '0.0005', help='Tolerance in energy defining whether iterative training converged')
+    wf.add_argument('-hotstart', metavar='hotstart',type=int, default = '0', help='Continue workflow at this iteration ( -1: only do testing )')
+    wf.add_argument('-sets', metavar='sets',type=str, default = '', help='Path to file defining sets')
     wf.add_argument('-nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
-    wf.add_argument('-model0', metavar='model0',type=str, default = '', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('-model0', metavar='model0',type=str, default = '', help='Build new model on top of model0 as a stacked estimator')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================

@@ -33,26 +33,11 @@ import sys
 import copy
 import pickle
 from types import SimpleNamespace as SN
+from .data import *
+from .other import *
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
-def plot_basis(args):
-    """ Plots a set of basis functions specified in .json file"""
-
-    basis_instructions = json.loads(open(args.basis,'r').read())
-    projector = xc.projector.DensityProjector(np.eye(3),np.ones(3),
-        basis_instructions['basis'])
-
-    for spec in basis_instructions['basis']:
-        if not len(spec) == 1: continue
-        basis = basis_instructions['basis'][spec]
-        n = basis_instructions['basis'][spec]['n']
-        W = projector.get_W(basis)
-        r = np.linspace(0,basis['r_o'],500)
-        radials = projector.radials(r,basis,W)
-        for rad in radials:
-            plt.plot(r, rad)
-        plt.show()
 
 def convert_tf(args):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
@@ -110,145 +95,6 @@ def merge_driver(args):
     pipeline.steps[-2] = (label, ChainedEstimator([npestimator, estimator]).merge())
     pipeline.steps = pipeline.steps[:-1]
     nxc_tf._pipeline.save(args.merged, True, True)
-
-def add_data_driver(args):
-    """ Adds data to hdf5 file"""
-    try:
-        file = h5py.File(args.hdf5 ,'r+')
-    except OSError:
-        file = h5py.File(args.hdf5 ,'w')
-
-    i,j,k = [(None if a == '' else int(a)) for a in args.slice.split(':')] +\
-        [None]*(3-len(args.slice.split(':')))
-
-    ijk = slice(i,j,k)
-
-    def obs(which):
-        if which == 'energy':
-            if args.traj:
-                add_species(file, args.system, args.traj)
-                energies = np.array([a.get_potential_energy()\
-                 for a in read(args.traj,':')])[ijk]
-                add_energy(file, energies, args.system, args.method, args.override, E0=args.zero)
-            else:
-                raise Exception('Must provide a trajectory file')
-                file.close()
-        elif which == 'forces':
-            if args.traj:
-                add_species(file, args.system, args.traj)
-                forces = np.array([a.get_forces()\
-                 for a in read(args.traj,':')])[ijk]
-                add_forces(file, forces, args.system, args.method, args.override)
-            else:
-                raise Exception('Must provide a trajectory file')
-                file.close()
-        elif which == 'density':
-            add_species(file, args.system, args.traj)
-            species = file[args.system].attrs['species']
-            data = np.load(args.density)[ijk]
-            add_density((args.density.split('/')[-1]).split('.')[0], file, data,
-                args.system, args.method, args.override)
-        else:
-            raise Exception('Option {} not recognized'.format(which))
-
-    if args.density and not 'density' in args.add:
-        args.add.append('density')
-    for observable in args.add:
-        obs(observable)
-
-    file.close()
-
-
-def split_data_driver(args):
-    """ Split dataset (or all data inside a group) by providing slices"""
-    file = h5py.File(args.hdf5 ,'r+')
-
-    i,j,k = [(None if a == '' else int(a)) for a in args.slice.split(':')] +\
-        [None]*(3-len(args.slice.split(':')))
-
-    ijk = slice(i,j,k)
-
-
-    root = args.group
-    if not root[0] == '/': root = '/' + root
-
-    def collect_all_sets(file, path):
-        sets = {}
-        if isinstance(file[path],h5py._hl.dataset.Dataset):
-            return {path: file[path]}
-        else:
-            for key in file[path]:
-                sets.update(collect_all_sets(file, path + '/' + key))
-        return sets
-
-    all_sets = collect_all_sets(file, root)
-    split_sets = {}
-    comp_sets = {}
-    length = -1
-    for path in all_sets:
-        new_len = len(all_sets[path][:])
-        if length == -1:
-            length = new_len
-        elif new_len != length:
-            raise Exception('Datasets contained in group dont have consistent lengths')
-        idx = path.find(args.group) + len(args.group)
-        new_path = path[:idx] +'/' + args.label + path[idx:]
-        if args.comp != '':
-            idx = path.find(args.group) + len(args.group)
-            comp_path = path[:idx] +'/' + args.comp + path[idx:]
-            comp_sets[comp_path] = all_sets[path][:].tolist()
-            del comp_sets[comp_path][ijk]
-        split_sets[new_path] = all_sets[path][ijk]
-
-    for new_path in split_sets:
-        file.create_dataset(new_path, data = split_sets[new_path])
-
-    for new_path, path in zip(split_sets, all_sets):
-        file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
-    if comp_sets:
-        for comp_path in comp_sets:
-            file.create_dataset(comp_path, data = comp_sets[comp_path])
-        for new_path, path in zip(comp_sets, all_sets):
-                file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
-    # print(split_sets)
-
-def delete_data_driver(args):
-    """ Deletes data in hdf5 file"""
-    file = h5py.File(args.hdf5 ,'r+')
-    root = args.group
-    if not root[0] == '/': root = '/' + root
-    del file[root]
-
-def parse_sets_input(path):
-    """ Reads a file containing the sets used for fitting
-
-    Parameters
-    ----------
-    path: str
-        Path to file containing dataset names
-
-    Returns
-    --------
-    hdf5, list
-        hdf5[0] : datafile location
-        hdf5[1],hdf5[2]: lists of baseline(,target) datasets
-    """
-    hdf5=['',[],[]]
-    with open(path, 'r') as setsfile:
-        line = setsfile.readline().rstrip()
-        hdf5[0] = line #datafile location
-        line = setsfile.readline().rstrip()
-        while(line):
-            split = line.split()
-            hdf5[1].append(split[0])
-            hdf5[2].append(split[1])
-            line = setsfile.readline().rstrip()
-    return hdf5
-
-
-def model_driver(args):
-    pass
-
 
 def mkdir(dirname):
     try:
@@ -581,30 +427,6 @@ def chain_driver(args):
     old_model.steps += [('estimator', new_model)]
     old_model.save(args.dest, True)
 
-def sample_driver(args):
-    """ Given a dataset, perform sampling in feature space"""
-
-    preprocessor = args.preprocessor
-    hdf5 = args.hdf5
-
-    pre = json.loads(open(preprocessor,'r').read())
-
-    datafile = h5py.File(hdf5[0],'r')
-    basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, args.cutoff)
-    basis = pre['basis']
-    symmetrizer_instructions = {'symmetrizer_type' :'casimir'}
-    symmetrizer_instructions.update({'basis' : basis})
-    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
-    spec_group = SpeciesGrouper(basis, species)
-    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-
-    sampler_pipeline = get_default_pipeline(basis, species, pca_threshold = 1)
-    sampler_pipeline = Pipeline(sampler_pipeline.steps)
-    sampler_pipeline.steps[-1] = ('sampler', SampleSelector(args.size))
-    sampler_pipeline.fit(data)
-    sample = sampler_pipeline.predict(data)
-    np.save(args.dest, np.array(sample).flatten())
 
 def eval_driver(args):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
@@ -687,68 +509,3 @@ def ensemble_driver(args):
     pipeline.steps[-1] = ('estimator', ensemble)
 
     pipeline.save(args.dest, override=True)
-
-
-
-def pre_driver(args):
-    """ Preprocess electron densities obtained from electronic structure
-    calculations
-    """
-    preprocessor = args.preprocessor
-    dest = args.dest
-    xyz = args.xyz
-    mask = args.mask
-
-    if not mask:
-        pre = json.loads(open(preprocessor,'r').read())
-    else:
-        pre = {}
-
-    if 'traj_path' in pre and pre['traj_path'] != '':
-        atoms = read(pre['traj_path'], ':')
-        trajectory_path = pre['traj_path']
-    elif xyz != '':
-        atoms = read(xyz, ':')
-        trajectory_path = xyz
-    else:
-        raise ValueError('Must specify path to to xyz file')
-
-    preprocessor = get_preprocessor(preprocessor, mask, xyz)
-    if not mask:
-        start = time.time()
-
-        if 'hdf5' in dest:
-            dest_split = dest.split('/')
-            file, system, method = dest_split + ['']*(3-len(dest_split))
-            workdir = '.tmp'
-            delete_workdir = True
-        else:
-            workdir = dest
-            delete_workdir = False
-
-        try:
-            os.mkdir(workdir)
-        except FileExistsError:
-            delete_workdir = False
-            pass
-        print('======Projecting onto basis sets======')
-        basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
-
-        for basis_instr in basis_grid:
-            preprocessor.basis_instructions = basis_instr
-            filename = os.path.join(workdir,basis_to_hash(basis_instr) + '.npy')
-            data = preprocessor.fit_transform(None)
-            np.save(filename, data)
-            if 'hdf5' in dest:
-                data_args = namedtuple(\
-                'data_ns','hdf5 system method density slice add traj override')(\
-                file,system,method,filename, ':',[],trajectory_path, True)
-                add_data_driver(data_args)
-
-                # data_args = namedtuple(\
-                # 'data_ns','hdf5 system method density slice add traj override')(\
-                # file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
-                # add_data_driver(data_args)
-
-        if delete_workdir:
-            shutil.rmtree(workdir)
