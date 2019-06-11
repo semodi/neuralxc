@@ -269,10 +269,10 @@ class DensityProjector(BaseProjector):
         radsr = np.array(rads)
         # radsr[R<1e-15] = 0
         radsr = radsr / R
-        radsr[:,R<1e-15] = 0
+        radsr[:, R < 1e-15] = 0
 
         rhat = np.array([X / R, Y / R, Z / R])
-        rhat[:,R<1e-15] = 0
+        rhat[:, R < 1e-15] = 0
 
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
@@ -284,8 +284,8 @@ class DensityProjector(BaseProjector):
                 idx_l = 0
                 for l in range(n_l):
                     for m in range(2 * l + 1):
-                        v2 = (rads[n]/(R**l)*dangs[idx_l,:,:,:,ix])
-                        v2[R<1e-15] = 0
+                        v2 = (rads[n] / (R**l) * dangs[idx_l, :, :, :, ix])
+                        v2[R < 1e-15] = 0
                         v += coeffs[idx_coeff] *\
                         (\
                         (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
@@ -772,7 +772,6 @@ class DeltaProjector():
         self.projector = projector
         self.constant_basis_rep = {}
 
-
     def set_constant_density(self, rho, positions, species):
         self.constant_rho = np.array(rho)
         print('NeuralXC: set_constant_density called ')
@@ -785,7 +784,7 @@ class DeltaProjector():
         basis_rep = self.projector.get_basis_rep(rho, positions, species)
 
         if positions.shape != self.positions.shape:
-            index = np.where(self.positions[species[0]==np.array(self.species)] == positions[0])[0][0]
+            index = np.where(self.positions[species[0] == np.array(self.species)] == positions[0])[0][0]
             basis_rep[species[0]] -= self.constant_basis_rep[species[0]][index]
         else:
             for spec in basis_rep:

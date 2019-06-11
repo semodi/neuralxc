@@ -18,6 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
 import h5py
 
+
 def find_attr_in_tree(file, tree, attr):
     """
     Given the leaf group inside a hdf5 file walk back the tree to
@@ -70,14 +71,14 @@ def load_sets(datafile, baseline, reference, basis_key='', percentile_cutoff=0):
         Cutoff this percentage of extreme (in the sense of target value)
         datapoints. Use to remove outliers
     """
-    if not isinstance(baseline ,list):
+    if not isinstance(baseline, list):
         baseline = [baseline]
 
-    if not isinstance(reference ,list):
+    if not isinstance(reference, list):
         reference = [reference]
 
-    if not isinstance(percentile_cutoff ,list):
-        percentile_cutoff = [percentile_cutoff]*len(baseline)
+    if not isinstance(percentile_cutoff, list):
+        percentile_cutoff = [percentile_cutoff] * len(baseline)
 
     Xs = []
     ys = []
@@ -86,25 +87,24 @@ def load_sets(datafile, baseline, reference, basis_key='', percentile_cutoff=0):
     for sysidx, (bl, ref, perc) in enumerate(zip(baseline, reference, percentile_cutoff)):
         X, y =\
             load_data(datafile, bl, ref, basis_key, perc)
-        X = np.concatenate([np.array([sysidx]*len(X)).reshape(-1,1), X],axis = 1)
+        X = np.concatenate([np.array([sysidx] * len(X)).reshape(-1, 1), X], axis=1)
         max_width = max(max_width, X.shape[1])
         Xs.append(X)
         ys.append(y)
 
     #pad datasets
     if len(Xs) > 1:
-        for i,X in enumerate(Xs):
+        for i, X in enumerate(Xs):
             if X.shape[1] < max_width:
-                Xs[i] = np.concatenate([X, np.zeros([len(X),
-                    max_width - X.shape[1]])],axis = 1)
+                Xs[i] = np.concatenate([X, np.zeros([len(X), max_width - X.shape[1]])], axis=1)
 
-    X = np.concatenate(Xs, axis = 0)
-    y = np.concatenate(ys, axis = 0)
-    data = np.concatenate([X,y.reshape(-1,1)], axis =1)
+    X = np.concatenate(Xs, axis=0)
+    y = np.concatenate(ys, axis=0)
+    data = np.concatenate([X, y.reshape(-1, 1)], axis=1)
     return data
 
-def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
-                E0 = None):
+
+def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E0=None):
     """
     Load data from hdf5 file
 
@@ -132,8 +132,8 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
         If None tries to find this value as an attribute inside datafile
     """
 
-    data_base = datafile[baseline +'/energy']
-    data_ref = datafile[reference +'/energy']
+    data_base = datafile[baseline + '/energy']
+    data_ref = datafile[reference + '/energy']
 
     if E0 == None:
         E0_base = find_attr_in_tree(datafile, baseline, 'E0')
@@ -150,19 +150,19 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
 
     print('E0 base', E0_base)
     print('E0 ref', E0_ref)
-    tar = (data_ref[:] - E0_ref) - (data_base[:] -  E0_base)
+    tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
     tar = tar.real
     if percentile_cutoff > 0:
-        lim1 = np.percentile(tar, percentile_cutoff*100)
-        lim2 = np.percentile(tar, (1 - percentile_cutoff)*100)
-        min_lim, max_lim = min(lim1,lim2), max(lim1,lim2)
+        lim1 = np.percentile(tar, percentile_cutoff * 100)
+        lim2 = np.percentile(tar, (1 - percentile_cutoff) * 100)
+        min_lim, max_lim = min(lim1, lim2), max(lim1, lim2)
         filter = (tar > min_lim) & (tar < max_lim)
     else:
-        filter = [True]*len(tar)
+        filter = [True] * len(tar)
     if basis_key == '':
-        data_base = np.zeros([len(tar),0])
+        data_base = np.zeros([len(tar), 0])
     else:
-        data_base = datafile[baseline +'/density/' + basis_key][:,:]
+        data_base = datafile[baseline + '/density/' + basis_key][:, :]
     data_base = data_base[filter]
     tar = tar[filter]
     # feat = {}
@@ -172,25 +172,26 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0,
     # attrs = {}
 
     # for spec in unique_species:
-        # attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
-             # for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
+    # attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
+    # for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
 
-# if grouped:
-#     for spec in unique_species:
-#         feat[spec] = []
-#
-#     current_loc = 0
-#     for spec in all_species:
-#         len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
-#         feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
-#         current_loc += len_descr
-#
-#     for spec in unique_species:
-#         feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
-#
-#     return feat, tar, attrs, ''.join(all_species)
-# else:
+    # if grouped:
+    #     for spec in unique_species:
+    #         feat[spec] = []
+    #
+    #     current_loc = 0
+    #     for spec in all_species:
+    #         len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
+    #         feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
+    #         current_loc += len_descr
+    #
+    #     for spec in unique_species:
+    #         feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
+    #
+    #     return feat, tar, attrs, ''.join(all_species)
+    # else:
     return data_base, tar
+
 
 def match_hyperparameter(hp, parameters):
     """ Given a partial hyperparameter name hp find the
@@ -202,8 +203,9 @@ def match_hyperparameter(hp, parameters):
         if hp == par:
             matches.append(par)
     if len(matches) != 1:
-        raise ValueError('{} matches found for hyperparameter {}. Must be exactly 1'.format(len(matches),hp))
+        raise ValueError('{} matches found for hyperparameter {}. Must be exactly 1'.format(len(matches), hp))
     return matches[0]
+
 
 def to_full_hyperparameters(hp, parameters):
     """ Convert partial hyperparameter names to full hp names used
@@ -218,29 +220,24 @@ def to_full_hyperparameters(hp, parameters):
     return full
 
 
-def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_threshold = 1):
+def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_threshold=1):
     """
     Get the default pipeline containing symmetrizer, variance selector, pca, and
     the final NetworkEstimator
     """
-    symmetrizer_instructions = {'basis': basis,
-                         'symmetrizer_type': symmetrizer_type}
+    symmetrizer_instructions = {'basis': basis, 'symmetrizer_type': symmetrizer_type}
 
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-    var_selector = GroupedVarianceThreshold(threshold = 1e-10)
+    var_selector = GroupedVarianceThreshold(threshold=1e-10)
 
-    estimator = NetworkWrapper(4, 1, 0,
-                            alpha=0.001, max_steps = 4001, test_size = 0.0,
-                               valid_size=0, random_seed = None)
+    estimator = NetworkWrapper(4, 1, 0, alpha=0.001, max_steps=4001, test_size=0.0, valid_size=0, random_seed=None)
 
-    pipeline_list = [('spec_group',  spec_group),
-                     ('symmetrizer', symmetrizer),
-                     ('var_selector', var_selector)]
+    pipeline_list = [('spec_group', spec_group), ('symmetrizer', symmetrizer), ('var_selector', var_selector)]
 
     pipeline_list.append(('scaler', GroupedStandardScaler()))
 
-    pca = GroupedPCA(n_components= pca_threshold, svd_solver='full')
+    pca = GroupedPCA(n_components=pca_threshold, svd_solver='full')
     pipeline_list.append(('pca', pca))
 
     pipeline_list.append(('estimator', estimator))
@@ -248,8 +245,9 @@ def get_default_pipeline(basis, species, symmetrizer_type= 'casimir', pca_thresh
     basis_instructions = basis
     symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
 
-    return  NXCPipeline(pipeline_list, basis_instructions=basis_instructions,
-                             symmetrize_instructions=symmetrizer_instructions)
+    return NXCPipeline(
+        pipeline_list, basis_instructions=basis_instructions, symmetrize_instructions=symmetrizer_instructions)
+
 
 def get_basis_grid(preprocessor):
     """ Give a file containing several basis sets return a grid
@@ -259,6 +257,7 @@ def get_basis_grid(preprocessor):
     basis = preprocessor['basis']
 
     from collections import abc
+
     def nested_dict_iter(nested):
         for key, value in nested.items():
             if isinstance(value, abc.Mapping):
@@ -270,7 +269,7 @@ def get_basis_grid(preprocessor):
         select_dict = {}
         for key, value in nested.items():
             if isinstance(value, abc.Mapping):
-                select_dict[key] =  nested_dict_build(value,i)
+                select_dict[key] = nested_dict_build(value, i)
             else:
                 if isinstance(value, list):
                     select_dict[key] = value[i]
@@ -290,24 +289,24 @@ def get_basis_grid(preprocessor):
             else:
                 max_len = new_len
 
-    max_len = max(max_len,1)
-    basis_grid = [nested_dict_build(basis,i) for i in range(max_len)]
+    max_len = max(max_len, 1)
+    basis_grid = [nested_dict_build(basis, i) for i in range(max_len)]
     basis_grid = {'preprocessor__basis_instructions': basis_grid}
 
     return basis_grid
 
-def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
+
+def get_grid_cv(hdf5, preprocessor, inputfile, mask=False):
     if not mask:
-        inp = json.loads(open(inputfile,'r').read())
-        pre = json.loads(open(preprocessor,'r').read())
+        inp = json.loads(open(inputfile, 'r').read())
+        pre = json.loads(open(preprocessor, 'r').read())
     else:
         inp = {}
         pre = {}
 
+    datafile = h5py.File(hdf5[0], 'r')
 
-    datafile = h5py.File(hdf5[0],'r')
-
-    if not isinstance(hdf5[1],list):
+    if not isinstance(hdf5[1], list):
         hdf5[1] = [hdf5[1]]
 
     all_species = []
@@ -318,16 +317,16 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
     if pre:
         basis = pre['basis']
     else:
-        basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in ''.join(all_species)}
-        basis.update({'extension' : 'DRHO'})
+        basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
+        basis.update({'extension': 'DRHO'})
     pipeline = get_default_pipeline(basis, all_species)
 
     if mask:
-        params ={key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
+        params = {key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
         inp.update({'hyperparameters': params})
-        inp.update({'cv':2,'n_workers':1,'threads_per_worker':1,'n_jobs':1})
-        open(inputfile,'w').write(json.dumps(inp, indent = 4))
-        open(preprocessor,'w').write(json.dumps({'basis': basis}, indent= 4))
+        inp.update({'cv': 2, 'n_workers': 1, 'threads_per_worker': 1, 'n_jobs': 1})
+        open(inputfile, 'w').write(json.dumps(inp, indent=4))
+        open(preprocessor, 'w').write(json.dumps({'basis': basis}, indent=4))
         return None, None
     else:
         if 'hyperparameters' in inp:
@@ -337,22 +336,22 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False) :
             pipeline.fit(data)
             sys.exit()
 
-        hyper = to_full_hyperparameters(hyper , pipeline.get_params())
+        hyper = to_full_hyperparameters(hyper, pipeline.get_params())
 
-        cv = inp.get('cv',2)
+        cv = inp.get('cv', 2)
         n_workers = inp.get('n_workers', 1)
         n_jobs = inp.get('n_jobs', 1)
         n_threads = inp.get('threads_per_worker', 1)
-        verbose = inp.get('verbose',10)
-
+        verbose = inp.get('verbose', 10)
 
         pipe = Pipeline([('ml', pipeline)])
-        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs= n_jobs, refit = True, verbose=4)
+        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=4)
         return grid_cv
+
 
 def get_preprocessor(preprocessor, mask=False, xyz=''):
     if not mask:
-        pre = json.loads(open(preprocessor,'r').read())
+        pre = json.loads(open(preprocessor, 'r').read())
     else:
         pre = {}
 
@@ -364,22 +363,23 @@ def get_preprocessor(preprocessor, mask=False, xyz=''):
         raise ValueError('Must specify path to to xyz file')
 
     species = ''.join(atoms.get_chemical_symbols())
-    basis = {spec:{'n':1, 'l':1, 'r_o' : 1} for spec in species}
+    basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
 
     if mask:
-        open(preprocessor,'w').write(json.dumps({'basis': basis,
-                                'src_path': '',
-                                'traj_path': xyz,
-                                'n_workers': 1}, indent= 4))
+        open(preprocessor, 'w').write(
+            json.dumps({
+                'basis': basis,
+                'src_path': '',
+                'traj_path': xyz,
+                'n_workers': 1
+            }, indent=4))
         return None, None
     else:
         basis_grid = get_basis_grid(pre)
 
-
-        preprocessor = Preprocessor(basis, pre['src_path'],
-                                           pre['traj_path'],
-                                           pre.get('n_workers',1))
+        preprocessor = Preprocessor(basis, pre['src_path'], pre['traj_path'], pre.get('n_workers', 1))
         return preprocessor
+
 
 class SampleSelector(BaseEstimator):
     def __init__(self, n_instances, random_state=None):
@@ -400,11 +400,12 @@ class SampleSelector(BaseEstimator):
             data = data[0]
             indices = np.zeros(data.shape[:-1], dtype=int)
             indices[:] = np.arange(len(data)).reshape(-1, 1)
-            picks[idx] += self.sample_clusters(atomic_shape(data),
-                                               indices.flatten(),
-                                               self._n_instances,
-                                               picked=picks[idx],
-                                               random_state=self._random_state)
+            picks[idx] += self.sample_clusters(
+                atomic_shape(data),
+                indices.flatten(),
+                self._n_instances,
+                picked=picks[idx],
+                random_state=self._random_state)
         picks = picks[0]
         np.random.shuffle(picks)
         return picks[:self._n_instances]
@@ -426,7 +427,7 @@ class SampleSelector(BaseEstimator):
         nbrs = NearestNeighbors(n_neighbors=1, algorithm='ball_tree').fit(data)
         np.random.seed(random_state)
         for center, label in zip(centers, np.unique(labels)):  # Loop over clusters
-            _, idx = nbrs.kneighbors(center.reshape(1,-1))
+            _, idx = nbrs.kneighbors(center.reshape(1, -1))
             choice = idx[0]
             if not choice in picked:
                 sampled.append(indices[choice])

@@ -2,16 +2,20 @@ from ase.io import read, write
 import hashlib
 import json
 
+
 def add_energy(*args, **kwargs):
     return add_data('energy', *args, **kwargs)
+
 
 def add_forces(*args, **kwargs):
     return add_data('forces', *args, **kwargs)
 
+
 def add_density(key, *args, **kwargs):
     return add_data(key, *args, **kwargs)
 
-def add_species(file, system, traj_path = ''):
+
+def add_species(file, system, traj_path=''):
     """
     Add an attribute containing the species string for a given
     system (ex. for water: {'species': 'OHH'})
@@ -27,7 +31,7 @@ def add_species(file, system, traj_path = ''):
     """
 
     order = [system]
-    cg = file #Current group
+    cg = file  #Current group
     for idx, o in enumerate(order):
         if not o in cg.keys():
             cg = cg.create_group(o)
@@ -38,10 +42,10 @@ def add_species(file, system, traj_path = ''):
         if not traj_path:
             raise Exception('Must provide a trajectory file to define species')
         species = ''.join(read(traj_path, 0).get_chemical_symbols())
-        cg.attrs.update({'species' : species})
+        cg.attrs.update({'species': species})
 
-def add_data(which, file, data, system, method,
-              override= False, E0 = None):
+
+def add_data(which, file, data, system, method, override=False, E0=None):
     """
     Add data to hdf5 file.
 
@@ -65,27 +69,26 @@ def add_data(which, file, data, system, method,
     """
 
     order = [system, method]
-    if not which in ['energy','forces']:
+    if not which in ['energy', 'forces']:
         order.append('density')
 
-    cg = file #Current group
+    cg = file  #Current group
     for idx, o in enumerate(order):
         if not o in cg.keys():
             cg = cg.create_group(o)
         else:
             cg = cg[o]
 
-    if which =='energy':
+    if which == 'energy':
         if E0 == None:
             cg.attrs.update({'E0': min(data)})
         else:
             cg.attrs.update({'E0': E0})
 
-    print('{} systems found, adding {}'.format( len(data), which))
+    print('{} systems found, adding {}'.format(len(data), which))
 
     def create_dataset():
-        cg.create_dataset(which,
-                data = data)
+        cg.create_dataset(which, data=data)
 
     try:
         create_dataset()
@@ -95,6 +98,7 @@ def add_data(which, file, data, system, method,
             create_dataset()
         else:
             print('Already exists. Set override=True')
+
 
 def basis_to_hash(basis):
     """
@@ -113,6 +117,7 @@ def basis_to_hash(basis):
         Encoding of the basis set
     """
     return hashlib.md5(json.dumps(basis).encode()).hexdigest()
+
 
 # def find_unique_root(file, group, path = '/'):
 #

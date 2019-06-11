@@ -42,7 +42,6 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         client = Client(cluster)
 
         class FakeClient():
-
             def map(self, *args):
                 return map(*args)
 
@@ -71,7 +70,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                  system.get_chemical_symbols()])
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
         futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)],
-            len(jobs)*[self.basis_instructions])
+                             len(jobs) * [self.basis_instructions])
         if self.num_workers == 1:
             results = list(futures)
         else:

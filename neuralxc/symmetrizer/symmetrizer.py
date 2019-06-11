@@ -127,7 +127,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
             return results
 
     # @doc_inherit
-    def get_gradient(self, dEdD, C = None):
+    def get_gradient(self, dEdD, C=None):
         """Uses chain rule to obtain dE/dC from dE/dD (unsymmetrized from symmetrized)
 
         Parameters
@@ -146,7 +146,7 @@ class Symmetrizer(BaseSymmetrizer, BaseEstimator, TransformerMixin):
             C = self.C
 
         # if C is None:
-            # assert False
+        # assert False
         basis = self._attrs['basis']
 
         results = [{}] * len(C)
@@ -244,6 +244,7 @@ class CasimirSymmetrizer(Symmetrizer):
         grad = 2 * c * casimirs_mask
         return grad.reshape(*dEdd_shape[:-1], grad.shape[-1])
 
+
 class MixedCasimirSymmetrizer(Symmetrizer):
 
     _registry_name = 'mixed_casimir'
@@ -276,18 +277,18 @@ class MixedCasimirSymmetrizer(Symmetrizer):
         """
         c_shape = c.shape
 
-        c = c.reshape(-1,c_shape[-1])
-        c = c.reshape(len(c),n,-1)
+        c = c.reshape(-1, c_shape[-1])
+        c = c.reshape(len(c), n, -1)
         casimirs = []
 
         for n1 in range(0, n):
-            for n2 in range(n1,n):
+            for n2 in range(n1, n):
                 idx = 0
                 for l in range(n_l):
                     casimirs.append(np.sum(c[:,n1,idx:idx+(2*l+1)]*\
                                            np.conj(c[:,n2,idx:idx+(2*l+1)]),
                                             axis = -1).real)
-                    idx += 2*l + 1
+                    idx += 2 * l + 1
 
         casimirs = np.array(casimirs).T
 
@@ -321,7 +322,7 @@ class MixedCasimirSymmetrizer(Symmetrizer):
         c_shape = c.shape
         dEdd = dEdd.reshape(-1, dEdd.shape[-1])
         c = np.conj(c.reshape(-1, c.shape[-1]))
-        c = c.reshape(len(c),n,-1)
+        c = c.reshape(len(c), n, -1)
         casimirs_mask = np.zeros_like(c)
         idx = 0
         cnt = 0
@@ -329,12 +330,13 @@ class MixedCasimirSymmetrizer(Symmetrizer):
             for n2 in range(n1, n):
                 idx = 0
                 for l in range(n_l):
-                    casimirs_mask[:,n1, idx:idx + (2 * l + 1)] = dEdd[:, cnt:cnt + 1]
+                    casimirs_mask[:, n1, idx:idx + (2 * l + 1)] = dEdd[:, cnt:cnt + 1]
                     idx += 2 * l + 1
                     cnt += 1
 
         grad = 2 * c * casimirs_mask
         return grad.reshape(*c_shape[:-1], -1)
+
 
 # class BispectrumSymmetrizer(Symmetrizer):
 #
@@ -459,17 +461,18 @@ def cg_matrix(n_l):
     """ Returns the Clebsch-Gordan coefficients for maximum angular momentum n_l-1
     """
     lmax = n_l - 1
-    cgs = np.zeros([n_l, 2*lmax+1, n_l, 2*lmax+1, n_l, 2*lmax+1], dtype=complex)
+    cgs = np.zeros([n_l, 2 * lmax + 1, n_l, 2 * lmax + 1, n_l, 2 * lmax + 1], dtype=complex)
 
     for l in range(n_l):
         for l1 in range(n_l):
             for l2 in range(n_l):
-                for m in range(-n_l, n_l+1):
-                    for m1 in range(-n_l,n_l+1):
-                        for m2 in range(-n_l,n_l+1):
+                for m in range(-n_l, n_l + 1):
+                    for m1 in range(-n_l, n_l + 1):
+                        for m2 in range(-n_l, n_l + 1):
                             # cgs[l1,l2,l,m1,m2,m] = N(CG(l1,l2,l,m1,m2,m).doit())
-                            cgs[l1,m1,l2,m2,l,m] = N(CG(l1,m1,l2,m2,l,m).doit())
+                            cgs[l1, m1, l2, m2, l, m] = N(CG(l1, m1, l2, m2, l, m).doit())
     return cgs
+
 
 # def to_casimirs_mixn(c, n_l, n):
 #     """ Returns the casimir invariants with mixed radial channels

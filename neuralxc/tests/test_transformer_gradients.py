@@ -80,6 +80,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
     for spec in dEdC:
         assert np.allclose(dEdC[spec], dEdC_chain[spec])
 
+
 @pytest.mark.pipeline
 @pytest.mark.parametrize('random_seed', [41, 42])
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
@@ -95,14 +96,8 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrizer_instructions)
     var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-10)
 
-    estimator = xc.ml.NetworkEstimator(4,
-                                       1, 1e-5  ,
-                                       alpha=0.001,
-                                       max_steps=1001,
-                                       test_size=0.0,
-                                       valid_size=0.1,
-                                       random_seed=random_seed,
-                                       batch_size=50)
+    estimator = xc.ml.NetworkEstimator(
+        4, 1, 1e-5, alpha=0.001, max_steps=1001, test_size=0.0, valid_size=0.1, random_seed=random_seed, batch_size=50)
 
     pipeline_list = [('spec_group', spec_group), ('symmetrizer', symmetrizer), ('var_selector', var_selector)]
 
@@ -111,22 +106,19 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     pipeline_list.append(('scaler', xc.ml.transformer.GroupedStandardScaler()))
     pipeline_list.append(('estimator', estimator))
 
-
-    ml_pipeline = xc.ml.NXCPipeline(pipeline_list,
-                                    basis_instructions=basis_set,
-                                    symmetrize_instructions=symmetrizer_instructions)
+    ml_pipeline = xc.ml.NXCPipeline(
+        pipeline_list, basis_instructions=basis_set, symmetrize_instructions=symmetrizer_instructions)
     ml_pipeline.fit(data)
 
     #Subset of data for which to calculate gradient
     x = data[0:1]
     grad_analytic = ml_pipeline.get_gradient(x)
 
-
     grad_fd = np.zeros_like(grad_analytic, dtype=complex)
     for ix in range(1, 20):
         for im in [1, 1j]:
             xp = np.array(x)
-            incr = np.mean(np.abs(xp[:,ix]))/1000
+            incr = np.mean(np.abs(xp[:, ix])) / 1000
             xp[:, ix] += incr * im
             xm = np.array(x)
             xm[:, ix] -= incr * im
@@ -137,5 +129,5 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     print(grad_analytic[0, 1:20])
     print(grad_fd[0, 1:20])
     # assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-4, atol=1e-5)
-    assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-3, atol = 1e-10)
+    assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-3, atol=1e-10)
     # assert False

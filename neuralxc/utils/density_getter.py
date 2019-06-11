@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from ..base import ABCRegistry
 import re
 
+
 class DensityGetterRegistry(ABCRegistry):
     REGISTRY = {}
 
@@ -106,7 +107,7 @@ class SiestaDensityGetter(BaseDensityGetter):
         grid = grid[:3]
         return rho, unitcell, grid
 
-    def get_forces(self, path, n_atoms = -1):
+    def get_forces(self, path, n_atoms=-1):
         """find forces in siesta .out file for first n_atoms atoms
         """
         with open(path, 'r') as infile:
@@ -119,15 +120,14 @@ class SiestaDensityGetter(BaseDensityGetter):
             alltext = alltext[0][:-len('\nsiesta: -')]
             forces = []
             for i, f in enumerate(alltext.split()):
-                if i%5 ==0: continue
-                if f =='siesta:': continue
+                if i % 5 == 0: continue
+                if f == 'siesta:': continue
                 forces.append(float(f))
-        forces = np.array(forces).reshape(-1,3)
+        forces = np.array(forces).reshape(-1, 3)
         if n_atoms == -1:
             return forces
         else:
             return forces[:n_atoms]
-
 
 
 def density_getter_factory(application, *args, **kwargs):

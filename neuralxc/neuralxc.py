@@ -19,6 +19,7 @@ import os
 import time
 import traceback
 from periodictable import elements as element_dict
+
 # from concurrent.futures import ProcessPoolExecutor
 # from mpi4py import MPI
 
@@ -80,13 +81,12 @@ class NXCAdapter(ABC):
 
 
 class SiestaNXC(NXCAdapter):
-
     @prints_error
     def initialize(self, rho, unitcell, grid, positions, elements):
         elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
         positions = positions.T
-        model_elements = [key for key in  self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
+        model_elements = [key for key in self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
@@ -160,7 +160,7 @@ class SiestaNXC(NXCAdapter):
     @prints_error
     def correct_forces(self, forces):
         if hasattr(self, 'force_correction'):
-            forces[:,self.element_filter] = forces[:,self.element_filter] + self.force_correction
+            forces[:, self.element_filter] = forces[:, self.element_filter] + self.force_correction
         else:
             raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
 
@@ -204,10 +204,9 @@ class NeuralXC():
         self.species = species
         self.projector = DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
 
-
     def _get_v_thread(self, rho, positions, species, calc_forces=False):
         # print(positions, species)
-        positions = positions.reshape(-1,3)
+        positions = positions.reshape(-1, 3)
         species = [species]
         C = self.projector.get_basis_rep(rho, positions, species)
         D = self.symmetrizer.get_symmetrized(C)
@@ -243,40 +242,42 @@ class NeuralXC():
         start = time.time()
         E = 0
         if calc_forces:
-            V = [0,np.zeros_like(self.positions)]
+            V = [0, np.zeros_like(self.positions)]
         else:
             V = 0
-        if not self._pipeline.steps[-1][1].allows_threading or self.max_workers ==1:
+        if not self._pipeline.steps[-1][1].allows_threading or self.max_workers == 1:
             print('Serial computation in python')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
             # for spec in C:
-                # try:
-                #     descr = np.load('descriptors_{}.npy'.format(spec))
-                #     descr = np.concatenate([descr, C[spec]])
-                # except FileNotFoundError:
-                #     descr = C[spec]
-                # np.save('descriptors_{}.npy'.format(spec),descr)
+            # try:
+            #     descr = np.load('descriptors_{}.npy'.format(spec))
+            #     descr = np.concatenate([descr, C[spec]])
+            # except FileNotFoundError:
+            #     descr = C[spec]
+            # np.save('descriptors_{}.npy'.format(spec),descr)
 
             D = self.symmetrizer.get_symmetrized(C)
             E = self._pipeline.predict(D)[0]
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
             V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
         else:
-            with ThreadPoolExecutor(max_workers = self.max_workers) as executor:
-                future_to_rep = {executor.submit(self._get_v_thread, rho, position,
-                    spec, calc_forces): spec for position, spec in zip(self.positions, self.species)}
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_rep = {
+                    executor.submit(self._get_v_thread, rho, position, spec, calc_forces): spec
+                    for position, spec in zip(self.positions, self.species)
+                }
 
                 for i, future in enumerate(future_to_rep):
                     results = future.result()
                     E += results[0]
                     if calc_forces:
                         V[0] += results[1][0]
-                        V[1][i:i+1] += results[1][1]
+                        V[1][i:i + 1] += results[1][1]
                     else:
                         V += results[1]
 
         end = time.time()
-        with open("TIME_PYTHON",'a') as file:
-            file.write('{}\n'.format(end-start))
+        with open("TIME_PYTHON", 'a') as file:
+            file.write('{}\n'.format(end - start))
 
         return E, V

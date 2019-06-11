@@ -135,7 +135,7 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
         super().__init__(**self.get_kwargs())
 
     def get_kwargs(self):
-        return dict(threshold = self.treshold)
+        return dict(threshold=self.treshold)
 
     def _gradient_function(self, X):
         X_shape = X.shape
@@ -161,28 +161,29 @@ class GroupedPCA(GroupedTransformer, PCA):
             See their documentation for more information
         """
 
-        self.n_components=n_components
-        self.copy=copy
-        self.whiten=whiten
-        self.svd_solver=svd_solver
-        self.tol=tol
-        self.iterated_power=iterated_power
-        self.random_state=random_state
+        self.n_components = n_components
+        self.copy = copy
+        self.whiten = whiten
+        self.svd_solver = svd_solver
+        self.tol = tol
+        self.iterated_power = iterated_power
+        self.random_state = random_state
 
         self._before_fit = StandardScaler().fit_transform
         self._initargs = []
         super().__init__(**self.get_kwargs())
 
     def get_kwargs(self):
-        return dict(n_components=self.n_components,
-                                copy=self.copy,
-                                whiten=self.whiten,
-                                svd_solver=self.svd_solver,
-                                tol=self.tol,
-                                iterated_power=self.iterated_power,
-                                random_state=self.random_state)
+        return dict(
+            n_components=self.n_components,
+            copy=self.copy,
+            whiten=self.whiten,
+            svd_solver=self.svd_solver,
+            tol=self.tol,
+            iterated_power=self.iterated_power,
+            random_state=self.random_state)
 
-    def fit(self, *args,**kwargs):
+    def fit(self, *args, **kwargs):
         if self.n_components == 1:
             return self
         else:
@@ -220,6 +221,7 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler):
 
     def get_kwargs(self):
         return {}
+
     def _gradient_function(self, X):
         X_shape = X.shape
         if not X.ndim == 2:

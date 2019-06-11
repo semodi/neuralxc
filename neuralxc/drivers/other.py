@@ -8,7 +8,7 @@ from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import StackedEstimator,ChainedEstimator
+from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
 from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.datastructures.hdf5 import *
@@ -39,23 +39,24 @@ os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
+
 def plot_basis(args):
     """ Plots a set of basis functions specified in .json file"""
 
-    basis_instructions = json.loads(open(args.basis,'r').read())
-    projector = xc.projector.DensityProjector(np.eye(3),np.ones(3),
-        basis_instructions['basis'])
+    basis_instructions = json.loads(open(args.basis, 'r').read())
+    projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['basis'])
 
     for spec in basis_instructions['basis']:
         if not len(spec) == 1: continue
         basis = basis_instructions['basis'][spec]
         n = basis_instructions['basis'][spec]['n']
         W = projector.get_W(basis)
-        r = np.linspace(0,basis['r_o'],500)
-        radials = projector.radials(r,basis,W)
+        r = np.linspace(0, basis['r_o'], 500)
+        radials = projector.radials(r, basis, W)
         for rad in radials:
             plt.plot(r, rad)
         plt.show()
+
 
 def parse_sets_input(path):
     """ Reads a file containing the sets used for fitting
@@ -71,17 +72,18 @@ def parse_sets_input(path):
         hdf5[0] : datafile location
         hdf5[1],hdf5[2]: lists of baseline(,target) datasets
     """
-    hdf5=['',[],[]]
+    hdf5 = ['', [], []]
     with open(path, 'r') as setsfile:
         line = setsfile.readline().rstrip()
-        hdf5[0] = line #datafile location
+        hdf5[0] = line  #datafile location
         line = setsfile.readline().rstrip()
-        while(line):
+        while (line):
             split = line.split()
             hdf5[1].append(split[0])
             hdf5[2].append(split[1])
             line = setsfile.readline().rstrip()
     return hdf5
+
 
 def pre_driver(args):
     """ Preprocess electron densities obtained from electronic structure
@@ -93,7 +95,7 @@ def pre_driver(args):
     mask = args.mask
 
     if not mask:
-        pre = json.loads(open(preprocessor,'r').read())
+        pre = json.loads(open(preprocessor, 'r').read())
     else:
         pre = {}
 
@@ -112,7 +114,7 @@ def pre_driver(args):
 
         if 'hdf5' in dest:
             dest_split = dest.split('/')
-            file, system, method = dest_split + ['']*(3-len(dest_split))
+            file, system, method = dest_split + [''] * (3 - len(dest_split))
             workdir = '.tmp'
             delete_workdir = True
         else:
@@ -129,7 +131,7 @@ def pre_driver(args):
 
         for basis_instr in basis_grid:
             preprocessor.basis_instructions = basis_instr
-            filename = os.path.join(workdir,basis_to_hash(basis_instr) + '.npy')
+            filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
             data = preprocessor.fit_transform(None)
             np.save(filename, data)
             if 'hdf5' in dest:

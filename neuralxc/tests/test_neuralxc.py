@@ -319,7 +319,6 @@ def test_force_correction(use_delta):
             assert np.allclose(-forces_fd, forces[incr_atom, incr_idx], atol=incr)
 
 
-
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.parallel
 @pytest.mark.parametrize('use_delta', [False, True])
@@ -340,7 +339,6 @@ def test_parallel(use_delta):
     else:
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
         benzene_nxc.initialize(unitcell, grid, positions, species)
-
 
     V = benzene_nxc.get_V(rho, calc_forces=False)[1]
     V = benzene_nxc.get_V(rho, calc_forces=False)[1]

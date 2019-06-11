@@ -8,7 +8,7 @@ from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import StackedEstimator,ChainedEstimator
+from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
 from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.datastructures.hdf5 import *
@@ -38,17 +38,19 @@ from .model import *
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
+
+
 def add_data_driver(args):
     """ Adds data to hdf5 file"""
     try:
-        file = h5py.File(args.hdf5 ,'r+')
+        file = h5py.File(args.hdf5, 'r+')
     except OSError:
-        file = h5py.File(args.hdf5 ,'w')
+        file = h5py.File(args.hdf5, 'w')
 
     i,j,k = [(None if a == '' else int(a)) for a in args.slice.split(':')] +\
         [None]*(3-len(args.slice.split(':')))
 
-    ijk = slice(i,j,k)
+    ijk = slice(i, j, k)
 
     def obs(which):
         if which == 'energy':
@@ -73,8 +75,8 @@ def add_data_driver(args):
             add_species(file, args.system, args.traj)
             species = file[args.system].attrs['species']
             data = np.load(args.density)[ijk]
-            add_density((args.density.split('/')[-1]).split('.')[0], file, data,
-                args.system, args.method, args.override)
+            add_density((args.density.split('/')[-1]).split('.')[0], file, data, args.system, args.method,
+                        args.override)
         else:
             raise Exception('Option {} not recognized'.format(which))
 
@@ -88,20 +90,19 @@ def add_data_driver(args):
 
 def split_data_driver(args):
     """ Split dataset (or all data inside a group) by providing slices"""
-    file = h5py.File(args.hdf5 ,'r+')
+    file = h5py.File(args.hdf5, 'r+')
 
     i,j,k = [(None if a == '' else int(a)) for a in args.slice.split(':')] +\
         [None]*(3-len(args.slice.split(':')))
 
-    ijk = slice(i,j,k)
-
+    ijk = slice(i, j, k)
 
     root = args.group
     if not root[0] == '/': root = '/' + root
 
     def collect_all_sets(file, path):
         sets = {}
-        if isinstance(file[path],h5py._hl.dataset.Dataset):
+        if isinstance(file[path], h5py._hl.dataset.Dataset):
             return {path: file[path]}
         else:
             for key in file[path]:
@@ -119,29 +120,30 @@ def split_data_driver(args):
         elif new_len != length:
             raise Exception('Datasets contained in group dont have consistent lengths')
         idx = path.find(args.group) + len(args.group)
-        new_path = path[:idx] +'/' + args.label + path[idx:]
+        new_path = path[:idx] + '/' + args.label + path[idx:]
         if args.comp != '':
             idx = path.find(args.group) + len(args.group)
-            comp_path = path[:idx] +'/' + args.comp + path[idx:]
+            comp_path = path[:idx] + '/' + args.comp + path[idx:]
             comp_sets[comp_path] = all_sets[path][:].tolist()
             del comp_sets[comp_path][ijk]
         split_sets[new_path] = all_sets[path][ijk]
 
     for new_path in split_sets:
-        file.create_dataset(new_path, data = split_sets[new_path])
+        file.create_dataset(new_path, data=split_sets[new_path])
 
     for new_path, path in zip(split_sets, all_sets):
         file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
     if comp_sets:
         for comp_path in comp_sets:
-            file.create_dataset(comp_path, data = comp_sets[comp_path])
+            file.create_dataset(comp_path, data=comp_sets[comp_path])
         for new_path, path in zip(comp_sets, all_sets):
-                file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
+            file['/'.join(new_path.split('/')[:-1])].attrs.update(file['/'.join(path.split('/')[:-1])].attrs)
     # print(split_sets)
+
 
 def delete_data_driver(args):
     """ Deletes data in hdf5 file"""
-    file = h5py.File(args.hdf5 ,'r+')
+    file = h5py.File(args.hdf5, 'r+')
     root = args.group
     if not root[0] == '/': root = '/' + root
     del file[root]
@@ -153,19 +155,19 @@ def sample_driver(args):
     preprocessor = args.preprocessor
     hdf5 = args.hdf5
 
-    pre = json.loads(open(preprocessor,'r').read())
+    pre = json.loads(open(preprocessor, 'r').read())
 
-    datafile = h5py.File(hdf5[0],'r')
+    datafile = h5py.File(hdf5[0], 'r')
     basis_key = basis_to_hash(pre['basis'])
     data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, args.cutoff)
     basis = pre['basis']
-    symmetrizer_instructions = {'symmetrizer_type' :'casimir'}
-    symmetrizer_instructions.update({'basis' : basis})
-    species =  [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
+    symmetrizer_instructions = {'symmetrizer_type': 'casimir'}
+    symmetrizer_instructions.update({'basis': basis})
+    species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
 
-    sampler_pipeline = get_default_pipeline(basis, species, pca_threshold = 1)
+    sampler_pipeline = get_default_pipeline(basis, species, pca_threshold=1)
     sampler_pipeline = Pipeline(sampler_pipeline.steps)
     sampler_pipeline.steps[-1] = ('sampler', SampleSelector(args.size))
     sampler_pipeline.fit(data)

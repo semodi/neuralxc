@@ -95,9 +95,10 @@ class NXCPipeline(Pipeline):
             Use all steps following and including step with index step_idx
         """
 
-        return NXCPipeline(self.steps[step_idx:],
-                           basis_instructions=self.basis_instructions,
-                           symmetrize_instructions=self.symmetrize_instructions)
+        return NXCPipeline(
+            self.steps[step_idx:],
+            basis_instructions=self.basis_instructions,
+            symmetrize_instructions=self.symmetrize_instructions)
 
     def save(self, path, override=False, npmodel=False):
         """ Save entire pipeline to disk.
@@ -120,12 +121,11 @@ class NXCPipeline(Pipeline):
         else:
             os.mkdir(path)
 
-
         if npmodel:
             np_estimator = self.steps[-1][-1].get_np_estimator()
-            pickle.dump(NXCPipeline(self.steps[:-1] + [('estimator', np_estimator)],
-             self.basis_instructions, self.symmetrize_instructions),
-              open(os.path.join(path, 'pipeline.pckl'), 'wb'))
+            pickle.dump(
+                NXCPipeline(self.steps[:-1] + [('estimator', np_estimator)], self.basis_instructions,
+                            self.symmetrize_instructions), open(os.path.join(path, 'pipeline.pckl'), 'wb'))
 
         else:
             ns_chunk = self.steps[-1][-1]._make_serializable(os.path.join(path, 'network'))
@@ -140,6 +140,7 @@ def load_pipeline(path):
     if not isinstance(pipeline.steps[-1][-1], NumpyNetworkEstimator):
         pipeline.steps[-1][-1].load_network(os.path.join(path, 'network'))
     return pipeline
+
 
 class NumpyNetworkEstimator(BaseEstimator):
 
@@ -159,7 +160,7 @@ class NumpyNetworkEstimator(BaseEstimator):
         if n == -1:
             uidx = -1
         else:
-            uidx = n+1
+            uidx = n + 1
 
         W_trunc = {}
         b_trunc = {}
@@ -168,7 +169,7 @@ class NumpyNetworkEstimator(BaseEstimator):
             W_trunc[spec] = self.W[spec][:uidx]
             b_trunc[spec] = self.B[spec][:uidx]
 
-        return NumpyNetworkEstimator(W_trunc, b_trunc, self.activation ,True)
+        return NumpyNetworkEstimator(W_trunc, b_trunc, self.activation, True)
 
     def transform(self, X, *args, **kwargs):
 
@@ -183,10 +184,9 @@ class NumpyNetworkEstimator(BaseEstimator):
                 y = X[1]
             else:
                 y = 0
-            return self.predict(X,*args, **kwargs, partial = True), y
+            return self.predict(X, *args, **kwargs, partial=True), y
 
-
-    def fit(self,*args):
+    def fit(self, *args):
         return self
 
     def get_gradient(self, X, *args, **kwargs):
@@ -211,17 +211,14 @@ class NumpyNetworkEstimator(BaseEstimator):
                     feat = atomic_shape(feat)
 
                 if not self.trunc:
-                    predictions[sys_idx][spec] = self.gradient(feat,
-                        self.W[spec],self.B[spec]).reshape(*old_shape)
+                    predictions[sys_idx][spec] = self.gradient(feat, self.W[spec], self.B[spec]).reshape(*old_shape)
                 else:
-                    predictions[sys_idx][spec] = self.gradient(feat,
-                        self.W[spec],self.B[spec]).reshape(old_shape[0],old_shape[1],
-                                                    -1,old_shape[2])
+                    predictions[sys_idx][spec] = self.gradient(feat, self.W[spec], self.B[spec]).reshape(
+                        old_shape[0], old_shape[1], -1, old_shape[2])
 
         if made_list:
             predictions = predictions[0]
         return predictions
-
 
     def predict(self, X, *args, **kwargs):
         made_list = False
@@ -254,11 +251,10 @@ class NumpyNetworkEstimator(BaseEstimator):
                     fit_kwargs = dict(kwargs)
                     fit_kwargs.pop('partial')
 
-                    prediction[spec] = self.get_energy(feat, self.W[spec],self.B[spec]).reshape(*old_shape[:-1],-1)
+                    prediction[spec] = self.get_energy(feat, self.W[spec], self.B[spec]).reshape(*old_shape[:-1], -1)
 
                 else:
-                    prediction += np.sum(self.get_energy(feat, self.W[spec],self.B[spec]).reshape(n_sys, -1),
-                                     axis=-1)
+                    prediction += np.sum(self.get_energy(feat, self.W[spec], self.B[spec]).reshape(n_sys, -1), axis=-1)
 
             predictions.append(prediction)
 
@@ -270,7 +266,7 @@ class NumpyNetworkEstimator(BaseEstimator):
         # For backwards compatibility
         if not hasattr(self, 'trunc'): self.trunc = False
 
-        for w,b in zip(W[:-1],B[:-1]):
+        for w, b in zip(W[:-1], B[:-1]):
             x = self.activation.f(x.dot(w) + b)
 
         if not self.trunc:
@@ -278,33 +274,32 @@ class NumpyNetworkEstimator(BaseEstimator):
         else:
             return self.activation.f(x.dot(W[-1]) + B[-1])
 
-
     def gradient(self, x, W, B):
         # For backwards compatibility
         if not hasattr(self, 'trunc'):
             self.trunc = False
 
         # del z_1/ del x_i
-        gradient = np.array([np.eye(len(W[0]))]*len(x)).swapaxes(0,1)
+        gradient = np.array([np.eye(len(W[0]))] * len(x)).swapaxes(0, 1)
 
         Z = []
-        for w,b in zip(W[:],B[:]):
+        for w, b in zip(W[:], B[:]):
             x = x.dot(w) + b
             Z.append(self.activation.df(x))
             x = self.activation.f(x)
 
         if not self.trunc:
-            for w,z in zip(W[:-1],Z[:-1]):
-                gradient = gradient.dot(w)*z
+            for w, z in zip(W[:-1], Z[:-1]):
+                gradient = gradient.dot(w) * z
 
             gradient = gradient.dot(W[-1])
-            return gradient[:,:,0].T
+            return gradient[:, :, 0].T
         else:
-            for w,z in zip(W,Z):
-                gradient = gradient.dot(w)*z
+            for w, z in zip(W, Z):
+                gradient = gradient.dot(w) * z
 
             # Output will be (n_samples, n_layerout, n_features)
-            return gradient.swapaxes(0,1).swapaxes(1,2)
+            return gradient.swapaxes(0, 1).swapaxes(1, 2)
 
     def _make_serializable(self, path):
         return None
@@ -318,9 +313,11 @@ class NumpyNetworkEstimator(BaseEstimator):
     def get_np_estimator(self):
         return self
 
+
 class NetworkEstimator(BaseEstimator):
 
     allows_threading = False
+
     def __init__(self,
                  n_nodes,
                  n_layers,
@@ -400,19 +397,19 @@ class NetworkEstimator(BaseEstimator):
         if not self.path is None:
             self._network.restore_model(self.path)
 
-
     def fit(self, X, y=None, *args, **kwargs):
 
         #TODO: Currently does not allow to continue training
         self.build_network(X, y)
-        self._network.train(step_size=self.alpha,
-                            max_steps=self.max_steps,
-                            b_=self.b,
-                            train_valid_split=1 - self.valid_size,
-                            optimizer=self.optimizer,
-                            random_seed=self.random_seed,
-                            batch_size=self.batch_size,
-                            target_loss=self.target_loss)
+        self._network.train(
+            step_size=self.alpha,
+            max_steps=self.max_steps,
+            b_=self.b,
+            train_valid_split=1 - self.valid_size,
+            optimizer=self.optimizer,
+            random_seed=self.random_seed,
+            batch_size=self.batch_size,
+            target_loss=self.target_loss)
 
     def get_gradient(self, X, *args, **kwargs):
 
@@ -437,11 +434,8 @@ class NetworkEstimator(BaseEstimator):
                     old_shape = feat.shape
                     feat = feat.reshape(-1, feat.shape[-1])
 
-                predictions[sys_idx][spec] = self._network.predict(feat,
-                                                                   species=spec.lower(),
-                                                                   *args,
-                                                                   return_gradient=True,
-                                                                   **kwargs)[1].reshape(*old_shape)
+                predictions[sys_idx][spec] = self._network.predict(
+                    feat, species=spec.lower(), *args, return_gradient=True, **kwargs)[1].reshape(*old_shape)
 
         if made_list:
             predictions = predictions[0]
@@ -469,7 +463,6 @@ class NetworkEstimator(BaseEstimator):
             else:
                 prediction = 0
 
-
             for spec in X:
                 feat = X[spec]
                 n_sys = len(feat)
@@ -479,12 +472,11 @@ class NetworkEstimator(BaseEstimator):
                 if kwargs.get('partial', False):
                     fit_kwargs = dict(kwargs)
                     fit_kwargs.pop('partial')
-                    prediction[spec] = self._network.predict(feat, species=spec.lower(), *args,
-                                                               **fit_kwargs).reshape(n_sys, -1)
+                    prediction[spec] = self._network.predict(
+                        feat, species=spec.lower(), *args, **fit_kwargs).reshape(n_sys, -1)
                 else:
-                    prediction += np.sum(self._network.predict(feat, species=spec.lower(), *args,
-                                                               **kwargs).reshape(n_sys, -1),
-                                         axis=-1)
+                    prediction += np.sum(
+                        self._network.predict(feat, species=spec.lower(), *args, **kwargs).reshape(n_sys, -1), axis=-1)
 
             predictions.append(prediction)
 
@@ -528,13 +520,13 @@ class NetworkEstimator(BaseEstimator):
     def _restore_after_pickling(self, network):
         self._network = network
 
-
     def load_network(self, path):
         self.path = path
 
     def get_np_estimator(self):
         W, B = self._network.get_weights()
         return NumpyNetworkEstimator(W, B, self.activation)
+
 
 class Energy_Network():
     """ Machine learned correcting functional (MLCF) for energies
@@ -569,6 +561,7 @@ class Energy_Network():
         self.species_nets_names = {}
         self.species_gradients_names = {}
         self.verbose = False
+
     # ========= Network operations ============ #
 
     def __add__(self, other):
@@ -749,7 +742,7 @@ class Energy_Network():
             --------
             None
         """
-        verbose=self.verbose
+        verbose = self.verbose
         self.model_loaded = True
         if self.graph is None:
             self.graph = tf.Graph()
@@ -758,10 +751,11 @@ class Energy_Network():
             build_graph = False
 
         with self.graph.as_default():
-            config = tf.ConfigProto(intra_op_parallelism_threads=1,
-                                    inter_op_parallelism_threads=1,
-                                    device_count={"CPU": 1},
-                                    use_per_session_threads=True)
+            config = tf.ConfigProto(
+                intra_op_parallelism_threads=1,
+                inter_op_parallelism_threads=1,
+                device_count={"CPU": 1},
+                use_per_session_threads=True)
             # log_device_placement=True)
             config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
             pool = config.session_inter_op_thread_pool.add()
@@ -984,7 +978,7 @@ class Energy_Network():
 
         self.checkpoint_path = path + '.ckpt'
 
-        if os.path.isfile(self.checkpoint_path +'.meta'):
+        if os.path.isfile(self.checkpoint_path + '.meta'):
             g = tf.Graph()
             with g.as_default():
                 sess = tf.Session()
@@ -1222,15 +1216,14 @@ def fc_nn_g(network, i, mean=0, std=1):
 
     for l in range(1, n):
         W.append(
-            tf.get_variable(initializer=tf.truncated_normal_initializer(),
-                            shape=[layers[l - 1], layers[l]],
-                            name='W' + str(l + 1)))
+            tf.get_variable(
+                initializer=tf.truncated_normal_initializer(), shape=[layers[l - 1], layers[l]],
+                name='W' + str(l + 1)))
         b.append(tf.get_variable(initializer=tf.constant_initializer(0), shape=[layers[l]], name='b' + str(l + 1)))
 
     W.append(
-        tf.get_variable(initializer=tf.random_normal_initializer(0, std),
-                        shape=[layers[n - 1], targets],
-                        name='W' + str(n + 1)))
+        tf.get_variable(
+            initializer=tf.random_normal_initializer(0, std), shape=[layers[n - 1], targets], name='W' + str(n + 1)))
     b.append(tf.get_variable(initializer=tf.constant_initializer(mean), shape=[targets], name='b' + str(n + 1)))
 
     for n_g in range(n_copies):

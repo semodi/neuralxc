@@ -2,9 +2,9 @@ from sklearn.base import BaseEstimator
 from neuralxc.ml.network import NumpyNetworkEstimator
 import numpy as np
 
-class EnsembleEstimator(BaseEstimator):
 
-    def __init__(self, estimators, operation = 'sum'):
+class EnsembleEstimator(BaseEstimator):
+    def __init__(self, estimators, operation='sum'):
 
         allows_threading = False
         self.estimators = estimators
@@ -23,12 +23,11 @@ class EnsembleEstimator(BaseEstimator):
         for idx, estimator in enumerate(self.estimators):
             self.estimators[idx].load_network(path + '_e{}'.format(idx))
 
-
     def get_np_estimator(self):
         np_estimators = []
         for est in self.estimators:
             np_estimators.append(est.get_np_estimator())
-        return type(self)(np_estimators,self.operation)
+        return type(self)(np_estimators, self.operation)
 
     def _make_serializable(self, path):
 
@@ -57,7 +56,6 @@ class EnsembleEstimator(BaseEstimator):
         else:
             raise Exception('Metric unknown or not implemented')
 
-
     #         metric_function = (lambda x: np.mean(np.abs(x)))
         scores = []
         if not isinstance(X, list):
@@ -68,6 +66,7 @@ class EnsembleEstimator(BaseEstimator):
             scores.append(metric_function(self.predict(X_) - y_))
 
         return -np.mean(scores)
+
 
 class ChainedEstimator(EnsembleEstimator):
     allows_threading = False
@@ -86,7 +85,6 @@ class ChainedEstimator(EnsembleEstimator):
             X = estimator.predict(X, *args, partial=True)
 
         return self.estimators[-1].predict(X, *args, **kwargs)
-
 
     def set_params(self, **kwargs):
         self.estimators[-1].set_params(**kwargs)
@@ -129,7 +127,7 @@ class ChainedEstimator(EnsembleEstimator):
 
             w = estimator.W
             b = estimator.B
-            if not isinstance(estimator.activation,type(act)):
+            if not isinstance(estimator.activation, type(act)):
                 raise Exception('Activations not consistent across layers.\
                         Merging not supported')
             act = estimator.activation
@@ -138,10 +136,11 @@ class ChainedEstimator(EnsembleEstimator):
                 if not spec in W:
                     W[spec] = []
                     B[spec] = []
-                for ws, bs in zip(w[spec],b[spec]):
+                for ws, bs in zip(w[spec], b[spec]):
                     W[spec].append(ws)
                     B[spec].append(bs)
         return NumpyNetworkEstimator(W, B, act)
+
 
 class StackedEstimator(EnsembleEstimator):
     allows_threading = False
@@ -164,15 +163,14 @@ class StackedEstimator(EnsembleEstimator):
                     predictions[species].append(pred[species])
 
             for species in predictions:
-                predictions[species] = self.operation(np.array(predictions[species]), axis = 0)
+                predictions[species] = self.operation(np.array(predictions[species]), axis=0)
             return [predictions]
         else:
             predictions = []
             for estimator in self.estimators:
                 predictions.append(estimator.predict(X, *args, **kwargs))
 
-            return self.operation(np.array(predictions), axis =0)
-
+            return self.operation(np.array(predictions), axis=0)
 
     def get_gradient(self, X, *args, **kwargs):
         gradients = {}
@@ -185,5 +183,5 @@ class StackedEstimator(EnsembleEstimator):
                 gradients[species].append(grad[species])
 
         for species in gradients:
-            gradients[species] = self.operation(np.array(gradients[species]), axis = 0)
+            gradients[species] = self.operation(np.array(gradients[species]), axis=0)
         return gradients

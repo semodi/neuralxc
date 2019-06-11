@@ -2,6 +2,7 @@ import numpy as np
 from ..base import ABCRegistry
 from abc import ABC, abstractmethod
 
+
 class BaseActivation(ABC):
 
     _registry_name = 'base'
@@ -9,9 +10,11 @@ class BaseActivation(ABC):
     @abstractmethod
     def f(self, x):
         pass
+
     @abstractmethod
     def df(self, x):
         pass
+
 
 class Sigmoid(BaseActivation):
 
@@ -21,10 +24,11 @@ class Sigmoid(BaseActivation):
         pass
 
     def f(self, x):
-        return 1/(1+np.exp(-x))
+        return 1 / (1 + np.exp(-x))
 
     def df(self, x):
-        return np.exp(-x)/(1+np.exp(-x))**2
+        return np.exp(-x) / (1 + np.exp(-x))**2
+
 
 class Tanh(BaseActivation):
 
@@ -38,6 +42,7 @@ class Tanh(BaseActivation):
 
     def df(self, x):
         return (1 - np.tanh(x)**2)
+
 
 def get_activation(activation):
     act_dict = {'sigmoid': Sigmoid, 'tanh': Tanh}
