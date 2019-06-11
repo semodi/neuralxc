@@ -275,6 +275,7 @@ def workflow_driver(args):
 
     if args.model0:
         args.model0 = os.path.abspath(args.model0)
+        open('siesta.fdf','a').write('\nNeuralXC ../../nxc\n')
         ensemble = True
     else:
         ensemble = False
@@ -337,7 +338,7 @@ def workflow_driver(args):
 
             os.chdir('../')
         args.hotstart += 1
-    open('siesta.fdf','a').write('\nNeuralXC ../../merged\n')
+    open('siesta.fdf','a').write('\nNeuralXC ../../nxc\n')
     if not args.hotstart == -1:
         for iteration in range(args.hotstart, args.maxit +1):
             print('====== Iteration {} ======'.format(iteration))
@@ -350,6 +351,11 @@ def workflow_driver(args):
                 shcopy(args.config, 'it{}/hyper.json'.format(iteration))
             shcopytree('it{}/merged_new'.format(iteration - 1),'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
+            if ensemble:
+                merge_driver(SN(operation='sum',dest='nxc',models=[args.model0, 'merged']))
+            else:
+                shcopytree('merged','nxc')
+
             open('sets.inp','w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
             if args.sets:
                 open('sets.inp','a').write('\n' + open(args.sets,'r').read())
@@ -399,7 +405,7 @@ def workflow_driver(args):
     mkdir('testing')
 
     shcopy('it{}/data.hdf5'.format(iteration),'testing/data.hdf5')
-    shcopytree('it{}/merged'.format(iteration),'testing/merged')
+    shcopytree('it{}/nxc'.format(iteration),'testing/nxc')
     os.chdir('testing')
     mkdir('workdir')
     subprocess.Popen(open('../' + args.engine,'r').read().strip() + ' ../testing.traj', shell=True).wait()
