@@ -309,6 +309,8 @@ def workflow_driver(args):
         else:
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
+            if ensemble:
+                shcopytree(args.model0,'it0/nxc')
             mkdir('it{}'.format(iteration))
             shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
             shcopy(args.config, 'it{}/hyper.json'.format(iteration))
@@ -352,7 +354,7 @@ def workflow_driver(args):
             shcopytree('it{}/merged_new'.format(iteration - 1),'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
-                merge_driver(SN(operation='sum',dest='nxc',models=[args.model0, 'merged']))
+                ensemble_driver(SN(operation='sum',dest='nxc',models=[args.model0, 'merged']))
             else:
                 shcopytree('merged','nxc')
 
