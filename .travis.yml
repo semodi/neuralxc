@@ -20,26 +20,35 @@ matrix:
       language: generic
       env: PYTHON_VER=3.7
 
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-7
+      - gfortran-7
 
 before_install:
     # Additional info about the build
   - uname -a
   - df -h
   - ulimit -a
-
     # Install the Python environment
   - source devtools/travis-ci/before_install.sh
   - python -V
+  - gfortran --version
+  - gcc --version
 
 install:
 
     # Create test environment for package
     #  - python devtools/scripts/create_conda_env.py -n=test -p=$PYTHON_VER devtools/conda-envs/test_env.yaml
-  - conda env create -f environment.yaml
+  - conda env create -f devtools/conda-envs/test_env.yaml
     # Activate the test environment
   - conda activate test
     # Build and install package
-  - python setup.py develop --no-deps
+  - f2py -m spher_grad -c src/spher_harm.f90
+  - pip install -e .
 
 
 script:

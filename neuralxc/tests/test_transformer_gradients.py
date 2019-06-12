@@ -133,3 +133,10 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     # assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-4, atol=1e-5)
     assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-3, atol=1e-10)
     # assert False
+
+@pytest.mark.estimator_gradient
+def test_estimator_gradient():
+
+    pipeline =  xc.ml.network.load_pipeline(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    estimator = pipeline.steps[0][1].steps[-1][1]
+    print(estimator)
