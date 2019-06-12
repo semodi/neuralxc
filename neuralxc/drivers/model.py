@@ -40,6 +40,32 @@ os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
+def parse_sets_input(path):
+    """ Reads a file containing the sets used for fitting
+
+    Parameters
+    ----------
+    path: str
+        Path to file containing dataset names
+
+    Returns
+    --------
+    hdf5, list
+        hdf5[0] : datafile location
+        hdf5[1],hdf5[2]: lists of baseline(,target) datasets
+    """
+    hdf5 = ['', [], []]
+    with open(path, 'r') as setsfile:
+        line = setsfile.readline().rstrip()
+        hdf5[0] = line  #datafile location
+        line = setsfile.readline().rstrip()
+        while (line):
+            split = line.split()
+            hdf5[1].append(split[0])
+            hdf5[2].append(split[1])
+            line = setsfile.readline().rstrip()
+    return hdf5
+    
 def convert_tf(args):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
     numpy base estimator"""

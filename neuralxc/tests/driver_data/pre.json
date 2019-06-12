@@ -1,0 +1,19 @@
+{
+    "basis": {
+        "C": {
+            "n": 4,
+            "l": 5,
+            "r_o": 2
+        },
+        "H": {
+            "n": 4,
+            "l": 5,
+            "r_o": 2
+        },
+        "extension": "RHOXC"
+    },
+    "src_path": "workdir",
+    "traj_path": "../sampled.traj",
+    "n_workers": -1
+}
+
