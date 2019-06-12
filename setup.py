@@ -6,7 +6,7 @@ Implementation of a machine learned density functional
 from numpy.distutils.core import setup, Extension
 import versioneer
 
-spher_grad = Extension('spher_grad',['src/spher_harm.f90',])
+spher_grad = Extension('spher_grad',['src/spher_harm.F',])
 
 short_description = __doc__.split("\n")
 

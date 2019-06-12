@@ -25,9 +25,9 @@ addons:
     sources:
       - ubuntu-toolchain-r-test
     packages:
-      - g++-7
-      - gfortran-7
-
+      - g++
+      - gcc
+      - gfortran
 before_install:
     # Additional info about the build
   - uname -a
@@ -36,19 +36,21 @@ before_install:
     # Install the Python environment
   - source devtools/travis-ci/before_install.sh
   - python -V
-  - gfortran --version
   - gcc --version
+  - gfortran --version
 
 install:
 
     # Create test environment for package
     #  - python devtools/scripts/create_conda_env.py -n=test -p=$PYTHON_VER devtools/conda-envs/test_env.yaml
+  - conda update conda
+  - conda install anaconda=5.2
   - conda env create -f devtools/conda-envs/test_env.yaml
     # Activate the test environment
   - conda activate test
     # Build and install package
-  - f2py -m spher_grad -c src/spher_harm.f90
   - pip install -e .
+
 
 
 script:

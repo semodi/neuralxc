@@ -14,6 +14,7 @@ import pickle
 import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Hartree
+from neuralxc.ml.ensemble import StackedEstimator
 try:
     import ase
     ase_found = True
@@ -135,8 +136,36 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     # assert False
 
 @pytest.mark.estimator_gradient
-def test_estimator_gradient():
+@pytest.mark.parametrize('use_stacked',[False, True])
+def test_estimator_gradient(use_stacked):
 
     pipeline =  xc.ml.network.load_pipeline(os.path.join(test_dir, 'benzene_test', 'benzene'))
-    estimator = pipeline.steps[0][1].steps[-1][1]
-    print(estimator)
+    estimator = pipeline.steps[-1][1]
+
+    if use_stacked:
+        estimator = StackedEstimator([estimator]*2)
+        spec = list(estimator.estimators[0].W.keys())[0]
+        dim = len(estimator.estimators[0].W[spec][0])
+        estimator.estimators[1].W[spec][0] += np.random.rand(*estimator.estimators[1].W[spec][0].shape)
+        estimator.estimators[1].W[spec][1] += np.random.rand(*estimator.estimators[1].W[spec][1].shape)
+    else:
+        spec = list(estimator.W.keys())[0]
+        dim = len(estimator.W[spec][0])
+
+    X = {spec: np.random.rand(10,1,dim)}
+
+    grad_analytic = estimator.get_gradient(X)
+    x = X[spec]
+    grad_fd = {spec: np.zeros_like(X[spec])}
+    incr = 0.0001
+    for ix in range(x.shape[-1]):
+        xp = np.array(x)
+        # incr = np.mean(np.abs(xp[:, ix])) / 1000
+        xp[:,:, ix] += incr
+        xm = np.array(x)
+        xm[:,:, ix] -= incr
+        Ep = estimator.predict({spec: xp})
+        Em = estimator.predict({spec: xm})
+        grad_fd[spec][:, 0, ix] += (Ep - Em) / (2 * incr)
+
+    assert np.allclose(grad_analytic[spec], grad_fd[spec])
