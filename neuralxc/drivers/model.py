@@ -317,7 +317,7 @@ def workflow_driver(args):
                    hyperopt=True))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            if statistics_fit['mae'] > statistics_sc['mae'] + args.tol:
+            if statistics_fit['mae'] > statistics_sc['mae']:
                 print('Stopping iterative training because fitting error is larger than self-consistent error')
                 os.chdir('../')
                 break
