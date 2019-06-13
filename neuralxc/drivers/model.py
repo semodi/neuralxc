@@ -65,7 +65,8 @@ def parse_sets_input(path):
             hdf5[2].append(split[1])
             line = setsfile.readline().rstrip()
     return hdf5
-    
+
+
 def convert_tf(args):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
     numpy base estimator"""

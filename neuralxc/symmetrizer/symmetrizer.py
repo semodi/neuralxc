@@ -337,7 +337,6 @@ class CasimirSymmetrizer(Symmetrizer):
 #         grad = 2 * c * casimirs_mask
 #         return grad.reshape(*c_shape[:-1], -1)
 
-
 # class BispectrumSymmetrizer(Symmetrizer):
 #
 #     _registry_name = 'bispectrum'

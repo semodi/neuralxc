@@ -34,7 +34,6 @@ import copy
 import pickle
 from types import SimpleNamespace as SN
 from .other import *
-from .model import *
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'

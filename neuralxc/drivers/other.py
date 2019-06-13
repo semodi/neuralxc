@@ -34,7 +34,6 @@ import copy
 import pickle
 from types import SimpleNamespace as SN
 from .data import *
-from .model import *
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -56,8 +55,6 @@ def plot_basis(args):
         for rad in radials:
             plt.plot(r, rad)
         plt.show()
-
-
 
 
 def pre_driver(args):

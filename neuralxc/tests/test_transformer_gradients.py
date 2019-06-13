@@ -135,15 +135,16 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-3, atol=1e-10)
     # assert False
 
+
 @pytest.mark.estimator_gradient
-@pytest.mark.parametrize('use_stacked',[False, True])
+@pytest.mark.parametrize('use_stacked', [False, True])
 def test_estimator_gradient(use_stacked):
 
-    pipeline =  xc.ml.network.load_pipeline(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    pipeline = xc.ml.network.load_pipeline(os.path.join(test_dir, 'benzene_test', 'benzene'))
     estimator = pipeline.steps[-1][1]
 
     if use_stacked:
-        estimator = StackedEstimator([estimator]*2)
+        estimator = StackedEstimator([estimator] * 2)
         spec = list(estimator.estimators[0].W.keys())[0]
         dim = len(estimator.estimators[0].W[spec][0])
         estimator.estimators[1].W[spec][0] += np.random.rand(*estimator.estimators[1].W[spec][0].shape)
@@ -152,7 +153,7 @@ def test_estimator_gradient(use_stacked):
         spec = list(estimator.W.keys())[0]
         dim = len(estimator.W[spec][0])
 
-    X = {spec: np.random.rand(10,1,dim)}
+    X = {spec: np.random.rand(10, 1, dim)}
 
     grad_analytic = estimator.get_gradient(X)
     x = X[spec]
@@ -161,9 +162,9 @@ def test_estimator_gradient(use_stacked):
     for ix in range(x.shape[-1]):
         xp = np.array(x)
         # incr = np.mean(np.abs(xp[:, ix])) / 1000
-        xp[:,:, ix] += incr
+        xp[:, :, ix] += incr
         xm = np.array(x)
-        xm[:,:, ix] -= incr
+        xm[:, :, ix] -= incr
         Ep = estimator.predict({spec: xp})
         Em = estimator.predict({spec: xm})
         grad_fd[spec][:, 0, ix] += (Ep - Em) / (2 * incr)
