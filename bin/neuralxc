@@ -133,6 +133,8 @@ if __name__ == '__main__':
         type=str,
         default='',
         help='Build new model on top of model0 as a stacked estimator')
+    wf.add_argument(
+        '-fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================
@@ -163,6 +165,7 @@ if __name__ == '__main__':
     ens.add_argument(
         '-operation', metavar='operation', type=str, default='sum', help='Operation to combine estimator outputs')
     ens.add_argument('-dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
+    ens.add_argument('-estonly', action=('store_true'), help='Only stack the final estimators')
     ens.add_argument('models', action='store', type=str, nargs='+', help='Paths to models to combine')
     ens.set_defaults(func=ensemble_driver)
 

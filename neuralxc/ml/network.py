@@ -100,6 +100,12 @@ class NXCPipeline(Pipeline):
             basis_instructions=self.basis_instructions,
             symmetrize_instructions=self.symmetrize_instructions)
 
+    def _make_serializable(self, path):
+        return self.steps[-1][-1]._make_serializable(os.path.join(path, 'network'))
+
+    def _restore_after_pickling(self, *args):
+        self.steps[-1][-1]._restore_after_pickling(*args)
+
     def save(self, path, override=False, npmodel=False):
         """ Save entire pipeline to disk.
 
