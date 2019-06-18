@@ -162,6 +162,7 @@ def workflow_driver(args):
             model0 = args.model0
     else:
         ensemble = False
+        model0 = ''
 
     if args.nozero:
         E0 = 0
