@@ -156,8 +156,13 @@ def workflow_driver(args):
         args.model0 = os.path.abspath(args.model0)
         open('siesta.fdf', 'a').write('\nNeuralXC ../../nxc\n')
         ensemble = True
+        if args.fullstack:
+            model0 = ''
+        else:
+            model0 = args.model0
     else:
         ensemble = False
+        model0 = ''
 
     if args.nozero:
         E0 = 0
@@ -185,7 +190,7 @@ def workflow_driver(args):
                    mask=False,
                    sample='',
                    cutoff=0.0,
-                   model=args.model0,
+                   model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
                    hyperopt=True))
@@ -239,7 +244,7 @@ def workflow_driver(args):
                    mask=False,
                    sample='',
                    cutoff=0.0,
-                   model=args.model0,
+                   model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
                    hyperopt=True))
@@ -263,7 +268,7 @@ def workflow_driver(args):
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
-                ensemble_driver(SN(operation='sum', dest='nxc', models=[args.model0, 'merged']))
+                ensemble_driver(SN(operation='sum', dest='nxc', models=[args.model0, 'merged'], estonly = not args.fullstack))
             else:
                 shcopytree('merged', 'nxc')
 
@@ -630,9 +635,13 @@ def ensemble_driver(args):
     # if not pickle.dumps(step0[1]) == pickle.dumps(step1[1]):
     # raise Exception('Parameters for {} in model {} inconsistent'.format(type(step0[1]), pidx))
 
-    all_networks = [pipeline.steps[-1][1] for pipeline in all_pipelines]
-    ensemble = StackedEstimator(all_networks, operation=args.operation)
-    pipeline = all_pipelines[0]
-    pipeline.steps[-1] = ('estimator', ensemble)
-
+    if args.estonly:
+        all_networks = [pipeline.steps[-1][1] for pipeline in all_pipelines]
+        ensemble = StackedEstimator(all_networks, operation=args.operation)
+        pipeline = all_pipelines[0]
+        pipeline.steps[-1] = ('estimator', ensemble)
+    else:
+        ensemble = StackedEstimator(all_pipelines, operation=args.operation)
+        pipeline = xc.ml.network.load_pipeline(model_path)
+        pipeline.steps = [('estimator', ensemble)]
     pipeline.save(args.dest, override=True)

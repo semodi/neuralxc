@@ -36,10 +36,11 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         return data
 
     def get_basis_rep(self):
-
-        cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
-        print(cluster)
-        client = Client(cluster)
+        
+        if self.num_workers > 1:
+            cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
+            print(cluster)
+            client = Client(cluster)
 
         class FakeClient():
             def map(self, *args):

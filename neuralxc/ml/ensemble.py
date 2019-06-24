@@ -21,7 +21,10 @@ class EnsembleEstimator(BaseEstimator):
 
     def load_network(self, path):
         for idx, estimator in enumerate(self.estimators):
-            self.estimators[idx].load_network(path + '_e{}'.format(idx))
+            try:
+                self.estimators[idx].load_network(path + '_e{}'.format(idx))
+            except AttributeError:
+                pass
 
     def get_np_estimator(self):
         np_estimators = []
