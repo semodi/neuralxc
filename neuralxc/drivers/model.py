@@ -559,7 +559,7 @@ def eval_driver(args):
         basis_key = ''
 
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
-
+    results = {}
     if not args.model == '':
         symmetrizer_instructions = model.get_symmetrize_instructions()
         symmetrizer_instructions.update({'basis': basis})
@@ -582,29 +582,39 @@ def eval_driver(args):
         if args.predict:
             raise Exception('Must provide a model to make predictions')
         dev = data[:, -1].real
+        predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
+        targets = load_sets(datafile, hdf5[2], hdf5[2], basis_key, cutoff)[:,-1].flatten()
+        force_base = datafile[hdf5[1] +'/forces'][:]
+        force_ref = datafile[hdf5[2] +'/forces'][:]
+        force_results = {'force_mae' : np.mean(np.abs(force_ref - force_base)),
+                'force_std' : np.std(force_ref - force_base),
+                'force_max' : np.max(force_ref - force_base)}
+        results.update(force_results)
+
     dev0 = np.abs(dev - np.mean(dev))
-    results = {
+    results.update({
         'mean deviation': np.mean(dev).round(4),
         'rmse': np.std(dev).round(4),
         'mae': np.mean(dev0).round(4),
         'max': np.max(dev0).round(4)
-    }
+    })
     pprint(results)
     if args.plot:
         if args.model == '':
+            plt.figure(figsize=(10,8))
+            plt.subplot(2,1,1)
             plt.hist(dev.flatten())
             plt.xlabel('Target energies [eV]')
-            plt.show()
-        else:
-            targets -= np.mean(targets)
-            predictions -= np.mean(predictions)
-            maxlim = np.max([np.max(targets), np.max(predictions)])
-            minlim = np.min([np.max(targets), np.min(predictions)])
-            plt.plot(targets.flatten(), predictions.flatten(), ls='', marker='.')
-            plt.plot([minlim, maxlim], [minlim, maxlim], ls='-', marker='', color='grey')
-            plt.xlabel('$E_{ref}[eV]$')
-            plt.ylabel('$E_{pred}[eV]$')
-            plt.show()
+            plt.subplot(2,1,2)
+        targets -= np.mean(targets)
+        predictions -= np.mean(predictions)
+        maxlim = np.max([np.max(targets), np.max(predictions)])
+        minlim = np.min([np.max(targets), np.min(predictions)])
+        plt.plot(targets.flatten(), predictions.flatten(), ls='', marker='.')
+        plt.plot([minlim, maxlim], [minlim, maxlim], ls='-', marker='', color='grey')
+        plt.xlabel('$E_{ref}[eV]$')
+        plt.ylabel('$E_{pred}[eV]$')
+        plt.show()
     return results
 
 

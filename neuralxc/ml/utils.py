@@ -151,6 +151,8 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     print('E0 base', E0_base)
     print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
+    if baseline == reference:
+            tar = data_ref[:] - E0_ref
     tar = tar.real
     if percentile_cutoff > 0:
         lim1 = np.percentile(tar, percentile_cutoff * 100)
