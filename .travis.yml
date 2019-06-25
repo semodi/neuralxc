@@ -44,7 +44,7 @@ install:
     # Create test environment for package
     #  - python devtools/scripts/create_conda_env.py -n=test -p=$PYTHON_VER devtools/conda-envs/test_env.yaml
   - conda update conda
-  - conda install anaconda=5.2
+    #  - conda install anaconda=5.2
   - conda env create -f devtools/conda-envs/test_env.yaml
     # Activate the test environment
   - conda activate test
