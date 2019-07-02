@@ -142,8 +142,7 @@ class SiestaNXC(NXCAdapter):
         if not self.initialized:
             raise Exception('Must call initialize before calling get_V')
 
-        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces=calc_forces,
-                                                    calc_stress = calc_forces)
+        Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces=calc_forces)
         if calc_forces:
             self.force_correction = Vnxc[1][:-3].T / Rydberg
             self.stress_correction = Vnxc[1][-3:].T / Rydberg
@@ -224,7 +223,7 @@ class NeuralXC():
         return E, V
 
     @prints_error
-    def get_V(self, rho, calc_forces=False, calc_stress=False):
+    def get_V(self, rho, calc_forces=False):
         """Parameters
         ------------------
         rho, array, float
@@ -238,14 +237,13 @@ class NeuralXC():
         species, list string
         	atomic species (chem. symbols)
         calc_forces, bool
-        	calculate force correction?
+        	calculate force and stress correction?
 
         Returns
         ------------
         E, V, (force_correction) np.ndarray
-        	Machine learned potential, if calc_forces = True, force corrections
-            are returned as a (n_atoms(+3) , 3) array.If calc_stress = True,
-            the last three rows store the stress correction
+        	Machine learned potential, if calc_forces = True, force/stress corrections
+            are returned as a (n_atoms+3 , 3) array.
 
         """
 
