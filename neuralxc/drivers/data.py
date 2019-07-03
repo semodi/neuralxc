@@ -55,8 +55,12 @@ def add_data_driver(args):
         if which == 'energy':
             if args.traj:
                 add_species(file, args.system, args.traj)
-                energies = np.array([a.get_potential_energy()\
-                 for a in read(args.traj,':')])[ijk]
+                if args.zero != None:
+                    energies = np.array([a.get_potential_energy()\
+                     for a in read(args.traj,':')])[ijk]
+                else:
+                    energies = E_from_atoms(read(args.traj,':'))
+                    args.zero = 0
                 add_energy(file, energies, args.system, args.method, args.override, E0=args.zero)
             else:
                 raise Exception('Must provide a trajectory file')

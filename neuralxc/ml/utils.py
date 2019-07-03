@@ -18,6 +18,59 @@ from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
 import h5py
 
+def opt_E0(file, baselines, references):
+
+    e_base = [file[data + '/energy'][:] for data in baselines]
+    species = [find_attr_in_tree(file, data, 'species') for data in baselines]
+    e_ref = [file[data + '/energy'][:] for data in references]
+    species2 = [find_attr_in_tree(file, data, 'species') for data in references]
+    for s,s2 in zip(species, species2):
+        assert s == s2
+
+    allspecies = np.unique([s for s in ''.join(species)])
+    X = np.zeros([len(baselines),len(allspecies)])
+    y = np.zeros(len(baselines))
+    for sysidx, sys in enumerate(species):
+        for sidx, spec in enumerate(allspecies):
+            X[sysidx, sidx] = sys.count(spec)
+        y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
+    lr = LinearRegression(fit_intercept=False)
+    lr.fit(X,y)
+    E0 = {}
+    for spec, coeff in zip(allspecies, lr.coef_):
+        E0[spec] = -coeff
+    return E0
+
+def E_from_atoms(traj):
+
+    energies = {}
+    for atoms in traj:
+        spec = ''.join(atoms.get_chemical_symbols())
+        if not spec in energies:
+            energies[spec] = []
+        energies[spec].append(atoms.get_potential_energy())
+
+    allspecies = np.unique([s for s in ''.join([key for key in energies])])
+
+    X = np.zeros([len(energies),len(allspecies)])
+    y = np.zeros(len(energies))
+    for sysidx, syskey in enumerate(energies):
+        for sidx, spec in enumerate(allspecies):
+            X[sysidx, sidx] = syskey.count(spec)
+        y[sysidx] = np.mean(energies[syskey])
+    lr = LinearRegression(fit_intercept=False)
+    lr.fit(X,y)
+    offsets = lr.predict(X)
+    offsets = {key: offset for key,offset in zip(energies, offsets)}
+
+    energies = []
+    for atoms in traj:
+        spec = ''.join(atoms.get_chemical_symbols())
+
+        energies.append(atoms.get_potential_energy() - offsets[spec])
+
+
+    return np.array(energies)
 
 def find_attr_in_tree(file, tree, attr):
     """
@@ -35,8 +88,7 @@ def find_attr_in_tree(file, tree, attr):
 
     attr: str
         attribute to look for
-
-    """
+"""
     if attr in file[tree].attrs:
         return file[tree].attrs[attr]
 
