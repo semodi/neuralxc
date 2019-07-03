@@ -16,8 +16,31 @@ from neuralxc.ml.utils import *
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
+from sklearn.linear_model import LinearRegression
 import h5py
 
+def opt_E0(file, baselines, references):
+
+    e_base = [file[data + '/energy'][:] for data in baselines]
+    e_ref = [file[data + '/energy'][:] for data in references]
+    species = [find_attr_in_tree(file, data, 'species') for data in baselines]
+    species2 = [find_attr_in_tree(file, data, 'species') for data in references]
+    for s,s2 in zip(species, species2):
+        assert s == s2
+
+    allspecies = np.unique([s for s in ''.join(species)])
+    X = np.zeros([len(baselines),len(allspecies)])
+    y = np.zeros(len(baselines))
+    for sysidx, sys in enumerate(species):
+        for sidx, spec in enumerate(allspecies):
+            X[sysidx, sidx] = sys.count(spec)
+        y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
+    lr = LinearRegression(fit_intercept=False)
+    lr.fit(X,y)
+    E0 = {}
+    for spec, coeff in zip(allspecies, lr.coef_):
+        E0[spec] = -coeff
+    return E0
 
 def find_attr_in_tree(file, tree, attr):
     """

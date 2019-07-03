@@ -69,7 +69,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def __init__(self, attrs, sys_species):
         """SpeciesGrouper allows to transform an array with columns
         [system_idx, feature1, feature2, ..., featureN, target]
-        to be transformed into an representation that is grouped by atomic
+        to be transformed into an representation that is grouped by atomic species
         like so: [{'species1': np.ndarray(values), 'species2': np.ndarray(values)},
                   ...] where the outer list runs over independent systems
         (e.g. different molecules). The first representation has to be used if
@@ -148,9 +148,9 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             targets.append(y_sys)
 
         if made_dict:
-            return {'data': (features, targets), 'basis_instructions': basis_instructions}
+            return {'data': (shrink(features), targets), 'basis_instructions': basis_instructions}
         else:
-            return features, targets
+            return shrink(features), targets
 
     def get_gradient(self, X):
         # Required by NXCPipeline
@@ -195,6 +195,21 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
         return np.concatenate([X, y.reshape(-1, 1)], axis=-1)
 
+
+def shrink(data):
+    """ Remove padded entries
+    """
+
+    for idx, key, dat in expand(data):
+        dat = dat[0]
+        mask= ~np.all(dat==0, axis = -1)
+        min_col = max(np.sum(mask, axis = -1))
+        mask = (mask | (~mask * np.cumsum(~mask, axis = -1) + np.cumsum(mask, axis = -1)[:,-1].reshape(-1,1) <= min_col))
+
+        dat = dat[mask].reshape(len(dat), min_col, -1)
+
+        data[idx][key] = dat
+    return data
 
 def expand(*args):
     """ Takes the common format in which datasets such as D and C are provided

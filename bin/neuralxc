@@ -72,6 +72,19 @@ if __name__ == '__main__':
     sampledat.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
 
+
+    #================ Merge datasets =============
+    mergedat = datsub.add_parser('merge', description='Merge datasets inside hdf5 file')
+    mergedat.add_argument('file', action='store', type=str, help='Path to hdf5 file')
+    mergedat.add_argument('-base', action='store', type=str,nargs='+', help='Baseline sets', required = True)
+    mergedat.add_argument('-ref', action='store', type=str,nargs='+', help='Reference sets', required = True)
+    mergedat.add_argument('-o', action='store', type=str, help='Destination', required = True)
+    mergedat.add_argument('-optE0', action='store_true', help='Optimize energy offset across datasets (recommended)')
+    mergedat.add_argument('-pre', action='store', default='',type=str, help='Preprocessor file defining basis set')
+
+    mergedat.set_defaults(func=merge_data_driver)
+
+
     # =======================================================
     # =============== Model routines ========================
     # =======================================================

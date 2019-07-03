@@ -1,8 +1,8 @@
 from ase.io import read, write
 import hashlib
 import json
-
-
+import numpy as np
+import neuralxc.ml.utils
 def add_energy(*args, **kwargs):
     return add_data('energy', *args, **kwargs)
 
@@ -41,7 +41,12 @@ def add_species(file, system, traj_path=''):
     if not 'species' in cg.attrs:
         if not traj_path:
             raise Exception('Must provide a trajectory file to define species')
-        species = ''.join(read(traj_path, 0).get_chemical_symbols())
+
+        species = {}
+        for atoms in read(traj_path,':'):
+            species[''.join(atoms.get_chemical_symbols())] = 0
+        species = ''.join([key for key in species])
+
         cg.attrs.update({'species': species})
 
 
@@ -99,6 +104,59 @@ def add_data(which, file, data, system, method, override=False, E0=None):
         else:
             print('Already exists. Set override=True')
 
+def merge_sets(file, datasets, density_key = None, new_name = 'merged', E0 = {}):
+
+    energies = [file[data + '/energy'][:] for data in datasets]
+    if not E0:
+        energies = [e - nxc.ml.utils.find_attr_in_tree(file, data,'E0') for e,data in zip(energies, datasets)]
+
+    forces_found = True
+    try:
+        forces = [file[data + '/forces'][:] for data in datasets]
+    except KeyError:
+        forces_found = False
+
+    if density_key:
+        densities = [file[data + '/density/' + density_key][:] for data in datasets]
+
+        densities_full = np.zeros([sum([len(d) for d in densities]), sum([d.shape[1] for d in densities])], dtype='complex')
+        line_mark = 0
+        col_mark = 0
+        for d in densities:
+            densities_full[line_mark:line_mark + d.shape[0], col_mark:col_mark+d.shape[1]] = d
+            line_mark += d.shape[0]
+            col_mark += d.shape[1]
+
+    if forces_found:
+        forces_full = np.zeros([sum([len(d) for d in forces]), max([d.shape[1] for d in forces]),3])
+        line_mark = 0
+
+        for f in forces:
+            forces_full[line_mark:line_mark + f.shape[0], :f.shape[1]] = f
+            line_mark += f.shape[0]
+
+    species = [neuralxc.ml.utils.find_attr_in_tree(file, data, 'species') for data in datasets]
+    if E0:
+        energies = [ e - sum([s.count(element)*value for element,value in E0.items()]) for e, s in zip(energies, species)]
+    species = [''.join(species)]
+    energies = np.concatenate(energies)
+
+    if forces_found:
+        assert len(energies) == len(forces_full)
+    if density_key:
+        assert len(energies) == len(densities_full)
+    try:
+        file.create_group(new_name)
+    except ValueError:
+        del file[new_name]
+        file.create_group(new_name)
+    file[new_name].attrs.update({'species' : species})
+    file[new_name].attrs.update({'E0' : 0})
+    file.create_dataset(new_name  +'/energy', data = energies)
+    if forces_found:
+        file.create_dataset(new_name  +'/forces', data = forces_full)
+    if density_key:
+        file.create_dataset(new_name  +'/density/' + density_key, data = densities_full)
 
 def basis_to_hash(basis):
     """

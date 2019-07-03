@@ -67,7 +67,7 @@ class BaseProjector(metaclass=ProjectorRegistry):
         species, list string
         	atomic species (chem. symbols)
         calc_forces, bool
-        	Calc. and return force corrections
+        	Calc. and return force corrections + stress corrections (concatenated)
         Returns
         ------------
         V, (force_correction) np.ndarray
@@ -172,6 +172,9 @@ class DensityProjector(BaseProjector):
                     raise ValueError('Must provide rho as np.ndarray')
                 force_corrections[i] = self.get_force_correction(rho, coeffs, box, basis, self.W[spec])
 
+        stress_correction = np.einsum('ij,ik-> jk', force_corrections, positions)
+
+        force_corrections = np.concatenate([force_corrections, stress_correction], axis = 0)
         if calc_forces:
             return V.real, force_corrections
         else:
@@ -235,8 +238,6 @@ class DensityProjector(BaseProjector):
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
         X, Y, Z = box['real']
-        # Automatically detect whether entire charge density or only surrounding
-        # box was provided
 
         #Build angular part of basis functions
         angs = []

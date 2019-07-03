@@ -27,7 +27,6 @@ import tensorflow as tf
 Dataset = namedtuple("Dataset", "data species")
 
 
-#TODO: Pipeline should save energy units
 class NXCPipeline(Pipeline):
     def __init__(self, steps, basis_instructions, symmetrize_instructions):
         """ Class that extends the scikit-learn Pipeline by adding get_gradient
@@ -748,7 +747,8 @@ class Energy_Network():
             --------
             None
         """
-        verbose = self.verbose
+        # verbose = self.verbose
+        verbose = True
         self.model_loaded = True
         if self.graph is None:
             self.graph = tf.Graph()
@@ -1239,10 +1239,15 @@ def fc_nn_g(network, i, mean=0, std=1):
             # hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1])/layers[l]*10 + b[l+1]))
             hidden.append(activations[l + 1](tf.matmul(hidden[n_g * n + l], W[l + 1]) + b[l + 1]))
 
+        mask = tf.reduce_all(tf.equal(tf.gather(x, n_g), np.zeros_like(tf.gather(x, n_g))),axis = -1)
         if n_g == 0:
-            logits = tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
+            e = tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
+            e = tf.where(mask, tf.zeros_like(e), e)
+            logits = e
         else:
-            logits += tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
+            e = tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
+            e = tf.where(mask, tf.zeros_like(e), e)
+            logits += e
 
     return logits, x, y_
 
