@@ -589,13 +589,17 @@ def eval_driver(args):
         dev = data[:, -1].real
         predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
         targets = load_sets(datafile, hdf5[2], hdf5[2], basis_key, cutoff)[:,-1].flatten()
-        force_base = datafile[hdf5[1] +'/forces'][:]
-        force_ref = datafile[hdf5[2] +'/forces'][:]
-        force_results = {'force_mae' : np.mean(np.abs(force_ref - force_base)),
-                'force_std' : np.std(force_ref - force_base),
-                'force_max' : np.max(force_ref - force_base)}
-        results.update(force_results)
 
+        try:
+            force_base = datafile[hdf5[1] +'/forces'][:]
+            force_ref = datafile[hdf5[2] +'/forces'][:]
+            force_results = {'force_mae' : np.mean(np.abs(force_ref - force_base)),
+                    'force_std' : np.std(force_ref - force_base),
+                    'force_max' : np.max(force_ref - force_base)}
+            results.update(force_results)
+        except Exception:
+            pass
+        
     dev0 = np.abs(dev - np.mean(dev))
     results.update({
         'mean deviation': np.mean(dev).round(4),

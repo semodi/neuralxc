@@ -16,6 +16,7 @@ from neuralxc.ml.utils import *
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
+from sklearn.linear_model import LinearRegression
 import h5py
 
 def opt_E0(file, baselines, references):
