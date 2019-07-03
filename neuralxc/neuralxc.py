@@ -146,8 +146,8 @@ class SiestaNXC(NXCAdapter):
         if calc_forces:
             self.force_correction = Vnxc[1][:-3].T / Rydberg
             self.stress_correction = Vnxc[1][-3:].T / Rydberg
-            if not np.allclose(self.stress_correction, self.stress_correction.T):
-                raise Exception('Stress correction not symmetric')
+#            if not np.allclose(self.stress_correction, self.stress_correction.T):
+#                raise Exception('Stress correction not symmetric')
             Vnxc = Vnxc[0]
 
         Enxc = Enxc / Rydberg
