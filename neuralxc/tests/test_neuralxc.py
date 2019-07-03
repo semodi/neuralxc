@@ -295,6 +295,7 @@ def test_force_correction(use_delta):
         return E, projector.get_V(dEdC, positions_shifted, species, calc_forces, rho)
 
     V, forces = benzene_nxc.get_V(rho, calc_forces=True)[1]
+    forces = forces[:-3] # no stress
 
     assert np.allclose(np.sum(forces, axis=0), np.zeros(3), atol=1e-6)
     for incr_atom in [0, 1, 2, 3]:

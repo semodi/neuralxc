@@ -30,13 +30,40 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         basis_rep = self.get_basis_rep()
         self.data = basis_rep
         self.computed_basis = self.basis_instructions
-        data = np.array(self.data)
+
+        unique_systems = np.array([''.join(a.get_chemical_symbols()) for a in self.atoms])
+        unique_systems = np.unique(unique_systems, axis = 0)
+
+        # === Padding ===
+
+        #Find padded width of data
+        width = {}
+        for dat, atoms in zip(self.data,self.atoms):
+            width[''.join(atoms.get_chemical_symbols())] = len(dat)
+        #Sanity check
+        assert len(unique_systems) == len(width)
+        paddedwidth = sum([width[key] for key in width])
+        paddedoffset = {}
+        cnt = 0
+        for key in width:
+            paddedoffset[key] = cnt
+            cnt += width[key]
+
+        padded_data = np.zeros([len(self.data), paddedwidth], dtype ='complex')
+
+
+        for lidx, (dat, atoms) in enumerate(zip(self.data, self.atoms)):
+            syskey = ''.join(atoms.get_chemical_symbols())
+            padded_data[lidx,
+                paddedoffset[syskey]:paddedoffset[syskey]+len(dat)] = dat
+
+        data = padded_data
         if isinstance(X, list) or isinstance(X, np.ndarray):
             data = data[X]
         return data
 
     def get_basis_rep(self):
-        
+
         if self.num_workers > 1:
             cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
             print(cluster)
@@ -50,6 +77,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             client = FakeClient()
 
         atoms = read(self.traj_path, ':')
+        self.atoms = atoms
         extension = self.basis_instructions.get('extension', 'RHOXC')
         if extension[0] != '.':
             extension = '.' + extension

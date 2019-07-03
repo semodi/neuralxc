@@ -84,7 +84,9 @@ class GroupedTransformer(ABC):
                      type(self)(*self._initargs,
                       **self.get_kwargs())
                     self._spec_dict[spec].__dict__.update(self.get_params())
-                    self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])))
+                    # Due to padding some rows might be zero, exclude those during fit:
+                    mask= ~np.all(atomic_shape(super_X[spec])==0, axis = -1)
+                    self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])[mask]))
                 return self
             else:
                 return super().fit(atomic_shape(super_X))

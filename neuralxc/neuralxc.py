@@ -12,16 +12,13 @@ from .ml.network import NetworkEstimator
 from .projector import DensityProjector, DeltaProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
-from .constants import Rydberg
+from .constants import Rydberg,Bohr
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import os
 import time
 import traceback
 from periodictable import elements as element_dict
-
-# from concurrent.futures import ProcessPoolExecutor
-# from mpi4py import MPI
 
 
 def prints_error(method):
@@ -147,7 +144,10 @@ class SiestaNXC(NXCAdapter):
 
         Enxc, Vnxc = self._adaptee.get_V(rho_reshaped, calc_forces=calc_forces)
         if calc_forces:
-            self.force_correction = Vnxc[1].T / Rydberg
+            self.force_correction = Vnxc[1][:-3].T / Rydberg
+            self.stress_correction = Vnxc[1][-3:].T / Rydberg
+            if not np.allclose(self.stress_correction, self.stress_correction.T):
+                raise Exception('Stress correction not symmetric')
             Vnxc = Vnxc[0]
 
         Enxc = Enxc / Rydberg
@@ -164,6 +164,12 @@ class SiestaNXC(NXCAdapter):
         else:
             raise Exception('get_V with calc_forces = True has to be called before forces can be corrected')
 
+    @prints_error
+    def correct_stress(self, stress):
+        if hasattr(self, 'stress_correction'):
+            stress = stress + self.stress_correction
+        else:
+            raise Exception('get_V with calc_forces = True has to be called before stress can be corrected')
 
 class NeuralXC():
     @prints_error
@@ -231,12 +237,14 @@ class NeuralXC():
         species, list string
         	atomic species (chem. symbols)
         calc_forces, bool
-        	calculate force correction?
+        	calculate force and stress correction?
 
         Returns
         ------------
         E, V, (force_correction) np.ndarray
-        	Machine learned potential
+        	Machine learned potential, if calc_forces = True, force/stress corrections
+            are returned as a (n_atoms+3 , 3) array.
+
         """
 
         E = 0
@@ -244,16 +252,8 @@ class NeuralXC():
             V = [0, np.zeros_like(self.positions)]
         else:
             V = 0
-        if not self._pipeline.steps[-1][1].allows_threading or self.max_workers == 1:
+        if not self._pipeline.steps[-1][1].allows_threading or self.max_workers == 1 or calc_forces:
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
-            # for spec in C:
-            # try:
-            #     descr = np.load('descriptors_{}.npy'.format(spec))
-            #     descr = np.concatenate([descr, C[spec]])
-            # except FileNotFoundError:
-            #     descr = C[spec]
-            # np.save('descriptors_{}.npy'.format(spec),descr)
-
             D = self.symmetrizer.get_symmetrized(C)
             E = self._pipeline.predict(D)[0]
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
