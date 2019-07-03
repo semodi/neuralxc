@@ -64,8 +64,14 @@ def add_data_driver(args):
         elif which == 'forces':
             if args.traj:
                 add_species(file, args.system, args.traj)
-                forces = np.array([a.get_forces()\
-                 for a in read(args.traj,':')])[ijk]
+                forces = [a.get_forces()\
+                 for a in read(args.traj,':')]
+                max_na = max([len(f) for f in forces])
+                forces_padded = np.zeros([len(forces),max_na,3])
+                for idx,f in enumerate(forces):
+                    forces_padded[idx,:len(f)] = f
+                forces = forces_padded[ijk]
+
                 add_forces(file, forces, args.system, args.method, args.override)
             else:
                 raise Exception('Must provide a trajectory file')
@@ -85,6 +91,28 @@ def add_data_driver(args):
         obs(observable)
 
     file.close()
+
+def merge_data_driver(args):
+
+    if args.pre:
+        pre = json.loads(open(args.pre, 'r').read())
+        basis_key = basis_to_hash(pre['basis'])
+    else:
+        basis_key = None
+
+    datafile = h5py.File(args.file, 'a')
+
+    if args.optE0:
+        E0 = opt_E0(datafile, args.base, args.ref)
+    else:
+        print('Warning: E0 is not being optimzed for merged dataset. Might produce' +\
+        'unexpected behavior')
+
+    merge_sets(datafile, args.base, basis_key, new_name = args.o +'/base', E0 = E0)
+    for key in E0:
+        E0[key] = 0
+
+    merge_sets(datafile, args.ref, None, new_name = args.o +'/ref', E0 = E0)
 
 
 def split_data_driver(args):
