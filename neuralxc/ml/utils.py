@@ -187,13 +187,13 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
 
     data_base = datafile[baseline + '/energy']
     data_ref = datafile[reference + '/energy']
-
     if E0 == None:
         E0_base = find_attr_in_tree(datafile, baseline, 'E0')
         E0_ref = find_attr_in_tree(datafile, reference, 'E0')
     else:
         E0_base = E0
         E0_ref = 0
+
     if E0_base == None:
         print('Warning: E0 for baseline data not found, setting to 0')
         E0_base = 0
@@ -204,9 +204,10 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     print('E0 base', E0_base)
     print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
-    if baseline == reference:
-            tar = data_ref[:] - E0_ref
+#    if baseline == reference:
+            # tar = data_ref[:] - E0_ref
     tar = tar.real
+
     if percentile_cutoff > 0:
         lim1 = np.percentile(tar, percentile_cutoff * 100)
         lim2 = np.percentile(tar, (1 - percentile_cutoff) * 100)
