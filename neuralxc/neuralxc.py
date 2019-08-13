@@ -44,7 +44,7 @@ def verify_type(obj):
 
 
 @prints_error
-def get_nxc_adapter(kind, path):
+def get_nxc_adapter(kind, path, options = {}):
     """ Adapter factory for NeuralXC
     """
     kind = kind.lower()
@@ -52,7 +52,7 @@ def get_nxc_adapter(kind, path):
     if not kind in adapter_dict:
         raise ValueError('Selected Adapter not available')
     else:
-        adapter = adapter_dict[kind](path)
+        adapter = adapter_dict[kind](path, options)
     return adapter
 
 
@@ -66,12 +66,21 @@ def get_V(nxc, *args):
 
 class NXCAdapter(ABC):
     @prints_error
-    def __init__(self, path):
+    def __init__(self, path, options = {}):
         # from mpi4py import MPI
         path = ''.join(path.split())
         self._adaptee = NeuralXC(path)
         self.initialized = False
 
+        # This complicated structure is necessary because of forpy, which
+        # for some reason doesn't let us access the dict by strings
+        workers = 1
+        for key in options:
+            if key == 'max_workers':
+                workers = options[key]
+        self._adaptee.max_workers = int(workers)
+
+        print('NeuralXC: Using {} thread(s)'.format(self._adaptee.max_workers))
     @abstractmethod
     def get_V(self):
         pass
@@ -87,12 +96,12 @@ class SiestaNXC(NXCAdapter):
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
-        rho_reshaped = rho.reshape(*grid[::-1]).T
         self._adaptee.initialize(unitcell, grid, positions, elements)
         use_drho = False
         if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
             use_drho = True
             print('NeuralXC: Using DRHO')
+            rho_reshaped = rho.reshape(*grid[::-1]).T
             self._adaptee.projector = DeltaProjector(self._adaptee.projector)
             self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
         else:
@@ -252,7 +261,7 @@ class NeuralXC():
             V = [0, np.zeros_like(self.positions)]
         else:
             V = 0
-        if not self._pipeline.steps[-1][1].allows_threading or self.max_workers == 1 or calc_forces:
+        if self.max_workers == 1 or calc_forces:
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
             D = self.symmetrizer.get_symmetrized(C)
             E = self._pipeline.predict(D)[0]
