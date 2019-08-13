@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 from periodictable import elements as element_dict
-
+from .timer import timer
 
 def prints_error(method):
     """ Decorator:forpy only prints stdout, no error messages,
@@ -219,7 +219,12 @@ class NeuralXC():
         self.species = species
         self.projector = DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
 
-    def _get_v_thread(self, rho, positions, species, calc_forces=False):
+    def _get_v_thread(self, dEdC, rho, positions, species, calc_forces=False):
+        # print(positions, species)
+        V = self.projector.get_V(dEdC, positions, species, calc_forces, rho)
+        return V
+
+    def _get_e_thread(self, rho, positions, species):
         # print(positions, species)
         positions = positions.reshape(-1, 3)
         species = [species]
@@ -228,8 +233,7 @@ class NeuralXC():
         E = self._pipeline.predict(D)[0]
         dEdD = self._pipeline.get_gradient(D)
         dEdC = self.symmetrizer.get_gradient(dEdD, C)
-        V = self.projector.get_V(dEdC, positions, species, calc_forces, rho)
-        return E, V
+        return E, dEdC
 
     @prints_error
     def get_V(self, rho, calc_forces=False):
@@ -258,28 +262,61 @@ class NeuralXC():
 
         E = 0
         if calc_forces:
-            V = [0, np.zeros_like(self.positions)]
+            timer.start('get_V_forces')
+            V = [0, np.zeros([len(self.positions)+3,3])]
         else:
+            timer.start('get_V')
             V = 0
         if self.max_workers == 1 or calc_forces:
+            timer.start('project')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
+            timer.stop('project')
+            timer.start('ml_pipeline')
             D = self.symmetrizer.get_symmetrized(C)
             E = self._pipeline.predict(D)[0]
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
+            timer.stop('ml_pipeline')
+            timer.start('build_V')
             V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
+            timer.stop('build_V')
         else:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_rep = {
-                    executor.submit(self._get_v_thread, rho, position, spec, calc_forces): spec
+                    executor.submit(self._get_e_thread, rho, position, spec): spec
                     for position, spec in zip(self.positions, self.species)
                 }
 
+                dEdC = []
                 for i, future in enumerate(future_to_rep):
                     results = future.result()
                     E += results[0]
-                    if calc_forces:
-                        V[0] += results[1][0]
-                        V[1][i:i + 1] += results[1][1]
-                    else:
-                        V += results[1]
+                    dEdC.append(results[1])
+
+                if not calc_forces:
+                    dEdC = np.array(dEdC)
+                    future_to_rep = {
+                        executor.submit(self.projector.get_V, dedc, position.reshape(-1,3), [spec], calc_forces, rho): spec
+                        for dedc, position, spec in zip(dEdC,self.positions, self.species)
+                    }
+                    for i, future in enumerate(future_to_rep):
+                        results = future.result()
+                        V += results
+                else:
+                    dEdC_dict = {}
+                    for entry in dEdC:
+                        for spec in entry:
+                            if not spec in dEdC_dict:
+                                dEdC_dist[spec] = []
+                            dEdC_dict[spec].append(entry)
+                    for spec in dEdC_dict:
+                        assert dEdC_dict[spec].ndim == 3
+                        dEdC_dict[spec] = np.concatenate(dEdC_dict[spec], axis = 1)
+
+                    V = self.projector.get_V(dEdC_dict , self.positions, self.species, calc_forces, rho)
+
+
+        if calc_forces:
+            timer.create_report('NXC_TIMING')
+        else:
+            timer.stop('get_V')
         return E, V

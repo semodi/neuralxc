@@ -10,7 +10,7 @@ from ..doc_inherit import doc_inherit
 from spher_grad import grlylm
 from ..base import ABCRegistry
 from numba import jit
-
+from ..timer import timer
 
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
@@ -109,6 +109,7 @@ class DensityProjector(BaseProjector):
         self.a = a
         self.basis = basis_instructions
         self.W = W
+        self.all_angs = {}
 
     def __getattr__(self, attr):
         return getattr(self.projector, attr)
@@ -121,10 +122,17 @@ class DensityProjector(BaseProjector):
             if not spec in basis_rep:
                 basis_rep[spec] = []
 
+            idx = '{}{}{}{}'.format(spec,pos[0],pos[1],pos[2])
+            if not idx in self.all_angs:
+                print('NEURALXC: Wrong allocation, recalculating for {}'.format(idx))
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
+            projection, angs = self.project(rho, box, basis, self.W[spec],
+                angs=self.all_angs.get(idx,None))
 
-            basis_rep[spec].append(self.project(rho, box, basis, self.W[spec]))
+            basis_rep[spec].append(projection)
+
+            self.all_angs[idx] = angs
 
         for spec in basis_rep:
             basis_rep[spec] = np.concatenate(basis_rep[spec], axis=0)
@@ -144,6 +152,9 @@ class DensityProjector(BaseProjector):
             box = self.box_around(pos, basis['r_o'])
 
             basis_rep[spec].append(self.project(rho, box, basis, self.W[spec], True))
+
+            basis_rep[spec].append(projection)
+            self.all_angs.append(angs)
 
         return basis_rep
 
@@ -165,12 +176,14 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            V[tuple(box['mesh'])] += self.build(coeffs, box, basis, self.W[spec])
-
+            idx = '{}{}{}{}'.format(spec,pos[0],pos[1],pos[2])
+            V[tuple(box['mesh'])] += self.build(coeffs, box, basis, self.W[spec],
+                angs=self.all_angs.get(idx,None))
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.get_force_correction(rho, coeffs, box, basis, self.W[spec])
+                force_corrections[i] = self.get_force_correction(rho, coeffs, box,
+                    basis, self.W[spec],angs=self.all_angs.get(idx,None))
 
         stress_correction = np.einsum('ij,ik-> jk', force_corrections, positions)
 
@@ -203,7 +216,7 @@ class DensityProjector(BaseProjector):
         """
         return sph_harm(m, l, phi, theta)
 
-    def get_force_correction(self, rho, coeffs, box, basis, W=None):
+    def get_force_correction(self, rho, coeffs, box, basis, W=None, angs=None):
         """ Calculate the contribution to the forces that arises from the
         dependence of the (nxc-)basis set on the atomic positions
 
@@ -240,12 +253,13 @@ class DensityProjector(BaseProjector):
         X, Y, Z = box['real']
 
         #Build angular part of basis functions
-        angs = []
-        for l in range(n_l):
-            angs.append([])
-            for m in range(-l, l + 1):
-                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(self.angulars(l, m, Theta, Phi))
+        if not isinstance(angs, list):
+            angs = []
+            for l in range(n_l):
+                angs.append([])
+                for m in range(-l, l + 1):
+                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                    angs[l].append(self.angulars(l, m, Theta, Phi))
 
         # Derivatives of spherical harmonic
         M = M_make_complex(n_l)
@@ -298,7 +312,7 @@ class DensityProjector(BaseProjector):
             force[ix] = np.sum(rho * v.real) * self.V_cell
         return force
 
-    def build(self, coeffs, box, basis, W=None):
+    def build(self, coeffs, box, basis, W=None, angs= None):
         """ Build the contribution from this atom to the potential V in a
         provided bounding box
 
@@ -334,31 +348,40 @@ class DensityProjector(BaseProjector):
         # Automatically detect whether entire charge density or only surrounding
         # box was provided
 
+        timer.start('build:basis_functions')
+        timer.start('build:basis_functions:angular')
         #Build angular part of basis functions
-        angs = []
-        for l in range(n_l):
-            angs.append([])
-            for m in range(-l, l + 1):
-                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(self.angulars(l, m, Theta, Phi))
+        if not isinstance(angs, list):
+            angs = []
+            for l in range(n_l):
+                angs.append([])
+                for m in range(-l, l + 1):
+                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                    angs[l].append(self.angulars(l, m, Theta, Phi))
 
+        timer.stop('build:basis_functions:angular')
+        timer.start('build:basis_functions:radial')
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
+        timer.stop('build:basis_functions:radial')
         v = np.zeros_like(Xm, dtype=complex)
         idx = 0
 
+        timer.stop('build:basis_functions')
+        timer.start('build:build')
         for n in range(n_rad):
             for l in range(n_l):
                 for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
+        timer.stop('build:build')
         return v
 
-    def project(self, rho, box, basis, W=None, return_dict=False):
+    def project(self, rho, box, basis, W=None, return_dict=False, angs = None):
         '''
             Project the real space density rho onto a set of basis functions
 
@@ -397,13 +420,15 @@ class DensityProjector(BaseProjector):
         else:
             small_rho = False
 
+        timer.start('project:basis_functions')
         #Build angular part of basis functions
-        angs = []
-        for l in range(n_l):
-            angs.append([])
-            for m in range(-l, l + 1):
-                # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                angs[l].append(sph_harm(m, l, Phi, Theta))
+        if not isinstance(angs, list):
+            angs = []
+            for l in range(n_l):
+                angs.append([])
+                for m in range(-l, l + 1):
+                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
+                    angs[l].append(sph_harm(m, l, Phi, Theta))
 
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
@@ -411,6 +436,8 @@ class DensityProjector(BaseProjector):
 
         rads = self.radials(R, basis, W)
 
+        timer.stop('project:basis_functions')
+        timer.start('project:project')
         coeff = []
         coeff_dict = {}
         if small_rho:
@@ -426,10 +453,11 @@ class DensityProjector(BaseProjector):
                         coeff.append(np.sum(angs[l][m] * rads[n] * rho[Xm, Ym, Zm]) * self.V_cell)
                         coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
 
+        timer.stop('project:project')
         if return_dict:
-            return coeff_dict
+            return coeff_dict, angs
         else:
-            return np.array(coeff).reshape(1, -1)
+            return np.array(coeff).reshape(1, -1), angs
 
     def box_around(self, pos, radius):
         '''
@@ -446,9 +474,8 @@ class DensityProjector(BaseProjector):
                 {'mesh','real','radial'}, box in mesh,
                 euclidean and spherical coordinates
         '''
-
         if pos.shape != (1, 3) and (pos.ndim != 1 or len(pos) != 3):
-            raise Exception('please provide only one point for pos')
+            raise Exception('please provide only one point for pos. shape = {}'.format(pos.shape))
 
         pos = pos.flatten()
 
