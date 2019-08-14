@@ -78,6 +78,8 @@ class NXCAdapter(ABC):
         for key in options:
             if key == 'max_workers':
                 workers = options[key]
+        if workers > 1:
+            timer.threaded = True
         self._adaptee.max_workers = int(workers)
 
         print('NeuralXC: Using {} thread(s)'.format(self._adaptee.max_workers))
@@ -267,7 +269,7 @@ class NeuralXC():
         else:
             timer.start('get_V')
             V = 0
-        if self.max_workers == 1 or calc_forces:
+        if self.max_workers == 1:
             timer.start('project')
             C = self.projector.get_basis_rep(rho, self.positions, self.species)
             timer.stop('project')
@@ -306,10 +308,9 @@ class NeuralXC():
                     for entry in dEdC:
                         for spec in entry:
                             if not spec in dEdC_dict:
-                                dEdC_dist[spec] = []
-                            dEdC_dict[spec].append(entry)
+                                dEdC_dict[spec] = []
+                            dEdC_dict[spec].append(entry[spec])
                     for spec in dEdC_dict:
-                        assert dEdC_dict[spec].ndim == 3
                         dEdC_dict[spec] = np.concatenate(dEdC_dict[spec], axis = 1)
 
                     V = self.projector.get_V(dEdC_dict , self.positions, self.species, calc_forces, rho)

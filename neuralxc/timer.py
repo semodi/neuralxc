@@ -20,28 +20,33 @@ class Timer():
         self.cnt_dict = {'master' : 1}
         self.accum_dict = {}
         self.path = 'NXC_TIMING'
+        self.threaded = False
 
-    def start(self, name):
-        if name in self.cnt_dict:
-            self.cnt_dict[name] +=1
-        else:
-            self.cnt_dict[name] = 1
+    def start(self, name, threadsafe=True):
 
-        if not name in self.start_dict:
-            self.start_dict[name] = time.time()
-
-
-
-    def stop(self, name):
-        if name in self.start_dict:
-            if name in self.accum_dict:
-                self.accum_dict[name] += time.time() - self.start_dict[name]
+        if not (self.threaded and not threadsafe):
+            if name in self.cnt_dict:
+                self.cnt_dict[name] +=1
             else:
-                self.accum_dict[name] = time.time() - self.start_dict[name]
+                self.cnt_dict[name] = 1
 
-            self.start_dict.pop(name)
-        else:
-            raise ValueError('Timer with name {} was never started'.format(name))
+            if not name in self.start_dict:
+                self.start_dict[name] = time.time()
+
+
+
+    def stop(self, name, threadsafe=True):
+
+        if not (self.threaded and not threadsafe):
+            if name in self.start_dict:
+                if name in self.accum_dict:
+                    self.accum_dict[name] += time.time() - self.start_dict[name]
+                else:
+                    self.accum_dict[name] = time.time() - self.start_dict[name]
+
+                self.start_dict.pop(name)
+            else:
+                raise ValueError('Timer with name {} was never started'.format(name))
 
     def create_report(self,path = None):
         keys = list(self.start_dict.keys())
@@ -58,5 +63,5 @@ class Timer():
         else:
             print(report)
 
-#timer = Timer()
-timer = DummyTimer()
+timer = Timer()
+#timer = DummyTimer()

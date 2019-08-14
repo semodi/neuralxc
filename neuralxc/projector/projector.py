@@ -252,6 +252,7 @@ class DensityProjector(BaseProjector):
         Xm, Ym, Zm = box['mesh']
         X, Y, Z = box['real']
 
+        timer.start('force:basis_functions:angular')
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -261,20 +262,29 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
+        timer.stop('force:basis_functions:angular')
+        timer.start('force:basis_functions:dangular')
         # Derivatives of spherical harmonic
+        timer.start('force:basis_functions:dangular:before')
         M = M_make_complex(n_l)
-        dangs = []
-        for l in range(n_l**2):
-            dangs.append(np.zeros([len(X.flatten()), 3]))
+        dangs = np.zeros([3, n_l**2, len(X.flatten())])
 
+        timer.stop('force:basis_functions:dangular:before')
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
-            vecspher = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
-            for il, vs in enumerate(vecspher.T):
-                dangs[il][ir] = vs
+            timer.start('force:basis_functions:dangular:grlylm')
+            dangs[:,:,ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
+            timer.stop('force:basis_functions:dangular:grlylm')
 
-        dangs = np.einsum('ij,jkl -> ikl', M, np.array(dangs))
+        timer.start('force:basis_functions:dangular:after')
+        timer.start('force:basis_functions:dangular:einsum')
+        dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
 
+        timer.stop('force:basis_functions:dangular:einsum')
         dangs = dangs.reshape(len(dangs), *X.shape, 3)
+
+        timer.stop('force:basis_functions:dangular:after')
+        timer.stop('force:basis_functions:dangular')
+        timer.start('force:basis_functions:radial')
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
@@ -292,6 +302,9 @@ class DensityProjector(BaseProjector):
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
 
+        timer.stop('force:basis_functions:radial')
+
+        timer.start('force:integrals')
         for ix in range(3):
             v = np.zeros_like(rho, dtype=complex)
             idx_coeff = 0
@@ -310,6 +323,7 @@ class DensityProjector(BaseProjector):
                         idx_coeff += 1
             assert np.allclose(v.imag, np.zeros_like(v))
             force[ix] = np.sum(rho * v.real) * self.V_cell
+        timer.stop('force:integrals')
         return force
 
     def build(self, coeffs, box, basis, W=None, angs= None):
@@ -348,8 +362,8 @@ class DensityProjector(BaseProjector):
         # Automatically detect whether entire charge density or only surrounding
         # box was provided
 
-        timer.start('build:basis_functions')
-        timer.start('build:basis_functions:angular')
+        timer.start('build:basis_functions',False)
+        timer.start('build:basis_functions:angular',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -359,26 +373,26 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
-        timer.stop('build:basis_functions:angular')
-        timer.start('build:basis_functions:radial')
+        timer.stop('build:basis_functions:angular',False)
+        timer.start('build:basis_functions:radial',False)
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('build:basis_functions:radial')
+        timer.stop('build:basis_functions:radial',False)
         v = np.zeros_like(Xm, dtype=complex)
         idx = 0
 
-        timer.stop('build:basis_functions')
-        timer.start('build:build')
+        timer.stop('build:basis_functions',False)
+        timer.start('build:build',False)
         for n in range(n_rad):
             for l in range(n_l):
                 for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
-        timer.stop('build:build')
+        timer.stop('build:build',False)
         return v
 
     def project(self, rho, box, basis, W=None, return_dict=False, angs = None):
@@ -420,7 +434,7 @@ class DensityProjector(BaseProjector):
         else:
             small_rho = False
 
-        timer.start('project:basis_functions')
+        timer.start('project:basis_functions',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -436,8 +450,8 @@ class DensityProjector(BaseProjector):
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('project:basis_functions')
-        timer.start('project:project')
+        timer.stop('project:basis_functions',False)
+        timer.start('project:project',False)
         coeff = []
         coeff_dict = {}
         if small_rho:
@@ -453,7 +467,7 @@ class DensityProjector(BaseProjector):
                         coeff.append(np.sum(angs[l][m] * rads[n] * rho[Xm, Ym, Zm]) * self.V_cell)
                         coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
 
-        timer.stop('project:project')
+        timer.stop('project:project',False)
         if return_dict:
             return coeff_dict, angs
         else:
