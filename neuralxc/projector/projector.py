@@ -252,7 +252,6 @@ class DensityProjector(BaseProjector):
         Xm, Ym, Zm = box['mesh']
         X, Y, Z = box['real']
 
-        timer.start('force:basis_functions:angular')
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -262,27 +261,18 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
-        timer.stop('force:basis_functions:angular')
         timer.start('force:basis_functions:dangular')
         # Derivatives of spherical harmonic
-        timer.start('force:basis_functions:dangular:before')
         M = M_make_complex(n_l)
         dangs = np.zeros([3, n_l**2, len(X.flatten())])
 
-        timer.stop('force:basis_functions:dangular:before')
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
-            timer.start('force:basis_functions:dangular:grlylm')
             dangs[:,:,ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
-            timer.stop('force:basis_functions:dangular:grlylm')
 
-        timer.start('force:basis_functions:dangular:after')
-        timer.start('force:basis_functions:dangular:einsum')
         dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
 
-        timer.stop('force:basis_functions:dangular:einsum')
         dangs = dangs.reshape(len(dangs), *X.shape, 3)
 
-        timer.stop('force:basis_functions:dangular:after')
         timer.stop('force:basis_functions:dangular')
         timer.start('force:basis_functions:radial')
         #Build radial part of b.f.
@@ -305,6 +295,15 @@ class DensityProjector(BaseProjector):
         timer.stop('force:basis_functions:radial')
 
         timer.start('force:integrals')
+
+        timer.start('force:integrals:precomp')
+        # Precomputing common factors in loops below (saves factor 3 comp. time)
+        RtoL = [R**l for l in range(n_l)]
+        radbyrl = [[rads[n]/RtoL[l] for l in range(n_l)] for n in range(n_rad)]
+        vmult0 = [[(drads[n] - l*radsr[n]) for l in range(n_l)] for n in range(n_rad)]
+        vmult = [[[angs[l][m] * vmult0[n][l] for m in range(2 * l +1)] for l in range(n_l)] for n in range(n_rad)]
+        timer.stop('force:integrals:precomp')
+
         for ix in range(3):
             v = np.zeros_like(rho, dtype=complex)
             idx_coeff = 0
@@ -312,16 +311,12 @@ class DensityProjector(BaseProjector):
                 idx_l = 0
                 for l in range(n_l):
                     for m in range(2 * l + 1):
-                        v2 = (rads[n] / (R**l) * dangs[idx_l, :, :, :, ix])
-                        v2[R < 1e-15] = 0
-                        v += coeffs[idx_coeff] *\
-                        (\
-                        (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
-                        v2\
-                        )
+                        v2 = (radbyrl[n][l] * dangs[idx_l, :, :, :, ix])
+                        v += coeffs[idx_coeff] * ((vmult[n][l][m] * rhat[ix]) + v2)
                         idx_l += 1
                         idx_coeff += 1
-            assert np.allclose(v.imag, np.zeros_like(v))
+
+            # assert np.allclose(v.imag, np.zeros_like(v))
             force[ix] = np.sum(rho * v.real) * self.V_cell
         timer.stop('force:integrals')
         return force
