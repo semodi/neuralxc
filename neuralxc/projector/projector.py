@@ -387,6 +387,13 @@ class DensityProjector(BaseProjector):
                 for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
+
+
+        # coeffs_rs = coeffs.reshape(n_rad,n_l**2)
+        # angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
+        # rads = np.array(rads)
+        #
+        # v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads, optimize=False)
         timer.stop('build:build',False)
         return v
 
@@ -447,20 +454,28 @@ class DensityProjector(BaseProjector):
 
         timer.stop('project:basis_functions',False)
         timer.start('project:project',False)
+
+        if not small_rho:
+            srho = rho[Xm,Ym,Zm]
+
+        #zero_pad_angs (so that it can be converted to numpy array):
+        zeropad = np.zeros_like(Xm)
+        angs_padded = []
+        for l in range(n_l):
+            angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
+        angs_padded = np.array(angs_padded)
+
+
+        rads = np.array(rads) * self.V_cell
+        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm',angs_padded,rads,srho,optimize=True)
         coeff = []
-        coeff_dict = {}
-        if small_rho:
-            for n in range(n_rad):
-                for l in range(n_l):
-                    for m in range(2 * l + 1):
-                        coeff.append(np.sum(angs[l][m] * rads[n] * rho) * self.V_cell)
-                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
-        else:
-            for n in range(n_rad):
-                for l in range(n_l):
-                    for m in range(2 * l + 1):
-                        coeff.append(np.sum(angs[l][m] * rads[n] * rho[Xm, Ym, Zm]) * self.V_cell)
-                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
+
+        #remove zero padding from m
+        for n in range(n_rad):
+            for l in range(n_l):
+                for m in range(2 * n_l + 1):
+                    if abs(m-n_l) <= l:
+                        coeff.append(coeff_array[n,l,m])
 
         timer.stop('project:project',False)
         if return_dict:
