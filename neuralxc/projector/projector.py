@@ -261,20 +261,20 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
+        timer.start('force:basis_functions:dangular')
         # Derivatives of spherical harmonic
         M = M_make_complex(n_l)
-        dangs = []
-        for l in range(n_l**2):
-            dangs.append(np.zeros([len(X.flatten()), 3]))
+        dangs = np.zeros([3, n_l**2, len(X.flatten())])
 
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
-            vecspher = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
-            for il, vs in enumerate(vecspher.T):
-                dangs[il][ir] = vs
+            dangs[:,:,ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
 
-        dangs = np.einsum('ij,jkl -> ikl', M, np.array(dangs))
+        dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
 
         dangs = dangs.reshape(len(dangs), *X.shape, 3)
+
+        timer.stop('force:basis_functions:dangular')
+        timer.start('force:basis_functions:radial')
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
@@ -292,6 +292,18 @@ class DensityProjector(BaseProjector):
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
 
+        timer.stop('force:basis_functions:radial')
+
+        timer.start('force:integrals')
+
+        timer.start('force:integrals:precomp')
+        # Precomputing common factors in loops below (saves factor 3 comp. time)
+        RtoL = [R**l for l in range(n_l)]
+        radbyrl = [[rads[n]/RtoL[l] for l in range(n_l)] for n in range(n_rad)]
+        vmult0 = [[(drads[n] - l*radsr[n]) for l in range(n_l)] for n in range(n_rad)]
+        vmult = [[[angs[l][m] * vmult0[n][l] for m in range(2 * l +1)] for l in range(n_l)] for n in range(n_rad)]
+        timer.stop('force:integrals:precomp')
+
         for ix in range(3):
             v = np.zeros_like(rho, dtype=complex)
             idx_coeff = 0
@@ -299,17 +311,14 @@ class DensityProjector(BaseProjector):
                 idx_l = 0
                 for l in range(n_l):
                     for m in range(2 * l + 1):
-                        v2 = (rads[n] / (R**l) * dangs[idx_l, :, :, :, ix])
-                        v2[R < 1e-15] = 0
-                        v += coeffs[idx_coeff] *\
-                        (\
-                        (angs[l][m] * (drads[n] - l*radsr[n]) * rhat[ix]) + \
-                        v2\
-                        )
+                        v2 = (radbyrl[n][l] * dangs[idx_l, :, :, :, ix])
+                        v += coeffs[idx_coeff] * ((vmult[n][l][m] * rhat[ix]) + v2)
                         idx_l += 1
                         idx_coeff += 1
-            assert np.allclose(v.imag, np.zeros_like(v))
+
+            # assert np.allclose(v.imag, np.zeros_like(v))
             force[ix] = np.sum(rho * v.real) * self.V_cell
+        timer.stop('force:integrals')
         return force
 
     def build(self, coeffs, box, basis, W=None, angs= None):
@@ -348,8 +357,8 @@ class DensityProjector(BaseProjector):
         # Automatically detect whether entire charge density or only surrounding
         # box was provided
 
-        timer.start('build:basis_functions')
-        timer.start('build:basis_functions:angular')
+        timer.start('build:basis_functions',False)
+        timer.start('build:basis_functions:angular',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -359,26 +368,33 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
-        timer.stop('build:basis_functions:angular')
-        timer.start('build:basis_functions:radial')
+        timer.stop('build:basis_functions:angular',False)
+        timer.start('build:basis_functions:radial',False)
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('build:basis_functions:radial')
+        timer.stop('build:basis_functions:radial',False)
         v = np.zeros_like(Xm, dtype=complex)
         idx = 0
 
-        timer.stop('build:basis_functions')
-        timer.start('build:build')
+        timer.stop('build:basis_functions',False)
+        timer.start('build:build',False)
         for n in range(n_rad):
             for l in range(n_l):
                 for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
-        timer.stop('build:build')
+
+
+        # coeffs_rs = coeffs.reshape(n_rad,n_l**2)
+        # angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
+        # rads = np.array(rads)
+        #
+        # v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads, optimize=False)
+        timer.stop('build:build',False)
         return v
 
     def project(self, rho, box, basis, W=None, return_dict=False, angs = None):
@@ -420,7 +436,7 @@ class DensityProjector(BaseProjector):
         else:
             small_rho = False
 
-        timer.start('project:basis_functions')
+        timer.start('project:basis_functions',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -436,24 +452,32 @@ class DensityProjector(BaseProjector):
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('project:basis_functions')
-        timer.start('project:project')
-        coeff = []
-        coeff_dict = {}
-        if small_rho:
-            for n in range(n_rad):
-                for l in range(n_l):
-                    for m in range(2 * l + 1):
-                        coeff.append(np.sum(angs[l][m] * rads[n] * rho) * self.V_cell)
-                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
-        else:
-            for n in range(n_rad):
-                for l in range(n_l):
-                    for m in range(2 * l + 1):
-                        coeff.append(np.sum(angs[l][m] * rads[n] * rho[Xm, Ym, Zm]) * self.V_cell)
-                        coeff_dict['{},{},{}'.format(n, l, m - l)] = coeff[-1]
+        timer.stop('project:basis_functions',False)
+        timer.start('project:project',False)
 
-        timer.stop('project:project')
+        if not small_rho:
+            srho = rho[Xm,Ym,Zm]
+
+        #zero_pad_angs (so that it can be converted to numpy array):
+        zeropad = np.zeros_like(Xm)
+        angs_padded = []
+        for l in range(n_l):
+            angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
+        angs_padded = np.array(angs_padded)
+
+
+        rads = np.array(rads) * self.V_cell
+        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm',angs_padded,rads,srho,optimize=True)
+        coeff = []
+
+        #remove zero padding from m
+        for n in range(n_rad):
+            for l in range(n_l):
+                for m in range(2 * n_l + 1):
+                    if abs(m-n_l) <= l:
+                        coeff.append(coeff_array[n,l,m])
+
+        timer.stop('project:project',False)
         if return_dict:
             return coeff_dict, angs
         else:
