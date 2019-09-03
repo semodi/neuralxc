@@ -22,7 +22,6 @@ import pickle
 import shutil
 from .activation import get_activation
 import copy
-import tensorflow as tf
 # import tensorflow
 Dataset = namedtuple("Dataset", "data species")
 
@@ -339,6 +338,7 @@ class NetworkEstimator(BaseEstimator):
         """ Estimator wrapper for the tensorflow based Network class which
         implements a Behler-Parinello type neural network
         """
+        import tensorflow as tf
         self.n_nodes = n_nodes
         self.n_layers = n_layers
         self.b = b
@@ -546,6 +546,7 @@ class Energy_Network():
 
     def __init__(self, subnets):
 
+        import tensorflow as tf
         if not isinstance(subnets, list):
             self.subnets = [subnets]
         else:

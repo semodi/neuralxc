@@ -92,7 +92,7 @@ class DensityProjector(BaseProjector):
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
-            if len(species) == 1:
+            if len(species) < 3:
                 W[species] = self.get_W(basis_instructions[species])
 
         # Determine unitcell constants
