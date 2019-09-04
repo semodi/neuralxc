@@ -203,10 +203,7 @@ class NeuralXC():
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
         self.max_workers = 1
         if symmetrize_dict['basis'].get('spec_agnostic',False):
-            print('Species agnostic')
             element_dict = agnostic_dict
-        else:
-            print('Not species agnostic')
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error

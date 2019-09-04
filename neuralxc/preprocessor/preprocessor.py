@@ -17,16 +17,13 @@ from dask.distributed import Client, LocalCluster
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):
+
     def __init__(self, basis_instructions, src_path, traj_path, target_path, num_workers=1):
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.traj_path = traj_path
         self.computed_basis = {}
         self.num_workers = num_workers
-        if self.basis_instructions.get('spec_agnostic',False):
-            self.get_chemical_symbols = (lambda x: return ['X'] * len(x.get_chemical_symbols()))
-        else:
-            self.get_chemical_symbols = (lambda x: return x.get_chemical_symbols())
 
     def fit(self, X=None, y=None, **kwargs):
         self.client = kwargs.get('client', None)
@@ -70,6 +67,13 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
     def get_basis_rep(self):
 
+        if self.basis_instructions.get('spec_agnostic', False):
+            print('Agnostic')
+            self.get_chemical_symbols = ( lambda x:  ['X'] * len(x.get_chemical_symbols()))
+        else:
+            print('Not Agnostic')
+            self.get_chemical_symbols =( lambda x:  x.get_chemical_symbols())
+
         if self.num_workers > 1:
             cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
             print(cluster)
@@ -88,6 +92,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         if extension[0] != '.':
             extension = '.' + extension
 
+        print('Extension', extension)
         jobs = []
         for i, system in enumerate(atoms):
             filename = ''
