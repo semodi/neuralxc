@@ -109,7 +109,6 @@ if __name__ == '__main__':
         help='Derive pipeline from -model and only fit final estimator, to be able to build\
     an ensemble of estimators later on')
     fit.add_argument('-hyperopt', action='store_true', help='Do a hyperparameter optimzation')
-    fit.add_argument('-spec_agnostic', action='store_true', help='Train a species agnostic model')
     fit.set_defaults(func=fit_driver)
 
     # ============= Workflow ====================
@@ -149,8 +148,6 @@ if __name__ == '__main__':
         help='Build new model on top of model0 as a stacked estimator')
     wf.add_argument(
         '-fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
-    wf.add_argument(
-        '-spec_agnostic', action='store_true', help='Train a species agnostic model')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================

@@ -21,6 +21,9 @@ import traceback
 from periodictable import elements as element_dict
 from .timer import timer
 
+
+agnostic_dict = {i :'X' for i in np.arange(500)}
+
 def prints_error(method):
     """ Decorator:forpy only prints stdout, no error messages,
     therefore print each error message to stdout instead
@@ -185,7 +188,7 @@ class SiestaNXC(NXCAdapter):
 class NeuralXC():
     @prints_error
     def __init__(self, path=None, pipeline=None):
-
+        global element_dict
         print('NeuralXC: Instantiate NeuralXC')
         if isinstance(path, str):
             print('NeuralXC: Load pipeline from ' + path)
@@ -199,6 +202,11 @@ class NeuralXC():
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
         self.max_workers = 1
+        if symmetrize_dict['basis'].get('spec_agnostic',False):
+            print('Species agnostic')
+            element_dict = agnostic_dict
+        else:
+            print('Not species agnostic')
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error

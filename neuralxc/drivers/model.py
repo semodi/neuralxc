@@ -193,8 +193,7 @@ def workflow_driver(args):
                    model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
-                   hyperopt=True,
-                   spec_agnostic=args.spec_agnostic))
+                   hyperopt=True))
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(SN(tf='best_model', np='merged_new'))
             os.chdir('../')
@@ -248,8 +247,7 @@ def workflow_driver(args):
                    model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
-                   hyperopt=True,
-                   spec_agnostic=args.spec_agnostic))
+                   hyperopt=True))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(SN(tf='best_model', np='merged_new'))
@@ -321,8 +319,7 @@ def workflow_driver(args):
                    model='chained',
                    ensemble=False,
                    sets='sets.inp',
-                   hyperopt=True,
-                   spec_agnostic=args.spec_agnostic))
+                   hyperopt=True))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             if statistics_fit['mae'] > statistics_sc['mae']:
@@ -403,7 +400,7 @@ def fit_driver(args):
             apply_to.append(pidx)
             hdf5[1][pidx] = path[1:]
 
-    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic= args.spec_agnostic)
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic= pre['basis'].get('spec_agnostic', False))
     if mask: return 0
 
     new_model = grid_cv.estimator

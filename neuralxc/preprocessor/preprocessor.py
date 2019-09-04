@@ -14,6 +14,8 @@ import json
 from dask.distributed import Client, LocalCluster
 
 
+
+
 class Preprocessor(TransformerMixin, BaseEstimator):
     def __init__(self, basis_instructions, src_path, traj_path, target_path, num_workers=1):
         self.basis_instructions = basis_instructions
@@ -21,6 +23,10 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         self.traj_path = traj_path
         self.computed_basis = {}
         self.num_workers = num_workers
+        if self.basis_instructions.get('spec_agnostic',False):
+            self.get_chemical_symbols = (lambda x: return ['X'] * len(x.get_chemical_symbols()))
+        else:
+            self.get_chemical_symbols = (lambda x: return x.get_chemical_symbols())
 
     def fit(self, X=None, y=None, **kwargs):
         self.client = kwargs.get('client', None)
@@ -31,7 +37,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         self.data = basis_rep
         self.computed_basis = self.basis_instructions
 
-        unique_systems = np.array([''.join(a.get_chemical_symbols()) for a in self.atoms])
+        unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis = 0)
 
         # === Padding ===
@@ -39,7 +45,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         #Find padded width of data
         width = {}
         for dat, atoms in zip(self.data,self.atoms):
-            width[''.join(atoms.get_chemical_symbols())] = len(dat)
+            width[''.join(self.get_chemical_symbols(atoms))] = len(dat)
         #Sanity check
         assert len(unique_systems) == len(width)
         paddedwidth = sum([width[key] for key in width])
@@ -53,7 +59,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
 
         for lidx, (dat, atoms) in enumerate(zip(self.data, self.atoms)):
-            syskey = ''.join(atoms.get_chemical_symbols())
+            syskey = ''.join(self.get_chemical_symbols(atoms))
             padded_data[lidx,
                 paddedoffset[syskey]:paddedoffset[syskey]+len(dat)] = dat
 
@@ -96,7 +102,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             jobs.append(
                 [pjoin(self.src_path, str(i), filename),
                  system.get_positions() / Bohr,
-                 system.get_chemical_symbols()])
+                 self.get_chemical_symbols(system)])
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
         futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)],
                              len(jobs) * [self.basis_instructions])
