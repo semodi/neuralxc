@@ -193,7 +193,8 @@ def workflow_driver(args):
                    model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
-                   hyperopt=True))
+                   hyperopt=True,
+                   spec_agnostic=args.spec_agnostic))
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(SN(tf='best_model', np='merged_new'))
             os.chdir('../')
@@ -247,7 +248,8 @@ def workflow_driver(args):
                    model=model0,
                    ensemble=ensemble,
                    sets='sets.inp',
-                   hyperopt=True))
+                   hyperopt=True,
+                   spec_agnostic=args.spec_agnostic))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(SN(tf='best_model', np='merged_new'))
@@ -319,7 +321,8 @@ def workflow_driver(args):
                    model='chained',
                    ensemble=False,
                    sets='sets.inp',
-                   hyperopt=True))
+                   hyperopt=True,
+                   spec_agnostic=args.spec_agnostic))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             if statistics_fit['mae'] > statistics_sc['mae']:
@@ -400,7 +403,7 @@ def fit_driver(args):
             apply_to.append(pidx)
             hdf5[1][pidx] = path[1:]
 
-    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask)
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic= args.spec_agnostic)
     if mask: return 0
 
     new_model = grid_cv.estimator
@@ -587,9 +590,11 @@ def eval_driver(args):
         if args.predict:
             raise Exception('Must provide a model to make predictions')
         dev = data[:, -1].real
-        predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
-        targets = load_sets(datafile, hdf5[2], hdf5[2], basis_key, cutoff)[:,-1].flatten()
+        # predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
+        # targets = load_sets(datafile, hdf5[2], hdf5[2], basis_key, cutoff)[:,-1].flatten()
 
+        predictions = datafile[hdf5[1] +'/energy'][:]
+        targets = datafile[hdf5[2] +'/energy'][:]
         try:
             force_base = datafile[hdf5[1] +'/forces'][:]
             force_ref = datafile[hdf5[2] +'/forces'][:]
@@ -599,7 +604,7 @@ def eval_driver(args):
             results.update(force_results)
         except Exception:
             pass
-        
+
     dev0 = np.abs(dev - np.mean(dev))
     results.update({
         'mean deviation': np.mean(dev).round(4),

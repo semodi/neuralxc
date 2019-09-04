@@ -65,8 +65,26 @@ class Formatter(TransformerMixin, BaseEstimator):
             return transformed
 
 
+def fix_species(species, spec_agnostic=False):
+    """ Expects a list of strings containing the species.
+        Return a list of lists of single chars"""
+
+    fixed = []
+    for sys in species:
+        fixed.append([])
+        for spec in sys:
+            if spec_agnostic:
+                if spec.upper() == spec:
+                    fixed[-1].append('X')
+            else:
+                if spec.upper() == spec:
+                    fixed[-1].append(spec)
+                else:
+                    fixed[-1][-1] = fixed[-1][-1] + spec
+    return fixed
+
 class SpeciesGrouper(BaseEstimator, TransformerMixin):
-    def __init__(self, attrs, sys_species):
+    def __init__(self, attrs, sys_species, spec_agnostic=False):
         """SpeciesGrouper allows to transform an array with columns
         [system_idx, feature1, feature2, ..., featureN, target]
         to be transformed into an representation that is grouped by atomic species
@@ -85,9 +103,11 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             per system, order of species inside system
         """
         self._attrs = attrs
+        if spec_agnostic:
+            self._attrs['X'] = self._attrs[list(self._attrs.keys())[0]]
         if not isinstance(sys_species, list):
             raise ValueError('sys_species must be a list but is {}'.format(sys_species))
-        self._sys_species = sys_species
+        self._sys_species = fix_species(sys_species, spec_agnostic)
 
     def get_params(self, *args, **kwargs):
         return {'attrs': self._attrs, 'sys_species': self._sys_species}

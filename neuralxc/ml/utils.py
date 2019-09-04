@@ -276,14 +276,14 @@ def to_full_hyperparameters(hp, parameters):
     return full
 
 
-def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_threshold=1):
+def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_threshold=1, spec_agnostic=False):
     """
     Get the default pipeline containing symmetrizer, variance selector, pca, and
     the final NetworkEstimator
     """
     symmetrizer_instructions = {'basis': basis, 'symmetrizer_type': symmetrizer_type}
 
-    spec_group = SpeciesGrouper(basis, species)
+    spec_group = SpeciesGrouper(basis, species, spec_agnostic)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
     var_selector = GroupedVarianceThreshold(threshold=1e-10)
 
@@ -352,7 +352,7 @@ def get_basis_grid(preprocessor):
     return basis_grid
 
 
-def get_grid_cv(hdf5, preprocessor, inputfile, mask=False):
+def get_grid_cv(hdf5, preprocessor, inputfile, mask=False, spec_agnostic=False):
     if not mask:
         inp = json.loads(open(inputfile, 'r').read())
         pre = json.loads(open(preprocessor, 'r').read())
@@ -375,7 +375,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False):
     else:
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
         basis.update({'extension': 'DRHO'})
-    pipeline = get_default_pipeline(basis, all_species)
+    pipeline = get_default_pipeline(basis, all_species, spec_agnostic=spec_agnostic)
 
     if mask:
         params = {key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
