@@ -107,10 +107,12 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             self._attrs['X'] = self._attrs[list(self._attrs.keys())[0]]
         if not isinstance(sys_species, list):
             raise ValueError('sys_species must be a list but is {}'.format(sys_species))
-        self._sys_species = fix_species(sys_species, spec_agnostic)
+        self._sys_species = sys_species
+        self._spec_agnostic = spec_agnostic
 
     def get_params(self, *args, **kwargs):
-        return {'attrs': self._attrs, 'sys_species': self._sys_species}
+        return {'attrs': self._attrs, 'sys_species': self._sys_species,
+                'spec_agnostic': self._spec_agnostic}
 
     def fit(self, X, y=None, **fit_params):
         return self
@@ -118,6 +120,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         """ Transform from ungrouped to grouped represenation
         """
+        sys_species = fix_species(self._sys_species, self._spec_agnostic)
         made_dict = False
         if isinstance(X, dict):
             basis_instructions = X['basis_instructions']
@@ -140,13 +143,13 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         features = []
         targets = []
 
-        if not n_sys == len(self._sys_species):
+        if not n_sys == len(sys_species):
             raise ValueError(
                 'Number of systems in X and len(sys_species) incompatible: n_sys: {}, len(sys_species): {}'.format(
-                    n_sys, len(self._sys_species)))
+                    n_sys, len(sys_species)))
 
-        for this_sys, _ in enumerate(self._sys_species):
-            this_species = self._sys_species[this_sys]
+        for this_sys, _ in enumerate(sys_species):
+            this_species = sys_species[this_sys]
 
             X_sys = X[system == this_sys]
             y_sys = y[system == this_sys]
@@ -183,6 +186,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def inverse_transform(self, features, targets):
         """ Transform from grouped to ungrouped representation
         """
+        sys_species = fix_species(self._sys_species, self._spec_agnostic)
         total_length = np.sum([len(tar) for tar in targets])
         max_vec_len = np.max([np.sum([feat[spec].shape[1]*feat[spec].shape[2] for spec in feat])\
                        for feat in features])
@@ -190,12 +194,12 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         X = np.zeros([total_length, max_vec_len + 1], dtype=complex)
         y = np.zeros(total_length)
 
-        if not len(features) == len(targets) == len(self._sys_species):
+        if not len(features) == len(targets) == len(sys_species):
             raise ValueError('number of systems inconsistent')
 
         sys_loc = 0
         for sysidx, (feat, tar) in enumerate(zip(features, targets)):
-            this_species = self._sys_species[sysidx]
+            this_species = sys_species[sysidx]
             this_len = len(tar)
             X[sys_loc:sys_loc + this_len, 0] = sysidx
             unique_species = np.unique([char for char in this_species])
