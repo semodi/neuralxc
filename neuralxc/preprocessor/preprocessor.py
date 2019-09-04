@@ -36,7 +36,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
         unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis = 0)
-
+        self.species_string = ''.join([s for s in unique_systems])
         # === Padding ===
 
         #Find padded width of data
@@ -68,10 +68,8 @@ class Preprocessor(TransformerMixin, BaseEstimator):
     def get_basis_rep(self):
 
         if self.basis_instructions.get('spec_agnostic', False):
-            print('Agnostic')
             self.get_chemical_symbols = ( lambda x:  ['X'] * len(x.get_chemical_symbols()))
         else:
-            print('Not Agnostic')
             self.get_chemical_symbols =( lambda x:  x.get_chemical_symbols())
 
         if self.num_workers > 1:
@@ -92,7 +90,6 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         if extension[0] != '.':
             extension = '.' + extension
 
-        print('Extension', extension)
         jobs = []
         for i, system in enumerate(atoms):
             filename = ''

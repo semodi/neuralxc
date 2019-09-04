@@ -116,6 +116,8 @@ def pre_driver(args):
                 # 'data_ns','hdf5 system method density slice add traj override')(\
                 # file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
                 # add_data_driver(data_args)
-
+                f = h5py.File(file)
+                f[system].attrs.update({'species': preprocessor.species_string})
+                f.close()
         if delete_workdir:
             shutil.rmtree(workdir)

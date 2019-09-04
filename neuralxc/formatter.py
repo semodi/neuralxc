@@ -156,16 +156,20 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             feat_dict = {}
 
             idx = 0
+            print(len(this_species))
             for spec in this_species:
                 if spec not in feat_dict:
                     feat_dict[spec] = []
 
                 vec_len = self._attrs[spec]['n'] * sum([2 * l + 1 for l in range(self._attrs[spec]['l'])])
                 x_atm = X_sys[:, idx:idx + vec_len]
+                # print(x_atm.shape)
                 feat_dict[spec].append(x_atm)
                 idx += vec_len
 
             for spec in feat_dict:
+                feat_dict[spec] = np.array(feat_dict[spec])
+                print(feat_dict[spec].shape)
                 feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
             features.append(feat_dict)
             targets.append(y_sys)
