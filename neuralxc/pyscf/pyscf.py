@@ -1,0 +1,147 @@
+from abc import ABC, abstractmethod
+import numpy as np
+from scipy.special import sph_harm
+import scipy.linalg
+from sympy import N
+from functools import reduce
+import time
+import math
+from ..doc_inherit import doc_inherit
+from spher_grad import grlylm
+from ..base import ABCRegistry
+from numba import jit
+from ..timer import timer
+from ..projector  import DensityProjector
+from pyscf import gto
+
+l_dict = {'s':0, 'p':1, 'd':2, 'f':3}
+l_dict_inv = {l_dict[key]:key for key in l_dict}
+
+
+
+def get_eri3c(mol, auxmol):
+    pmol = mol + auxmol
+    nao = mol.nao_nr()
+    naux = auxmol.nao_nr()
+
+    eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
+    return eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
+
+def get_dm(mo_coeff, mo_occ):
+    return np.einsum('ij,j,jk -> ik',mo_coeff,mo_occ,mo_coeff.T)
+
+def get_coeff(dm, eri3c):
+    return np.einsum('ijk, ij -> k',eri3c, dm)
+
+
+
+class PySCFProjector(DensityProjector):
+
+    _registry_name = 'pyscf'
+
+    def __init__(self, basis_instructions):
+        self.basis = basis_instructions
+
+    def initialize(self, mol):
+        auxmol = gto.M(atom = mol.atom, basis=self.basis['basis'])
+        self.bp = BasisPadder(auxmol)
+        self.eri3c = get_eri3c(mol, auxmol)
+        self.mol = mol
+        self.auxmol = auxmol
+
+    def get_basis_rep(self, dm, mol=None, auxmol=None):
+        # if not mol is None and mol.atom != self.mol.atom:
+        #     self.initialize(mol)
+        coeff = get_coeff(dm, self.eri3c)
+        return self.bp.pad_basis(coeff)
+
+
+    def get_V(self, dEdC, positions=None, species=None, calc_forces=False, rho=None):
+        dEdC = self.bp.unpad_basis(dEdC)
+        V = np.einsum('ijk, k', self.eri3c, dEdC)
+        return V
+
+
+class BasisPadder():
+
+    def __init__(self, mol):
+
+        self.mol = mol
+
+        max_l = {}
+        max_n = {}
+        sym_cnt = {}
+
+        # Find maximum angular momentum and n for each species
+        for atom_idx, _ in enumerate(mol.atom_charges()):
+            sym = mol.atom_pure_symbol(atom_idx)
+            if not sym in sym_cnt:
+                sym_cnt[sym] = 0
+            sym_cnt[sym] += 1
+
+        for ao_idx, label in enumerate(mol.ao_labels(fmt=False)):
+            sym = label[1]
+            if not sym in max_l:
+                max_l[sym] = 0
+                max_n[sym] = 0
+
+            n = int(label[2][0])
+            max_n[sym] = max(n, max_n[sym])
+
+            l = l_dict[label[2][1]]
+            max_l[sym] = max(l, max_l[sym])
+
+        indexing_left = {sym: [] for sym in max_n}
+        indexing_right = {sym: [] for sym in max_n}
+
+        labels = mol.ao_labels()
+
+        for sym in max_n:
+            for n in range(1, max_n[sym]+1):
+                for l in range(max_l[sym]+1):
+                    if any(['{} {}{}'.format(sym,n,l_dict_inv[l]) in lab for lab in labels]):
+                        indexing_left[sym] += [True] * (2*l + 1)
+                        sidx = np.where(['{} {}{}'.format(sym,n,l_dict_inv[l]) in lab for lab in labels])[0][0]
+                        indexing_right[sym] += np.arange(sidx,sidx + (2*l+1)).astype(int).tolist()
+                    else:
+                        indexing_left[sym] += [False] * (2*l + 1)
+
+        self.sym_cnt = sym_cnt
+        self.max_l = max_l
+        self.max_n = max_n
+        self.indexing_l = indexing_left
+        self.indexing_r = indexing_right
+
+    def get_basis_json(self):
+
+        basis = {}
+
+        for sym in self.sym_cnt:
+            basis[sym] = {'n': self.max_n[sym],'l': self.max_l[sym]+1}
+
+        return basis
+
+    def pad_basis(self, coeff):
+
+        coeff_out = {sym: np.zeros([ self.sym_cnt[sym], self.max_n[sym] * (self.max_l[sym]+1)**2])  for sym in self.indexing_l}
+        cnt = {sym : 0 for sym in self.indexing_l}
+
+        for aidx, slice in enumerate(self.mol.aoslice_by_atom()):
+            sym = self.mol.atom_pure_symbol(aidx)
+            coeff_out[sym][cnt[sym] , self.indexing_l[sym]] = coeff[slice[-2]:slice[-1]][np.array(self.indexing_r[sym]) - slice[-2]]
+            cnt[sym] += 1
+
+        return coeff_out
+
+    def unpad_basis(self, coeff):
+
+        cnt = {sym : 0 for sym in self.indexing_l}
+        coeff_out = np.zeros(len(self.mol.ao_labels()))
+        for aidx, slice in enumerate(self.mol.aoslice_by_atom()):
+            sym = self.mol.atom_pure_symbol(aidx)
+            coeff_in = coeff[sym]
+            if coeff_in.ndim == 3: coeff_in = coeff_in[0]
+            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym]) - slice[-2]] = coeff_in[cnt[sym] , self.indexing_l[sym]]
+            cnt[sym] += 1
+
+        return coeff_out

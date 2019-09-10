@@ -81,35 +81,45 @@ class DensityProjector(BaseProjector):
 
     #TODO: Make some functions private
     # @doc_inherit
-    def __init__(self, unitcell, grid, basis_instructions):
+    def __init__(self, unitcell=None, grid=None, basis_instructions=None):
 
+        application = basis_instructions.get('application','siesta')
         projector_type = basis_instructions.get('projector_type', 'ortho')
+        if application == 'pyscf':
+            projector_type = 'pyscf'
+
         registry = BaseProjector.get_registry()
         if not projector_type in registry:
             raise Exception('Projector: {} not registered'.format(projector_type))
 
         self.projector = registry[projector_type](basis_instructions)
-        # Initialize the matrix used to orthonormalize radial basis
-        W = {}
-        for species in basis_instructions:
-            if len(species) < 3:
-                W[species] = self.get_W(basis_instructions[species])
-
-        # Determine unitcell constants
-        U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
-        for i in range(3):
-            U[i, :] = U[i, :] / grid[i]
-        a = np.linalg.norm(unitcell, axis=1) / grid[:3]
-
-        self.unitcell = unitcell
-        self.grid = grid
-        self.V_cell = np.linalg.det(U)
-        self.U = U.T
-        self.U_inv = np.linalg.inv(U)
-        self.a = a
         self.basis = basis_instructions
-        self.W = W
-        self.all_angs = {}
+
+        if not application == 'pyscf':
+            # Initialize the matrix used to orthonormalize radial basis
+            W = {}
+            for species in basis_instructions:
+                if len(species) < 3:
+                    W[species] = self.get_W(basis_instructions[species])
+
+            # Determine unitcell constants
+            U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
+            for i in range(3):
+                U[i, :] = U[i, :] / grid[i]
+            a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+
+            self.unitcell = unitcell
+            self.grid = grid
+            self.V_cell = np.linalg.det(U)
+            self.U = U.T
+            self.U_inv = np.linalg.inv(U)
+            self.a = a
+            self.W = W
+            self.all_angs = {}
+        else:
+            self.projector.initialize(unitcell)
+            self.get_basis_rep = self.projector.get_basis_rep
+            self.get_V = self.projector.get_V
 
     def __getattr__(self, attr):
         return getattr(self.projector, attr)
@@ -436,7 +446,6 @@ class DensityProjector(BaseProjector):
         else:
             small_rho = False
 
-        timer.start('project:basis_functions',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -452,7 +461,6 @@ class DensityProjector(BaseProjector):
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('project:basis_functions',False)
         timer.start('project:project',False)
 
         if not small_rho:

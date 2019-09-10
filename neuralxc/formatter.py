@@ -103,6 +103,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             per system, order of species inside system
         """
         self._attrs = attrs
+        # print(self._attrs)
         if spec_agnostic:
             self._attrs['X'] = self._attrs[list(self._attrs.keys())[0]]
         if not isinstance(sys_species, list):

@@ -12,7 +12,7 @@ from .ml.network import NetworkEstimator
 from .projector import DensityProjector, DeltaProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
-from .constants import Rydberg,Bohr
+from .constants import Rydberg,Bohr, Hartree
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -20,7 +20,7 @@ import time
 import traceback
 from periodictable import elements as element_dict
 from .timer import timer
-
+from .pyscf import BasisPadder
 
 agnostic_dict = {i :'X' for i in np.arange(500)}
 
@@ -51,7 +51,7 @@ def get_nxc_adapter(kind, path, options = {}):
     """ Adapter factory for NeuralXC
     """
     kind = kind.lower()
-    adapter_dict = {'siesta': SiestaNXC}
+    adapter_dict = {'siesta': SiestaNXC, 'pyscf': PySCFNXC}
     if not kind in adapter_dict:
         raise ValueError('Selected Adapter not available')
     else:
@@ -86,10 +86,24 @@ class NXCAdapter(ABC):
         self._adaptee.max_workers = int(workers)
 
         print('NeuralXC: Using {} thread(s)'.format(self._adaptee.max_workers))
+
     @abstractmethod
     def get_V(self):
         pass
 
+class PySCFNXC(NXCAdapter):
+
+    def initialize(self, mol):
+        # elements = np.array([str(element_dict[e]) for e in elements])
+        self.initialized = True
+        self._adaptee.initialize(mol, None, None, None)
+
+
+    def get_V(self, dm):
+        E, V =  self._adaptee.get_V(dm)
+        E /= Hartree
+        V /= Hartree
+        return E, V
 
 class SiestaNXC(NXCAdapter):
     @prints_error

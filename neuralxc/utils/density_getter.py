@@ -4,7 +4,13 @@ import numpy as np
 import struct
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
+from ..pyscf.pyscf import get_dm
 import re
+try:
+    from pyscf.scf.chkfile import load_scf
+    pyscf_found = True
+except ModuleNotFoundError:
+    pyscf_found = False
 
 
 class DensityGetterRegistry(ABCRegistry):
@@ -21,6 +27,16 @@ class BaseDensityGetter(metaclass=DensityGetterRegistry):
     def get_density(self, file_path):
         pass
 
+class PySCFDensityGetter(BaseDensityGetter):
+
+    _registry_name = 'pyscf'
+
+    def __init__(self, binary=None):
+        pass
+
+    def get_density(self, file_path):
+        mol, results = load_scf(file_path)
+        return get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
 
 class SiestaDensityGetter(BaseDensityGetter):
 
