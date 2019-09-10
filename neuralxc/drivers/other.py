@@ -62,7 +62,8 @@ def get_real_basis(atoms, basis):
     real_basis = {}
     for a in atoms:
         symbols = a.get_chemical_symbols()
-        auxmol = gto.M(atom=[[s,np.array([2*i,0,0])] for i,s in enumerate(symbols)], basis=basis)
+        atom = [[s,np.array([2*j,0,0])] for j,s in enumerate(symbols)]
+        auxmol = gto.M(atom=atom, basis=basis)
         bp = BasisPadder(auxmol)
         padded_basis = bp.get_basis_json()
         for sym in padded_basis:
@@ -126,7 +127,7 @@ def pre_driver(args):
                 real_basis = get_real_basis(atoms, basis_instr['basis'])
                 for key in real_basis:
                     basis_instr[key] = real_basis[key]
-                open('pre_nxc.json','w').write(json.dumps({'basis':basis_instr}))
+                open(args.preprocessor,'w').write(json.dumps({'basis':basis_instr}))
             filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
             data = preprocessor.fit_transform(None)
             np.save(filename, data)

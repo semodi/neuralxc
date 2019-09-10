@@ -75,16 +75,21 @@ def convert_tf(args):
     pipeline = nxc_tf._pipeline
 
     #Needs to do a fake run to build the tensorflow graph
-    unitcell = np.eye(3) * 20
-    grid = [40] * 3
-    rho = np.zeros(grid)
+    # unitcell = np.eye(3) * 20
+    # grid = [40] * 3
+    # rho = np.zeros(grid)
 
-    species = [key for key in pipeline.get_basis_instructions() if len(key) < 3]
-    positions = np.zeros([len(species), 3])
+    # species = [key for key in pipeline.get_basis_instructions() if len(key) < 3]
+    # positions = np.zeros([len(species), 3])
 
-    nxc_tf.initialize(unitcell, grid, positions, species)
+    # nxc_tf.initialize(unitcell, grid, positions, species)
     # nxc_tf.get_V(rho)
-    C = nxc_tf.projector.get_basis_rep(rho, positions, species)
+    # C = nxc_tf.projector.get_basis_rep(rho, positions, species)
+    C = {}
+    basis = pipeline.get_basis_instructions()
+    for sym in basis:
+        if len(sym) > 2: continue
+        C[sym] = np.zeros([1,1,basis[sym]['n'] * basis[sym]['l']**2])
     D = nxc_tf.symmetrizer.get_symmetrized(C)
     nxc_tf._pipeline.predict(D)
     nxc_tf._pipeline.save(args.np, True, True)
@@ -152,9 +157,16 @@ def workflow_driver(args):
     if args.sets:
         args.sets = os.path.abspath(args.sets)
 
+    engine_cont = open(args.engine, 'r').read()
+    engine_cont = engine_cont.split()
+    engine_cont = ' '.join([e for e in engine_cont if not 'nxc' in e])
+    open(args.engine, 'w').write(engine_cont.strip())
+
     if args.model0:
         args.model0 = os.path.abspath(args.model0)
-        open('siesta.fdf', 'a').write('\nNeuralXC ../../nxc\n')
+        engine_cont = open(args.engine, 'r').read()
+        if not '--nxc' in engine_cont:
+            open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../nxc')
         ensemble = True
         if args.fullstack:
             model0 = ''
@@ -254,7 +266,9 @@ def workflow_driver(args):
 
             os.chdir('../')
         args.hotstart += 1
-    open('siesta.fdf', 'a').write('\nNeuralXC ../../nxc\n')
+    engine_cont = open(args.engine, 'r').read()
+    if not '--nxc' in engine_cont:
+        open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../nxc')
     if not args.hotstart == -1:
         for iteration in range(args.hotstart, args.maxit + 1):
             print('====== Iteration {} ======'.format(iteration))

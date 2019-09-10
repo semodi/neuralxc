@@ -117,37 +117,37 @@ if __name__ == '__main__':
     wf.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('engine', action='store', type=str, help='Command to start engine')
     wf.add_argument(
-        '-data', metavar='data', type=str, default='', help='Start from this dataset instead of computing iteration 0')
+        '--data', metavar='data', type=str, default='', help='Start from this dataset instead of computing iteration 0')
     wf.add_argument(
-        '-config2',
+        '--config2',
         metavar='config2',
         type=str,
         default='',
         help='Path to .json configuration file setting hyperparameters used for iteration > 0')
-    wf.add_argument('-maxit', metavar='maxit', type=int, default='5', help='Maximum number of iterations')
+    wf.add_argument('--maxit', metavar='maxit', type=int, default='5', help='Maximum number of iterations')
     wf.add_argument(
-        '-tol',
+        '--tol',
         metavar='maxit',
         type=float,
         default='0.0005',
         help='Tolerance in energy defining whether iterative training converged')
     wf.add_argument(
-        '-hotstart',
+        '--hotstart',
         metavar='hotstart',
         type=int,
         default='0',
         help='Continue workflow at this iteration ( -1: only do testing )')
     wf.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     wf.add_argument(
-        '-nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
+        '--nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
     wf.add_argument(
-        '-model0',
+        '--model0',
         metavar='model0',
         type=str,
         default='',
         help='Build new model on top of model0 as a stacked estimator')
     wf.add_argument(
-        '-fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
+        '--fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================
