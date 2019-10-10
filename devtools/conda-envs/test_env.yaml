@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - ase
+  - pip
   - dask
   - h5py
   - hdf5
@@ -26,5 +27,6 @@ dependencies:
   - pytest-cov
   - pip:
     - codecov 
+    - tabulate
 
 

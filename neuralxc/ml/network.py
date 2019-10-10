@@ -694,7 +694,7 @@ class Energy_Network():
                     for l, layer in enumerate(subnet.layers + ['']):
                         w.append(self.sess.run(tf.get_variable("{}/W{}".format(species, l + 1))))
                         b.append(self.sess.run(tf.get_variable("{}/b{}".format(species, l + 1))))
-            species = species.upper()
+            species = species.capitalize()
             if not species in W:
                 W[species] = w
                 B[species] = b

@@ -79,7 +79,7 @@ def convert_tf(args):
     grid = [40] * 3
     rho = np.zeros(grid)
 
-    species = [key for key in pipeline.get_basis_instructions() if len(key) == 1]
+    species = [key for key in pipeline.get_basis_instructions() if len(key) < 3]
     positions = np.zeros([len(species), 3])
 
     nxc_tf.initialize(unitcell, grid, positions, species)
