@@ -6,8 +6,8 @@ dependencies:
   - ase
   - pip
   - dask
-  - h5py
-  - hdf5
+  - h5py=2.9.0
+  - hdf5=1.10.4
   - ipyparallel
   - ipython
   - jupyter
@@ -17,7 +17,7 @@ dependencies:
   - numpy
   - pandas
   - periodictable
-  - scikit-learn
+  - scikit-learn=0.20
   - scipy
   - seaborn
   - statsmodels
