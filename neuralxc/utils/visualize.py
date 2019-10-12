@@ -15,7 +15,10 @@ def plot_density_cut(rho, rmax=0, plane=2, height=0, *args, **kwargs):
     RHO = _plane_cut(rho, plane, height, grid, rmax=rmax)
 
     fig = plt.figure()
-    CS = plt.imshow(RHO, *args, cmap=plt.cm.jet, origin='lower', **kwargs)
+    if 'cmap' in kwargs:
+        CS = plt.imshow(RHO, *args, origin='lower', **kwargs)
+    else:
+        CS = plt.imshow(RHO, *args, cmap=plt.cm.jet, origin='lower', **kwargs)
     plt.colorbar()
     # plt.show()
     return fig
