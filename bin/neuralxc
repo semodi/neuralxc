@@ -51,9 +51,9 @@ if __name__ == '__main__':
     splitdat.add_argument('hdf5', action='store', type=str, help='Path to hdf5 file')
     splitdat.add_argument('group', action='store', type=str, help='Which group to apply slicing to')
     splitdat.add_argument('label', action='store', type=str, help='New label for slice')
-    splitdat.add_argument('-slice', metavar='slice', default=':', type=str, help='Slice in numpy notation')
+    splitdat.add_argument('--slice', metavar='slice', default=':', type=str, help='Slice in numpy notation')
     splitdat.add_argument(
-        '-comp', metavar='comp', default='', type=str, help='Store complementary slice under this group')
+        '--comp', metavar='comp', default='', type=str, help='Store complementary slice under this group')
     splitdat.set_defaults(func=split_data_driver)
 
     #================ Delete data ================
@@ -67,20 +67,20 @@ if __name__ == '__main__':
         'sample', description='Sample the data for a given basis set using KMeans cluster in feature-space')
     sampledat.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     sampledat.add_argument('size', action='store', type=int, help='Sample size')
-    sampledat.add_argument('-dest', action='store', type=str, default='sample.npy', help='Save to')
-    sampledat.add_argument('-hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
-    sampledat.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    sampledat.add_argument('--dest', action='store', type=str, default='sample.npy', help='Save to')
+    sampledat.add_argument('--hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
+    sampledat.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
 
 
     #================ Merge datasets =============
     mergedat = datsub.add_parser('merge', description='Merge datasets inside hdf5 file')
     mergedat.add_argument('file', action='store', type=str, help='Path to hdf5 file')
-    mergedat.add_argument('-base', action='store', type=str,nargs='+', help='Baseline sets', required = True)
-    mergedat.add_argument('-ref', action='store', type=str,nargs='+', help='Reference sets', required = True)
-    mergedat.add_argument('-o', action='store', type=str, help='Destination', required = True)
-    mergedat.add_argument('-optE0', action='store_true', help='Optimize energy offset across datasets (recommended)')
-    mergedat.add_argument('-pre', action='store', default='',type=str, help='Preprocessor file defining basis set')
+    mergedat.add_argument('--base', action='store', type=str,nargs='+', help='Baseline sets', required = True)
+    mergedat.add_argument('--ref', action='store', type=str,nargs='+', help='Reference sets', required = True)
+    mergedat.add_argument('--o', action='store', type=str, help='Destination', required = True)
+    mergedat.add_argument('--optE0', action='store_true', help='Optimize energy offset across datasets (recommended)')
+    mergedat.add_argument('--pre', action='store', default='',type=str, help='Preprocessor file defining basis set')
 
     mergedat.set_defaults(func=merge_data_driver)
 
@@ -94,22 +94,74 @@ if __name__ == '__main__':
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
     fit.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    fit.add_argument('-mask', action=('store_true'), help='Create a config file mask')
+    fit.add_argument('--mask', action=('store_true'), help='Create a config file mask')
     fit.add_argument(
-        '-hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+        '--hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
     fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     fit.add_argument(
-        '-sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+        '--sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
     fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     fit.add_argument(
-        '-model', metavar='model', type=str, default='', help='Continue training model found at this location')
+        '--model', metavar='model', type=str, default='', help='Continue training model found at this location')
     fit.add_argument(
-        '-ensemble',
+        '--ensemble',
         action='store_true',
         help='Derive pipeline from -model and only fit final estimator, to be able to build\
     an ensemble of estimators later on')
-    fit.add_argument('-hyperopt', action='store_true', help='Do a hyperparameter optimzation')
+    fit.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
+    fit.add_argument('--b', metavar='b',type=float, default=-1, help='Weight decay parameter (supercedes the one specified in config file)')
     fit.set_defaults(func=fit_driver)
+
+    # =============  Adiabatic  ====================
+    ad = subparser.add_parser('adiabatic', description='Fit a NeuralXC model adiabatically')
+    ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
+    ad.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    ad.add_argument('engine', action='store', type=str, help='Command to start engine')
+    ad.add_argument(
+        '--data', metavar='data', type=str, default='', help='Start from this dataset instead of computing iteration 0')
+    ad.add_argument(
+        '--config2',
+        metavar='config2',
+        type=str,
+        default='',
+        help='Path to .json configuration file setting hyperparameters used for iteration > 0')
+    ad.add_argument('--maxit', metavar='maxit', type=int, default='5', help='Maximum number of iterations')
+    ad.add_argument(
+        '--tol',
+        metavar='tol',
+        type=float,
+        default='0.0005',
+        help='Tolerance in energy defining whether iterative training converged')
+    ad.add_argument(
+        '--b0',
+        metavar='b0',
+        type=float,
+        default='1',
+        help='Initial value for weight decay')
+    ad.add_argument(
+        '--b_decay',
+        metavar='b_decay',
+        type=float,
+        default='0.1',
+        help='Decay for regularization parameter b (applied after every iteration)')
+    ad.add_argument(
+        '--hotstart',
+        metavar='hotstart',
+        type=int,
+        default='0',
+        help='Continue workflow at this iteration ( -1: only do testing )')
+    ad.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    ad.add_argument(
+        '--nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
+    ad.add_argument(
+        '--model0',
+        metavar='model0',
+        type=str,
+        default='',
+        help='Build new model on top of model0 as a stacked estimator')
+    ad.add_argument(
+        '--fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
+    ad.set_defaults(func=adiabatic_driver)
 
     # ============= Workflow ====================
     wf = subparser.add_parser('workflow', description='Fit a NeuralXC model iteratively')

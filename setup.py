@@ -38,7 +38,7 @@ setup(
     package_data={'neuralxc': ["data/*.dat"]
                   },
 
-    scripts=['./bin/neuralxc'],
+    scripts=['./bin/neuralxc','./bin/pyscf_ks'],
     ext_modules=[spher_grad],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email

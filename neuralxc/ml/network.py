@@ -354,6 +354,7 @@ class NetworkEstimator(BaseEstimator):
         self.optimizer = optimizer
         self.target_loss = target_loss
         self.verbose = False
+        self.fitted = False
 
     def get_params(self, *args, **kwargs):
         return {
@@ -415,6 +416,7 @@ class NetworkEstimator(BaseEstimator):
             random_seed=self.random_seed,
             batch_size=self.batch_size,
             target_loss=self.target_loss)
+        self.fitted = True
 
     def get_gradient(self, X, *args, **kwargs):
 

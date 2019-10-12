@@ -152,6 +152,193 @@ def shcopytree(src, dest):
         pass
 
 
+def adiabatic_driver(args):
+    statistics_sc = {'mae': 1000}
+    if args.sets:
+        args.sets = os.path.abspath(args.sets)
+
+    engine_cont = open(args.engine, 'r').read()
+    engine_cont = engine_cont.split()
+    engine_cont = ' '.join([e for e in engine_cont if not ('nxc' in e or 'best_model' in e)])
+    open(args.engine, 'w').write(engine_cont.strip())
+
+    if args.model0:
+        args.model0 = os.path.abspath(args.model0)
+        engine_cont = open(args.engine, 'r').read()
+        if not '--nxc' in engine_cont:
+            open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../best_model')
+        ensemble = True
+        if args.fullstack:
+            model0 = ''
+        else:
+            model0 = args.model0
+    else:
+        ensemble = False
+        model0 = ''
+
+    if args.nozero:
+        E0 = 0
+    else:
+        E0 = None
+    b = args.b0
+    if args.hotstart == 0:
+        if args.data:
+            mkdir('it0')
+            shcopy(args.data, 'it0/data.hdf5')
+            shcopy(args.preprocessor, 'it0/pre.json')
+            shcopy(args.config, 'it0/hyper.json')
+            os.chdir('it0')
+            open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
+            if args.sets:
+                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            statistics_sc = \
+            eval_driver(SN(model = '',hdf5=['data.hdf5','system/base',
+                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+            open('statistics_sc', 'w').write(json.dumps(statistics_sc))
+            statistics_fit = fit_driver(
+                SN(preprocessor='pre.json',
+                   config='hyper.json',
+                   mask=False,
+                   sample='',
+                   cutoff=0.0,
+                   model=model0,
+                   ensemble=ensemble,
+                   sets='sets.inp',
+                   hyperopt=True,
+                   b=b))
+            open('statistics_fit', 'w').write(json.dumps(statistics_fit))
+            convert_tf(SN(tf='best_model', np='merged_new'))
+            os.chdir('../')
+        else:
+            iteration = 0
+            print('====== Iteration {} ======'.format(iteration))
+            if ensemble:
+                shcopytree(args.model0, 'it0/nxc')
+            mkdir('it{}'.format(iteration))
+            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
+            shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+            os.chdir('it{}'.format(iteration))
+            open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
+            if args.sets:
+                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            mkdir('workdir')
+            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            pre_driver(
+                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
+            add_data_driver(
+                SN(hdf5='data.hdf5',
+                   system='system',
+                   method='it0',
+                   add=['energy'],
+                   traj='workdir/results.traj',
+                   density='',
+                   override=True,
+                   slice=':',
+                   zero=E0))
+            add_data_driver(
+                SN(hdf5='data.hdf5',
+                   system='system',
+                   method='ref',
+                   add=['energy'],
+                   traj='../sampled.traj',
+                   density='',
+                   override=True,
+                   slice=':',
+                   zero=E0))
+            statistics_sc = \
+            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+            open('statistics_sc', 'w').write(json.dumps(statistics_sc))
+            statistics_fit = fit_driver(
+                SN(preprocessor='pre.json',
+                   config='hyper.json',
+                   mask=False,
+                   sample='',
+                   cutoff=0.0,
+                   model=model0,
+                   ensemble=ensemble,
+                   sets='sets.inp',
+                   hyperopt=False,
+                   b=b))
+
+            open('statistics_fit', 'w').write(json.dumps(statistics_fit))
+            convert_tf(SN(tf='best_model', np='merged_new'))
+
+            os.chdir('../')
+        args.hotstart += 1
+    engine_cont = open(args.engine, 'r').read()
+    if not '--nxc' in engine_cont:
+        open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../best_model')
+    if not args.hotstart == -1:
+        for it in range(args.hotstart, args.maxit + 1):
+            b = b*args.b_decay
+            iteration = 0
+            print('====== Iteration {} ======'.format(iteration))
+            mkdir('it{}'.format(iteration))
+            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
+            shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+            os.chdir('it{}'.format(iteration))
+            open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+            if args.sets:
+                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            shutil.rmtree('workdir')
+            mkdir('workdir')
+            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            pre_driver(
+                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
+
+            add_data_driver(
+                SN(hdf5='data.hdf5',
+                   system='system',
+                   method='it{}'.format(iteration),
+                   add=['energy'],
+                   traj='workdir/results.traj',
+                   density='',
+                   override=True,
+                   slice=':',
+                   zero=E0))
+            old_statistics = dict(statistics_sc)
+            statistics_sc = \
+            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+
+            open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
+
+            # if old_statistics['mae'] - statistics_sc['mae'] < args.tol:
+            #     if old_statistics['mae'] - statistics_sc['mae'] < 0:
+            #         print('Self-consistent error increased in this iteration: dMAE = {} eV'.format(
+            #             old_statistics['mae'] - statistics_sc['mae']))
+            #         iteration -= 1
+            #         os.chdir('../')
+            #     else:
+            #         print('Iterative training converged: dMAE = {} eV'.format(old_statistics['mae'] -
+            #                                                                   statistics_sc['mae']))
+            #         os.chdir('../')
+            #     break
+
+            statistics_fit = fit_driver(
+                SN(preprocessor='pre.json',
+                   config='hyper.json',
+                   mask=False,
+                   sample='',
+                   cutoff=0.0,
+                   model='best_model',
+                   ensemble=False,
+                   sets='sets.inp',
+                   hyperopt=False,
+                   b=b))
+
+            open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
+            # if statistics_fit['mae'] > statistics_sc['mae']:
+            #     print('Stopping iterative training because fitting error is larger than self-consistent error')
+            #     os.chdir('../')
+            #     break
+            os.chdir('../')
+        else:
+            print('Maximum number of iterations reached. Proceeding to test set...')
+
 def workflow_driver(args):
     statistics_sc = {'mae': 1000}
     if args.sets:
@@ -433,10 +620,15 @@ def fit_driver(args):
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
 
     if args.model:
-        if new_model.steps[-1][1].steps[-1][1]._network == None:
+        # if new_model.steps[-1][1].steps[-1][1]._network == None:
+        #     pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
+        # else:
+        #     pipeline = new_model
+        if not new_model.steps[-1][1].steps[-1][1].fitted:
             pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
         else:
             pipeline = new_model
+        # pipeline = new_model
         for set in apply_to:
             selection = (data[:, 0] == set)
             prediction = pipeline.predict(data)[set]
