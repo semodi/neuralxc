@@ -25,6 +25,7 @@ dependencies:
   - tensorflow
   - pytest
   - pytest-cov
+  - pyscf
   - pip:
     - codecov 
     - tabulate
