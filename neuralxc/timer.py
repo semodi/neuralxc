@@ -5,12 +5,12 @@ from tabulate import tabulate
 class DummyTimer():
 
 
-    def start(self,name):
+    def start(self,name,*args,**kwargs):
         pass
-    def stop(self,stop):
+    def stop(self,stop,*args,**kwargs):
         pass
 
-    def create_report(self,path):
+    def create_report(self,path,*args,**kwargs):
         pass
 class Timer():
 
@@ -63,5 +63,5 @@ class Timer():
         else:
             print(report)
 
-timer = Timer()
-#timer = DummyTimer()
+# timer = Timer()
+timer = DummyTimer()

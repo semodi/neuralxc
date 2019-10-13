@@ -84,7 +84,7 @@ def test_siesta_density_getter():
 
 @pytest.mark.fast
 @pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base']])
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf']])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -97,7 +97,6 @@ def test_density_projector(projector_type):
                           ]) / xc.constants.Bohr
 
     basis_rep = density_projector.get_basis_rep(rho, positions, ['O', 'H', 'H'])
-    print(basis_rep)
     if projector_type == 'ortho':
         if save_test_density_projector:
             with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'wb') as file:
@@ -220,12 +219,10 @@ def test_species_grouper():
     with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
         C = pickle.load(file)
 
-    # print(C)
     C = [{spec: C[spec].reshape(1, -1, C[spec].shape[-1]) for spec in C}]
     basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}}
     species_grouper = xc.formatter.SpeciesGrouper(basis_set, ['OHH'])
     re_grouped = species_grouper.transform(species_grouper.inverse_transform(C, np.array([[0]])))[0]
-    print(re_grouped)
     re_grouped = re_grouped[0]
     C = C[0]
     for spec in C:
@@ -315,8 +312,6 @@ def test_force_correction(use_delta):
             fm = dv * np.sum(Vm * rho)
 
             forces_fd = (fp - fm) / (2 * incr)
-            print(forces_fd)
-            print(forces[incr_atom, incr_idx])
             assert np.allclose(-forces_fd, forces[incr_atom, incr_idx], atol=incr)
 
 
@@ -351,5 +346,4 @@ def test_parallel(use_delta):
     benzene_nxc.max_workers = 4
     V_parallel = benzene_nxc.get_V(rho, calc_forces=False)[1]
 
-    print(np.max(np.abs(V_serial - V_parallel)))
     assert np.allclose(V_serial, V_parallel, atol=1e-6, rtol=1e-5)
