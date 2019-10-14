@@ -7,6 +7,19 @@ neuralxc
 
 Implementation of a machine learned density functional
 
+
+
+### Reference
+
+If you use this code in your work, please cite it as 
+
+*Dick, Sebastian, and Marivi Fernandez-Serra. "Learning from the density to correct total energy and forces in first principle simulations." The Journal of Chemical Physics 151.14 (2019): 144102.*
+
+and
+
+
+*Dick, Sebastian, and Marivi Fernandez-Serra. "Machine Learning a Highly Accurate Exchange and Correlation Functional of the Electronic Density". ChemRxiv 9947312 (preprint), doi:10.26434/chemrxiv.9947312.v1*
+
 ### Copyright
 
 Copyright (c) 2019, Sebastian Dick
