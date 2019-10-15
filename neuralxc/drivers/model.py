@@ -35,6 +35,7 @@ import pickle
 from types import SimpleNamespace as SN
 from .data import *
 from .other import *
+from neuralxc.preprocessor import driver
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -162,6 +163,7 @@ def adiabatic_driver(args):
     engine_cont = ' '.join([e for e in engine_cont if not ('nxc' in e or 'best_model' in e)])
     open(args.engine, 'w').write(engine_cont.strip())
 
+    pre = json.loads(open(args.preprocessor, 'r').read())
     if args.model0:
         args.model0 = os.path.abspath(args.model0)
         engine_cont = open(args.engine, 'r').read()
@@ -223,7 +225,13 @@ def adiabatic_driver(args):
             if args.sets:
                 open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
             mkdir('workdir')
-            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            # subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            driver(
+                read(pre['traj_path'], ':'),
+                pre['basis'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=pre.get('engine_kwargs', {}))
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
             add_data_driver(
@@ -285,7 +293,15 @@ def adiabatic_driver(args):
                 open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
             shutil.rmtree('workdir')
             mkdir('workdir')
-            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            # subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            engine_kwargs = {'nxc': '../../best_model'}
+            engine_kwargs.update(pre.get('engine_kwargs', {}))
+            driver(
+                read(pre['traj_path'], ':'),
+                pre['basis'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=engine_kwargs)
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
 
@@ -670,9 +686,8 @@ def fit_driver(args):
 
                 pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
                 estimator = GridSearchCV(
-                    Pipeline(new_model.steps[-1][1].steps[:2] +
-                             [('file_pipe',
-                               FilePipeline('.tmp.pckl')), ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                    Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
+                                                                 ('estimator', new_model.steps[-1][1].steps[-1][1])]),
                     new_param_grid,
                     cv=inp.get('cv', 2))
 
@@ -781,9 +796,10 @@ def eval_driver(args):
         spec_group = SpeciesGrouper(basis, species)
         symmetrizer = symmetrizer_factory(symmetrizer_instructions)
         print('Symmetrizer instructions', symmetrizer_instructions)
-        pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
-                               basis_instructions=basis,
-                               symmetrize_instructions=symmetrizer_instructions)
+        pipeline = NXCPipeline(
+            [('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
+            basis_instructions=basis,
+            symmetrize_instructions=symmetrizer_instructions)
 
         targets = data[:, -1].real
         predictions = pipeline.predict(data)[0]
