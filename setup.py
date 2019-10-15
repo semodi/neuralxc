@@ -6,7 +6,9 @@ Implementation of a machine learned density functional
 from numpy.distutils.core import setup, Extension
 import versioneer
 
-spher_grad = Extension('spher_grad',['src/spher_harm.F',])
+spher_grad = Extension('spher_grad', [
+    'src/spher_harm.F',
+])
 
 short_description = __doc__.split("\n")
 
@@ -15,7 +17,6 @@ try:
         long_description = handle.read()
 except:
     long_description = "\n".join(short_description[2:]),
-
 
 setup(
     # Self-descriptive entries which should always be present
@@ -35,10 +36,8 @@ setup(
     # Optional include package data to ship with your package
     # Comment out this line to prevent the files from being packaged with your software
     # Extend/modify the list to include/exclude other items as need be
-    package_data={'neuralxc': ["data/*.dat"]
-                  },
-
-    scripts=['./bin/neuralxc','./bin/pyscf_ks'],
+    package_data={'neuralxc': ["data/*.dat"]},
+    scripts=['./bin/neuralxc', './bin/pyscf_ks'],
     ext_modules=[spher_grad],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email
@@ -52,5 +51,4 @@ setup(
 
     # Manual control if final package is compressible or not, set False to prevent the .egg from being made
     # zip_safe=False,
-
 )

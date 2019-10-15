@@ -1,6 +1,6 @@
 #!/home/sebastian/miniconda3/envs/neuralxc/bin/python
 import neuralxc as nxc
-import pyscf 
+import pyscf
 from pyscf import gto, dft
 from pyscf.dft.libxc import define_xc_
 from pyscf.dft import RKS
@@ -14,11 +14,11 @@ from ase import Atoms
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.units import Hartree
 
-def hcore_mod(mol):
 
+def hcore_mod(mol):
     def get_hcore(mol=mol):
         h = mol.intor_symmetric('int1e_kin')
-        h[:,:] = 0
+        h[:, :] = 0
         if mol._pseudo:
             # Although mol._pseudo for GTH PP is only available in Cell, GTH PP
             # may exist if mol is converted from cell object.
@@ -30,10 +30,11 @@ def hcore_mod(mol):
         if len(mol._ecpbas) > 0:
             h += mol.intor_symmetric('ECPscalar')
         return h
+
     return get_hcore
 
-def in_private_dir(method):
 
+def in_private_dir(method):
     def wrapper_private_dir(dir, *args, **kwargs):
         try:
             os.chdir(dir)
@@ -44,70 +45,72 @@ def in_private_dir(method):
             os.mkdir(dir)
             os.chdir(dir)
         return method(*args, **kwargs)
+
     return wrapper_private_dir
+
 
 def veff_mod(mf, model):
     def get_veff(mol=None, dm=None, dm_last=0, vhf_last=0, hermi=1):
         veff = pyscf.dft.rks.get_veff(mf, mol, dm, dm_last, vhf_last, hermi)
         vnxc = NPArrayWithTag(veff.shape)
         nxc = model.get_V(dm)
-        vnxc[:,:] = nxc[1][:,:]
+        vnxc[:, :] = nxc[1][:, :]
         vnxc.exc = nxc[0]
         vnxc.ecoul = 0
-        veff[:,:] += vnxc[:,:]
+        veff[:, :] += vnxc[:, :]
         veff.exc += vnxc.exc
         return veff
+
     return get_veff
+
 
 @in_private_dir
 def compute_KS(atoms, path, basis='ccpvdz', xc='PBE', nxc_path='', kin_coeff=None):
     pos = atoms.positions
     spec = atoms.get_chemical_symbols()
-    mol_input = [[s,p] for s,p in zip(spec,pos)]
+    mol_input = [[s, p] for s, p in zip(spec, pos)]
 
     mol = gto.M(atom=mol_input, basis=basis)
     mf = dft.RKS(mol)
     mf.set(chkfile=path)
-    mf.xc= xc
+    mf.xc = xc
     if not nxc_path is '':
-        model = nxc.get_nxc_adapter('pyscf',nxc_path)
+        model = nxc.get_nxc_adapter('pyscf', nxc_path)
         model.initialize(mol)
         mf.get_veff = veff_mod(mf, model)
     if kin_coeff is not None:
         mf.get_hcore = hcore_mod(mol)
-        mf.xc = mf.xc +'+ {}*XC_LDA_K_TF + {}*XC_GGA_K_VW'.format(*kin_coeff)
-        mf.xc = mf.xc +'+ .0*XC_GGA_K_TFVW'
+        mf.xc = mf.xc + '+ {}*XC_LDA_K_TF + {}*XC_GGA_K_VW'.format(*kin_coeff)
+        mf.xc = mf.xc + '+ .0*XC_GGA_K_TFVW'
     mf.kernel()
     print(mf.energy_tot())
     return mf, mol
 
 
 if __name__ == '__main__':
-    
+
     parser = argparse.ArgumentParser(description='Run KS-DFT with pyscf on structures saved in .traj file')
-    parser.add_argument('file', action='store', help ='Path to .xyz/.traj file containing trajectory')
-    parser.add_argument('--nxc', metavar='nxc', type=str, nargs = '?', default='',
-        help='NXC model')
+    parser.add_argument('file', action='store', help='Path to .xyz/.traj file containing trajectory')
+    parser.add_argument('--nxc', metavar='nxc', type=str, nargs='?', default='', help='NXC model')
 
-    parser.add_argument('--xc', metavar='xc', type=str, nargs = '?', default='PBE',
-        help='XC functional')
-    parser.add_argument('--basis', metavar='basis', type=str, nargs = '?', default='ccpvdz',
-        help='Basis set')
-    parser.add_argument('--outfile', metavar='out', type=str, nargs = '?', default='results.traj',
-        help='Destination')
+    parser.add_argument('--xc', metavar='xc', type=str, nargs='?', default='PBE', help='XC functional')
+    parser.add_argument('--basis', metavar='basis', type=str, nargs='?', default='ccpvdz', help='Basis set')
+    parser.add_argument('--outfile', metavar='out', type=str, nargs='?', default='results.traj', help='Destination')
 
-    parser.add_argument('--workdir', metavar='workdir', type=str, nargs = '?', default='.',
-        help='Destination')
+    parser.add_argument('--workdir', metavar='workdir', type=str, nargs='?', default='.', help='Destination')
 
-    parser.add_argument('--kin', action='store_true',
-        help='Compute and store kinetic energies')
+    parser.add_argument('--kin', action='store_true', help='Compute and store kinetic energies')
 
-    parser.add_argument('--kin_coeff', metavar='kin_coeff', type=float, nargs = '*', default=[0.0,0.0],
-        help='Coefficients for kinetic density functional (TF, VW)')
+    parser.add_argument('--kin_coeff',
+                        metavar='kin_coeff',
+                        type=float,
+                        nargs='*',
+                        default=[0.0, 0.0],
+                        help='Coefficients for kinetic density functional (TF, VW)')
 
     args = parser.parse_args()
     atoms = read(args.file, ':')
-    if args.kin_coeff == [0.0,0.0]:
+    if args.kin_coeff == [0.0, 0.0]:
         args.kin_coeff = None
     print(args.kin_coeff)
     results = []
@@ -122,31 +125,29 @@ if __name__ == '__main__':
         os.mkdir(workdir)
         os.chdir(workdir)
 
-     
     for i, a in enumerate(atoms):
         res = Atoms(a)
-        mf, mol = compute_KS(str(i), atoms[i],'pyscf.chkpt', args.basis, args.xc, args.nxc, args.kin_coeff)
+        mf, mol = compute_KS(str(i), atoms[i], 'pyscf.chkpt', args.basis, args.xc, args.nxc, args.kin_coeff)
         os.chdir(workdir)
         res.calc = SinglePointCalculator(res)
-        res.calc.results = {'energy': mf.energy_tot()*Hartree}
-        res.calc.results['stress'] = mf.mo_energy*Hartree
+        res.calc.results = {'energy': mf.energy_tot() * Hartree}
+        res.calc.results['stress'] = mf.mo_energy * Hartree
         if args.kin:
             e_tot = mf.e_tot
             mf.get_hcore = hcore_mod(mol)
             e_nokin = mf.energy_tot()
             e_kin_ks = e_tot - e_nokin
-        
-            mf.xc = args.xc +' + 1.0*XC_LDA_K_TF'
+
+            mf.xc = args.xc + ' + 1.0*XC_LDA_K_TF'
             print(mf.xc)
             e_kin_tf = mf.energy_tot() - e_nokin
 
-            mf.xc = args.xc +' + 1.0*XC_GGA_K_VW'
+            mf.xc = args.xc + ' + 1.0*XC_GGA_K_VW'
             print(mf.xc)
-            e_kin_vw =  mf.energy_tot() - e_nokin
-            
-            res.calc.results['energy'] = (res.calc.results['energy'],
-                    e_kin_ks*Hartree,e_kin_tf*Hartree, e_kin_vw*Hartree)
+            e_kin_vw = mf.energy_tot() - e_nokin
+
+            res.calc.results['energy'] = (res.calc.results['energy'], e_kin_ks * Hartree, e_kin_tf * Hartree,
+                                          e_kin_vw * Hartree)
         results.append(res)
 
     write(args.outfile, results)
-

@@ -56,13 +56,14 @@ def plot_basis(args):
             plt.plot(r, rad)
         plt.show()
 
+
 def get_real_basis(atoms, basis):
     from pyscf import gto
     from ..pyscf import BasisPadder
     real_basis = {}
     for a in atoms:
         symbols = a.get_chemical_symbols()
-        atom = [[s,np.array([2*j,0,0])] for j,s in enumerate(symbols)]
+        atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
         auxmol = gto.M(atom=atom, basis=basis)
         bp = BasisPadder(auxmol)
         padded_basis = bp.get_basis_json()
@@ -74,6 +75,7 @@ def get_real_basis(atoms, basis):
             real_basis[sym] = padded_basis[sym]
 
     return real_basis
+
 
 def pre_driver(args):
     """ Preprocess electron densities obtained from electronic structure
@@ -121,13 +123,13 @@ def pre_driver(args):
 
         for basis_instr in basis_grid:
             preprocessor.basis_instructions = basis_instr
-            print('BI',basis_instr)
+            print('BI', basis_instr)
 
-            if basis_instr.get('application','siesta') == 'pyscf':
+            if basis_instr.get('application', 'siesta') == 'pyscf':
                 real_basis = get_real_basis(atoms, basis_instr['basis'])
                 for key in real_basis:
                     basis_instr[key] = real_basis[key]
-                open(args.preprocessor,'w').write(json.dumps({'basis':basis_instr}))
+                open(args.preprocessor, 'w').write(json.dumps({'basis': basis_instr}))
             filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
             data = preprocessor.fit_transform(None)
             np.save(filename, data)

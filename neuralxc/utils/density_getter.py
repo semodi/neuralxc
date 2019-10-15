@@ -27,6 +27,7 @@ class BaseDensityGetter(metaclass=DensityGetterRegistry):
     def get_density(self, file_path):
         pass
 
+
 class PySCFDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf'
@@ -37,6 +38,7 @@ class PySCFDensityGetter(BaseDensityGetter):
     def get_density(self, file_path):
         mol, results = load_scf(file_path)
         return get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
+
 
 class SiestaDensityGetter(BaseDensityGetter):
 

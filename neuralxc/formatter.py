@@ -83,6 +83,7 @@ def fix_species(species, spec_agnostic=False):
                     fixed[-1][-1] = fixed[-1][-1] + spec
     return fixed
 
+
 class SpeciesGrouper(BaseEstimator, TransformerMixin):
     def __init__(self, attrs, sys_species, spec_agnostic=False):
         """SpeciesGrouper allows to transform an array with columns
@@ -112,8 +113,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         self._spec_agnostic = spec_agnostic
 
     def get_params(self, *args, **kwargs):
-        return {'attrs': self._attrs, 'sys_species': self._sys_species,
-                'spec_agnostic': self._spec_agnostic}
+        return {'attrs': self._attrs, 'sys_species': self._sys_species, 'spec_agnostic': self._spec_agnostic}
 
     def fit(self, X, y=None, **fit_params):
         return self
@@ -231,14 +231,15 @@ def shrink(data):
 
     for idx, key, dat in expand(data):
         dat = dat[0]
-        mask= ~np.all(dat==0, axis = -1)
-        min_col = max(np.sum(mask, axis = -1))
-        mask = (mask | (~mask * np.cumsum(~mask, axis = -1) + np.cumsum(mask, axis = -1)[:,-1].reshape(-1,1) <= min_col))
+        mask = ~np.all(dat == 0, axis=-1)
+        min_col = max(np.sum(mask, axis=-1))
+        mask = (mask | (~mask * np.cumsum(~mask, axis=-1) + np.cumsum(mask, axis=-1)[:, -1].reshape(-1, 1) <= min_col))
 
         dat = dat[mask].reshape(len(dat), min_col, -1)
 
         data[idx][key] = dat
     return data
+
 
 def expand(*args):
     """ Takes the common format in which datasets such as D and C are provided

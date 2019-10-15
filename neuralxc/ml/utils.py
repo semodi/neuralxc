@@ -19,28 +19,30 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.linear_model import LinearRegression
 import h5py
 
+
 def opt_E0(file, baselines, references):
 
     e_base = [file[data + '/energy'][:] for data in baselines]
     species = [find_attr_in_tree(file, data, 'species') for data in baselines]
     e_ref = [file[data + '/energy'][:] for data in references]
     species2 = [find_attr_in_tree(file, data, 'species') for data in references]
-    for s,s2 in zip(species, species2):
+    for s, s2 in zip(species, species2):
         assert s == s2
 
     allspecies = np.unique([s for s in ''.join(species)])
-    X = np.zeros([len(baselines),len(allspecies)])
+    X = np.zeros([len(baselines), len(allspecies)])
     y = np.zeros(len(baselines))
     for sysidx, sys in enumerate(species):
         for sidx, spec in enumerate(allspecies):
             X[sysidx, sidx] = sys.count(spec)
         y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
     lr = LinearRegression(fit_intercept=False)
-    lr.fit(X,y)
+    lr.fit(X, y)
     E0 = {}
     for spec, coeff in zip(allspecies, lr.coef_):
         E0[spec] = -coeff
     return E0
+
 
 def E_from_atoms(traj):
 
@@ -53,16 +55,16 @@ def E_from_atoms(traj):
 
     allspecies = np.unique([s for s in ''.join([key for key in energies])])
 
-    X = np.zeros([len(energies),len(allspecies)])
+    X = np.zeros([len(energies), len(allspecies)])
     y = np.zeros(len(energies))
     for sysidx, syskey in enumerate(energies):
         for sidx, spec in enumerate(allspecies):
             X[sysidx, sidx] = syskey.count(spec)
         y[sysidx] = np.mean(energies[syskey])
     lr = LinearRegression(fit_intercept=False)
-    lr.fit(X,y)
+    lr.fit(X, y)
     offsets = lr.predict(X)
-    offsets = {key: offset for key,offset in zip(energies, offsets)}
+    offsets = {key: offset for key, offset in zip(energies, offsets)}
 
     energies = []
     for atoms in traj:
@@ -70,8 +72,8 @@ def E_from_atoms(traj):
 
         energies.append(atoms.get_potential_energy() - offsets[spec])
 
-
     return np.array(energies)
+
 
 def find_attr_in_tree(file, tree, attr):
     """
@@ -204,8 +206,8 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     print('E0 base', E0_base)
     print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
-#    if baseline == reference:
-            # tar = data_ref[:] - E0_ref
+    #    if baseline == reference:
+    # tar = data_ref[:] - E0_ref
     tar = tar.real
 
     if percentile_cutoff > 0:
@@ -301,8 +303,9 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
     basis_instructions = basis
     symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
 
-    return NXCPipeline(
-        pipeline_list, basis_instructions=basis_instructions, symmetrize_instructions=symmetrizer_instructions)
+    return NXCPipeline(pipeline_list,
+                       basis_instructions=basis_instructions,
+                       symmetrize_instructions=symmetrizer_instructions)
 
 
 def get_basis_grid(preprocessor):
@@ -422,13 +425,13 @@ def get_preprocessor(preprocessor, mask=False, xyz=''):
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
 
     if mask:
-        open(preprocessor, 'w').write(
-            json.dumps({
-                'basis': basis,
-                'src_path': '',
-                'traj_path': xyz,
-                'n_workers': 1
-            }, indent=4))
+        open(preprocessor,
+             'w').write(json.dumps({
+                 'basis': basis,
+                 'src_path': '',
+                 'traj_path': xyz,
+                 'n_workers': 1
+             }, indent=4))
         return None, None
     else:
         basis_grid = get_basis_grid(pre)
@@ -456,12 +459,11 @@ class SampleSelector(BaseEstimator):
             data = data[0]
             indices = np.zeros(data.shape[:-1], dtype=int)
             indices[:] = np.arange(len(data)).reshape(-1, 1)
-            picks[idx] += self.sample_clusters(
-                atomic_shape(data),
-                indices.flatten(),
-                self._n_instances,
-                picked=picks[idx],
-                random_state=self._random_state)
+            picks[idx] += self.sample_clusters(atomic_shape(data),
+                                               indices.flatten(),
+                                               self._n_instances,
+                                               picked=picks[idx],
+                                               random_state=self._random_state)
         picks = picks[0]
         np.random.shuffle(picks)
         return picks[:self._n_instances]

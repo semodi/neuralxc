@@ -89,7 +89,7 @@ def convert_tf(args):
     basis = pipeline.get_basis_instructions()
     for sym in basis:
         if len(sym) > 2: continue
-        C[sym] = np.zeros([1,1,basis[sym]['n'] * basis[sym]['l']**2])
+        C[sym] = np.zeros([1, 1, basis[sym]['n'] * basis[sym]['l']**2])
     D = nxc_tf.symmetrizer.get_symmetrized(C)
     nxc_tf._pipeline.predict(D)
     nxc_tf._pipeline.save(args.np, True, True)
@@ -273,7 +273,7 @@ def adiabatic_driver(args):
         open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../best_model')
     if not args.hotstart == -1:
         for it in range(args.hotstart, args.maxit + 1):
-            b = b*args.b_decay
+            b = b * args.b_decay
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             mkdir('it{}'.format(iteration))
@@ -338,6 +338,7 @@ def adiabatic_driver(args):
             os.chdir('../')
         else:
             print('Maximum number of iterations reached. Proceeding to test set...')
+
 
 def workflow_driver(args):
     statistics_sc = {'mae': 1000}
@@ -469,7 +470,8 @@ def workflow_driver(args):
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
-                ensemble_driver(SN(operation='sum', dest='nxc', models=[args.model0, 'merged'], estonly = not args.fullstack))
+                ensemble_driver(
+                    SN(operation='sum', dest='nxc', models=[args.model0, 'merged'], estonly=not args.fullstack))
             else:
                 shcopytree('merged', 'nxc')
 
@@ -601,7 +603,7 @@ def fit_driver(args):
             apply_to.append(pidx)
             hdf5[1][pidx] = path[1:]
 
-    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic= pre['basis'].get('spec_agnostic', False))
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic=pre['basis'].get('spec_agnostic', False))
     if mask: return 0
 
     new_model = grid_cv.estimator
@@ -668,8 +670,9 @@ def fit_driver(args):
 
                 pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
                 estimator = GridSearchCV(
-                    Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
-                                                                 ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                    Pipeline(new_model.steps[-1][1].steps[:2] +
+                             [('file_pipe',
+                               FilePipeline('.tmp.pckl')), ('estimator', new_model.steps[-1][1].steps[-1][1])]),
                     new_param_grid,
                     cv=inp.get('cv', 2))
 
@@ -778,10 +781,9 @@ def eval_driver(args):
         spec_group = SpeciesGrouper(basis, species)
         symmetrizer = symmetrizer_factory(symmetrizer_instructions)
         print('Symmetrizer instructions', symmetrizer_instructions)
-        pipeline = NXCPipeline(
-            [('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
-            basis_instructions=basis,
-            symmetrize_instructions=symmetrizer_instructions)
+        pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
+                               basis_instructions=basis,
+                               symmetrize_instructions=symmetrizer_instructions)
 
         targets = data[:, -1].real
         predictions = pipeline.predict(data)[0]
@@ -796,14 +798,16 @@ def eval_driver(args):
         # predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
         # targets = load_sets(datafile, hdf5[2], hdf5[2], basis_key, cutoff)[:,-1].flatten()
 
-        predictions = datafile[hdf5[1] +'/energy'][:]
-        targets = datafile[hdf5[2] +'/energy'][:]
+        predictions = datafile[hdf5[1] + '/energy'][:]
+        targets = datafile[hdf5[2] + '/energy'][:]
         try:
-            force_base = datafile[hdf5[1] +'/forces'][:]
-            force_ref = datafile[hdf5[2] +'/forces'][:]
-            force_results = {'force_mae' : np.mean(np.abs(force_ref - force_base)),
-                    'force_std' : np.std(force_ref - force_base),
-                    'force_max' : np.max(force_ref - force_base)}
+            force_base = datafile[hdf5[1] + '/forces'][:]
+            force_ref = datafile[hdf5[2] + '/forces'][:]
+            force_results = {
+                'force_mae': np.mean(np.abs(force_ref - force_base)),
+                'force_std': np.std(force_ref - force_base),
+                'force_max': np.max(force_ref - force_base)
+            }
             results.update(force_results)
         except Exception:
             pass
@@ -818,11 +822,11 @@ def eval_driver(args):
     pprint(results)
     if args.plot:
         if args.model == '':
-            plt.figure(figsize=(10,8))
-            plt.subplot(2,1,1)
+            plt.figure(figsize=(10, 8))
+            plt.subplot(2, 1, 1)
             plt.hist(dev.flatten())
             plt.xlabel('Target energies [eV]')
-            plt.subplot(2,1,2)
+            plt.subplot(2, 1, 2)
         targets -= np.mean(targets)
         predictions -= np.mean(predictions)
         maxlim = np.max([np.max(targets), np.max(predictions)])

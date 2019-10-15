@@ -59,7 +59,7 @@ def add_data_driver(args):
                     energies = np.array([a.get_potential_energy()\
                      for a in read(args.traj,':')])[ijk]
                 else:
-                    energies = E_from_atoms(read(args.traj,':'))
+                    energies = E_from_atoms(read(args.traj, ':'))
                     args.zero = 0
                 add_energy(file, energies, args.system, args.method, args.override, E0=args.zero)
             else:
@@ -71,9 +71,9 @@ def add_data_driver(args):
                 forces = [a.get_forces()\
                  for a in read(args.traj,':')]
                 max_na = max([len(f) for f in forces])
-                forces_padded = np.zeros([len(forces),max_na,3])
-                for idx,f in enumerate(forces):
-                    forces_padded[idx,:len(f)] = f
+                forces_padded = np.zeros([len(forces), max_na, 3])
+                for idx, f in enumerate(forces):
+                    forces_padded[idx, :len(f)] = f
                 forces = forces_padded[ijk]
 
                 add_forces(file, forces, args.system, args.method, args.override)
@@ -96,6 +96,7 @@ def add_data_driver(args):
 
     file.close()
 
+
 def merge_data_driver(args):
 
     if args.pre:
@@ -112,11 +113,11 @@ def merge_data_driver(args):
         print('Warning: E0 is not being optimzed for merged dataset. Might produce' +\
         'unexpected behavior')
 
-    merge_sets(datafile, args.base, basis_key, new_name = args.o +'/base', E0 = E0)
+    merge_sets(datafile, args.base, basis_key, new_name=args.o + '/base', E0=E0)
     for key in E0:
         E0[key] = 0
 
-    merge_sets(datafile, args.ref, None, new_name = args.o +'/ref', E0 = E0)
+    merge_sets(datafile, args.ref, None, new_name=args.o + '/ref', E0=E0)
 
 
 def split_data_driver(args):

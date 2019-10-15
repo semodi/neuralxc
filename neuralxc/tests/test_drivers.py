@@ -167,7 +167,7 @@ def test_chain_merge():
 @pytest.mark.driver
 @pytest.mark.driver_ensemble
 @pytest.mark.parametrize('operation', ['sum', 'mean'])
-@pytest.mark.parametrize('estonly',[False, True])
+@pytest.mark.parametrize('estonly', [False, True])
 def test_ensemble(operation, estonly):
 
     os.chdir(test_dir)
@@ -175,8 +175,7 @@ def test_ensemble(operation, estonly):
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    ensemble_driver(SN(operation=operation, dest=operation, models=['model', 'model'],
-                estonly =estonly))
+    ensemble_driver(SN(operation=operation, dest=operation, models=['model', 'model'], estonly=estonly))
 
     eval_driver(
         SN(model='model',

@@ -13,11 +13,10 @@ from spher_grad import grlylm
 from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
-from ..projector  import DensityProjector
+from ..projector import DefaultProjector, BaseProjector
 
-l_dict = {'s':0, 'p':1, 'd':2, 'f':3, 'g':4, 'h':5}
-l_dict_inv = {l_dict[key]:key for key in l_dict}
-
+l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
+l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
 def get_eri3c(mol, auxmol):
@@ -25,26 +24,27 @@ def get_eri3c(mol, auxmol):
     nao = mol.nao_nr()
     naux = auxmol.nao_nr()
 
-    eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
+    eri3c = pmol.intor('int3c2e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
     return eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
 
+
 def get_dm(mo_coeff, mo_occ):
-    return np.einsum('ij,j,jk -> ik',mo_coeff,mo_occ,mo_coeff.T)
+    return np.einsum('ij,j,jk -> ik', mo_coeff, mo_occ, mo_coeff.T)
+
 
 def get_coeff(dm, eri3c):
-    return np.einsum('ijk, ij -> k',eri3c, dm)
+    return np.einsum('ijk, ij -> k', eri3c, dm)
 
 
-
-class PySCFProjector(DensityProjector):
+class PySCFProjector(BaseProjector):
 
     _registry_name = 'pyscf'
 
     def __init__(self, basis_instructions):
         self.basis = basis_instructions
 
-    def initialize(self, mol):
-        auxmol = gto.M(atom = mol.atom, basis=self.basis['basis'])
+    def initialize(self, mol, *args, **kwargs):
+        auxmol = gto.M(atom=mol.atom, basis=self.basis['basis'])
         self.bp = BasisPadder(auxmol)
         self.eri3c = get_eri3c(mol, auxmol)
         self.mol = mol
@@ -54,10 +54,9 @@ class PySCFProjector(DensityProjector):
         # if not mol is None and mol.atom != self.mol.atom:
         #     self.initialize(mol)
         coeff = get_coeff(dm, self.eri3c)
-        coeff =  self.bp.pad_basis(coeff)
-            # print(coeff['Mimu'])
+        coeff = self.bp.pad_basis(coeff)
+        # print(coeff['Mimu'])
         return coeff
-
 
     def get_V(self, dEdC, positions=None, species=None, calc_forces=False, rho=None):
         dEdC = self.bp.unpad_basis(dEdC)
@@ -66,7 +65,6 @@ class PySCFProjector(DensityProjector):
 
 
 class BasisPadder():
-
     def __init__(self, mol):
 
         self.mol = mol
@@ -104,14 +102,15 @@ class BasisPadder():
             for idx in sym_idx[sym]:
                 indexing_left[sym].append([])
                 indexing_right[sym].append([])
-                for n in range(1, max_n[sym]+1):
-                    for l in range(max_l[sym]+1):
-                        if any(['{} {} {}{}'.format(idx, sym,n,l_dict_inv[l]) in lab for lab in labels]):
-                            indexing_left[sym][-1] += [True] * (2*l + 1)
-                            sidx = np.where(['{} {} {}{}'.format(idx, sym,n,l_dict_inv[l]) in lab for lab in labels])[0][0]
-                            indexing_right[sym][-1] += np.arange(sidx,sidx + (2*l+1)).astype(int).tolist()
+                for n in range(1, max_n[sym] + 1):
+                    for l in range(max_l[sym] + 1):
+                        if any(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels]):
+                            indexing_left[sym][-1] += [True] * (2 * l + 1)
+                            sidx = np.where(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab
+                                             for lab in labels])[0][0]
+                            indexing_right[sym][-1] += np.arange(sidx, sidx + (2 * l + 1)).astype(int).tolist()
                         else:
-                            indexing_left[sym][-1] += [False] * (2*l + 1)
+                            indexing_left[sym][-1] += [False] * (2 * l + 1)
 
         self.sym_cnt = sym_cnt
         self.max_l = max_l
@@ -124,32 +123,37 @@ class BasisPadder():
         basis = {}
 
         for sym in self.sym_cnt:
-            basis[sym] = {'n': self.max_n[sym],'l': self.max_l[sym]+1}
+            basis[sym] = {'n': self.max_n[sym], 'l': self.max_l[sym] + 1}
 
         return basis
 
     def pad_basis(self, coeff):
         # Mimu = None
-        coeff_out = {sym: np.zeros([ self.sym_cnt[sym], self.max_n[sym] * (self.max_l[sym]+1)**2])  for sym in self.indexing_l}
+        coeff_out = {
+            sym: np.zeros([self.sym_cnt[sym], self.max_n[sym] * (self.max_l[sym] + 1)**2])
+            for sym in self.indexing_l
+        }
 
-        cnt = {sym : 0 for sym in self.indexing_l}
+        cnt = {sym: 0 for sym in self.indexing_l}
 
         for aidx, slice in enumerate(self.mol.aoslice_by_atom()):
             sym = self.mol.atom_pure_symbol(aidx)
-            coeff_out[sym][cnt[sym] , self.indexing_l[sym][cnt[sym]]] = coeff[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]]) - slice[-2]]
+            coeff_out[sym][cnt[sym], self.indexing_l[sym][cnt[sym]]] = coeff[slice[-2]:slice[-1]][
+                np.array(self.indexing_r[sym][cnt[sym]]) - slice[-2]]
             cnt[sym] += 1
 
         return coeff_out
 
     def unpad_basis(self, coeff):
 
-        cnt = {sym : 0 for sym in self.indexing_l}
+        cnt = {sym: 0 for sym in self.indexing_l}
         coeff_out = np.zeros(len(self.mol.ao_labels()))
         for aidx, slice in enumerate(self.mol.aoslice_by_atom()):
             sym = self.mol.atom_pure_symbol(aidx)
             coeff_in = coeff[sym]
             if coeff_in.ndim == 3: coeff_in = coeff_in[0]
-            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]]) - slice[-2]] = coeff_in[cnt[sym] , self.indexing_l[sym][cnt[sym]]]
+            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]]) -
+                                           slice[-2]] = coeff_in[cnt[sym], self.indexing_l[sym][cnt[sym]]]
             cnt[sym] += 1
 
         return coeff_out
