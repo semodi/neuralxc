@@ -303,8 +303,9 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
     basis_instructions = basis
     symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
 
-    return NXCPipeline(
-        pipeline_list, basis_instructions=basis_instructions, symmetrize_instructions=symmetrizer_instructions)
+    return NXCPipeline(pipeline_list,
+                       basis_instructions=basis_instructions,
+                       symmetrize_instructions=symmetrizer_instructions)
 
 
 def get_basis_grid(preprocessor):
@@ -424,13 +425,13 @@ def get_preprocessor(preprocessor, mask=False, xyz=''):
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
 
     if mask:
-        open(preprocessor, 'w').write(
-            json.dumps({
-                'basis': basis,
-                'src_path': '',
-                'traj_path': xyz,
-                'n_workers': 1
-            }, indent=4))
+        open(preprocessor,
+             'w').write(json.dumps({
+                 'basis': basis,
+                 'src_path': '',
+                 'traj_path': xyz,
+                 'n_workers': 1
+             }, indent=4))
         return None, None
     else:
         basis_grid = get_basis_grid(pre)
@@ -458,12 +459,11 @@ class SampleSelector(BaseEstimator):
             data = data[0]
             indices = np.zeros(data.shape[:-1], dtype=int)
             indices[:] = np.arange(len(data)).reshape(-1, 1)
-            picks[idx] += self.sample_clusters(
-                atomic_shape(data),
-                indices.flatten(),
-                self._n_instances,
-                picked=picks[idx],
-                random_state=self._random_state)
+            picks[idx] += self.sample_clusters(atomic_shape(data),
+                                               indices.flatten(),
+                                               self._n_instances,
+                                               picked=picks[idx],
+                                               random_state=self._random_state)
         picks = picks[0]
         np.random.shuffle(picks)
         return picks[:self._n_instances]

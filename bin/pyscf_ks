@@ -101,13 +101,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--kin', action='store_true', help='Compute and store kinetic energies')
 
-    parser.add_argument(
-        '--kin_coeff',
-        metavar='kin_coeff',
-        type=float,
-        nargs='*',
-        default=[0.0, 0.0],
-        help='Coefficients for kinetic density functional (TF, VW)')
+    parser.add_argument('--kin_coeff',
+                        metavar='kin_coeff',
+                        type=float,
+                        nargs='*',
+                        default=[0.0, 0.0],
+                        help='Coefficients for kinetic density functional (TF, VW)')
 
     args = parser.parse_args()
     atoms = read(args.file, ':')

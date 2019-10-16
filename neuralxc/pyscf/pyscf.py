@@ -107,8 +107,8 @@ class BasisPadder():
                     for l in range(max_l[sym] + 1):
                         if any(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels]):
                             indexing_left[sym][-1] += [True] * (2 * l + 1)
-                            sidx = np.where(
-                                ['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels])[0][0]
+                            sidx = np.where(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab
+                                             for lab in labels])[0][0]
                             indexing_right[sym][-1] += np.arange(sidx, sidx + (2 * l + 1)).astype(int).tolist()
                         else:
                             indexing_left[sym][-1] += [False] * (2 * l + 1)

@@ -41,6 +41,27 @@ os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
+def mkdir(dirname):
+    try:
+        os.mkdir(dirname)
+    except FileExistsError:
+        pass
+
+
+def shcopy(src, dest):
+    try:
+        shutil.copy(src, dest)
+    except FileExistsError:
+        pass
+
+
+def shcopytree(src, dest):
+    try:
+        shutil.copytree(src, dest)
+    except FileExistsError:
+        pass
+
+
 def parse_sets_input(path):
     """ Reads a file containing the sets used for fitting
 
@@ -68,11 +89,11 @@ def parse_sets_input(path):
     return hdf5
 
 
-def convert_tf(args):
+def convert_tf(tf_path, np_path):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
     numpy base estimator"""
 
-    nxc_tf = xc.NeuralXC(args.tf)
+    nxc_tf = xc.NeuralXC(tf_path)
     pipeline = nxc_tf._pipeline
 
     #Needs to do a fake run to build the tensorflow graph
@@ -93,14 +114,14 @@ def convert_tf(args):
         C[sym] = np.zeros([1, 1, basis[sym]['n'] * basis[sym]['l']**2])
     D = nxc_tf.symmetrizer.get_symmetrized(C)
     nxc_tf._pipeline.predict(D)
-    nxc_tf._pipeline.save(args.np, True, True)
+    nxc_tf._pipeline.save(np_path, True, True)
 
 
-def merge_driver(args):
+def merge_driver(chained, merged):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
     numpy base estimator"""
 
-    nxc_tf = xc.NeuralXC(args.chained)
+    nxc_tf = xc.NeuralXC(chained)
     pipeline = nxc_tf._pipeline
 
     label, estimator = pipeline.steps[-1]
@@ -115,10 +136,10 @@ def merge_driver(args):
             raise Exception('Something went wrong. Last pipeline element'\
             +' must be an estimator')
         else:
-            convert_tf(namedtuple('tuplename', ('tf', 'np'))(args.chained, args.merged))
-            args.chained = args.merged
+            convert_tf(tf_path=chained, np_path=merged)
+            chained = merged
 
-            nxc_tf = xc.NeuralXC(args.chained)
+            nxc_tf = xc.NeuralXC(chained)
             pipeline = nxc_tf._pipeline
 
             label, estimator = pipeline.steps[-1]
@@ -129,109 +150,86 @@ def merge_driver(args):
 
     pipeline.steps[-2] = (label, ChainedEstimator([npestimator, estimator]).merge())
     pipeline.steps = pipeline.steps[:-1]
-    nxc_tf._pipeline.save(args.merged, True, True)
+    nxc_tf._pipeline.save(merged, True, True)
 
 
-def mkdir(dirname):
-    try:
-        os.mkdir(dirname)
-    except FileExistsError:
-        pass
+def adiabatic_driver(preprocessor,
+                     config,
+                     data='',
+                     config2='',
+                     maxit=5,
+                     tol=0.0005,
+                     b0=1,
+                     b_decay=0.1,
+                     hotstart=0,
+                     sets='',
+                     nozero=False,
+                     model0='',
+                     fullstack=False):
 
-
-def shcopy(src, dest):
-    try:
-        shutil.copy(src, dest)
-    except FileExistsError:
-        pass
-
-
-def shcopytree(src, dest):
-    try:
-        shutil.copytree(src, dest)
-    except FileExistsError:
-        pass
-
-
-def adiabatic_driver(args):
     statistics_sc = {'mae': 1000}
-    if args.sets:
-        args.sets = os.path.abspath(args.sets)
+    if sets:
+        sets = os.path.abspath(sets)
 
-    engine_cont = open(args.engine, 'r').read()
-    engine_cont = engine_cont.split()
-    engine_cont = ' '.join([e for e in engine_cont if not ('nxc' in e or 'best_model' in e)])
-    open(args.engine, 'w').write(engine_cont.strip())
-
-    pre = json.loads(open(args.preprocessor, 'r').read())
-    if args.model0:
-        args.model0 = os.path.abspath(args.model0)
-        engine_cont = open(args.engine, 'r').read()
-        if not '--nxc' in engine_cont:
-            open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../best_model')
+    pre = json.loads(open(preprocessor, 'r').read())
+    if model0:
+        model0 = os.path.abspath(model0)
         ensemble = True
-        if args.fullstack:
+        if fullstack:
             model0 = ''
         else:
-            model0 = args.model0
+            model0 = model0
     else:
         ensemble = False
         model0 = ''
 
-    if args.nozero:
+    if nozero:
         E0 = 0
     else:
         E0 = None
-    b = args.b0
-    if args.hotstart == 0:
-        if args.data:
+    b = b0
+    if hotstart == 0:
+        if data:
             mkdir('it0')
-            shcopy(args.data, 'it0/data.hdf5')
-            shcopy(args.preprocessor, 'it0/pre.json')
-            shcopy(args.config, 'it0/hyper.json')
+            shcopy(data, 'it0/data.hdf5')
+            shcopy(preprocessor, 'it0/pre.json')
+            shcopy(config, 'it0/hyper.json')
             os.chdir('it0')
             open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/base',
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/base','system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model=model0,
-                   ensemble=ensemble,
-                   sets='sets.inp',
-                   hyperopt=True,
-                   b=b))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        hyperopt=True,
+                                        b=b)
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            convert_tf(SN(tf='best_model', np='merged_new'))
+            convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
         else:
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             if ensemble:
-                shcopytree(args.model0, 'it0/nxc')
+                shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
-            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
+            shcopy(config, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            # subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
-            driver(
-                read(pre['traj_path'], ':'),
-                pre['basis'].get('application', 'siesta'),
-                workdir='workdir',
-                nworkers=pre.get('n_workers', 1),
-                kwargs=pre.get('engine_kwargs', {}))
+            driver(read(pre['traj_path'], ':'),
+                   pre['basis'].get('application', 'siesta'),
+                   workdir='workdir',
+                   nworkers=pre.get('n_workers', 1),
+                   kwargs=pre.get('engine_kwargs', {}))
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
             add_data_driver(
@@ -255,53 +253,43 @@ def adiabatic_driver(args):
                    slice=':',
                    zero=E0))
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model=model0,
-                   ensemble=ensemble,
-                   sets='sets.inp',
-                   hyperopt=False,
-                   b=b))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        b=b)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            convert_tf(SN(tf='best_model', np='merged_new'))
+            convert_tf(tf_path='best_model', np_path='merged_new')
 
             os.chdir('../')
-        args.hotstart += 1
-    engine_cont = open(args.engine, 'r').read()
-    if not '--nxc' in engine_cont:
-        open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../best_model')
-    if not args.hotstart == -1:
-        for it in range(args.hotstart, args.maxit + 1):
-            b = b * args.b_decay
+        hotstart += 1
+    if not hotstart == -1:
+        for it in range(hotstart, maxit + 1):
+            b = b * b_decay
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             mkdir('it{}'.format(iteration))
-            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
+            shcopy(config, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             shutil.rmtree('workdir')
             mkdir('workdir')
-            # subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
             engine_kwargs = {'nxc': '../../best_model'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            driver(
-                read(pre['traj_path'], ':'),
-                pre['basis'].get('application', 'siesta'),
-                workdir='workdir',
-                nworkers=pre.get('n_workers', 1),
-                kwargs=engine_kwargs)
+            driver(read(pre['traj_path'], ':'),
+                   pre['basis'].get('application', 'siesta'),
+                   workdir='workdir',
+                   nworkers=pre.get('n_workers', 1),
+                   kwargs=engine_kwargs)
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
 
@@ -317,116 +305,98 @@ def adiabatic_driver(args):
                    zero=E0))
             old_statistics = dict(statistics_sc)
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'])
 
             open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
 
-            # if old_statistics['mae'] - statistics_sc['mae'] < args.tol:
-            #     if old_statistics['mae'] - statistics_sc['mae'] < 0:
-            #         print('Self-consistent error increased in this iteration: dMAE = {} eV'.format(
-            #             old_statistics['mae'] - statistics_sc['mae']))
-            #         iteration -= 1
-            #         os.chdir('../')
-            #     else:
-            #         print('Iterative training converged: dMAE = {} eV'.format(old_statistics['mae'] -
-            #                                                                   statistics_sc['mae']))
-            #         os.chdir('../')
-            #     break
-
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model='best_model',
-                   ensemble=False,
-                   sets='sets.inp',
-                   hyperopt=False,
-                   b=b))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model='best_model',
+                                        sets='sets.inp',
+                                        b=b)
 
             open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
-            # if statistics_fit['mae'] > statistics_sc['mae']:
-            #     print('Stopping iterative training because fitting error is larger than self-consistent error')
-            #     os.chdir('../')
-            #     break
             os.chdir('../')
         else:
             print('Maximum number of iterations reached. Proceeding to test set...')
 
 
-def workflow_driver(args):
+def workflow_driver(preprocessor,
+                    config,
+                    data='',
+                    config2='',
+                    maxit=5,
+                    tol=0.0005,
+                    hotstart=0,
+                    sets='',
+                    nozero=False,
+                    model0='',
+                    fullstack=False):
     statistics_sc = {'mae': 1000}
-    if args.sets:
-        args.sets = os.path.abspath(args.sets)
+    if sets:
+        sets = os.path.abspath(sets)
 
-    engine_cont = open(args.engine, 'r').read()
-    engine_cont = engine_cont.split()
-    engine_cont = ' '.join([e for e in engine_cont if not 'nxc' in e])
-    open(args.engine, 'w').write(engine_cont.strip())
-
-    if args.model0:
-        args.model0 = os.path.abspath(args.model0)
-        engine_cont = open(args.engine, 'r').read()
-        if not '--nxc' in engine_cont:
-            open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../nxc')
+    if model0:
+        model0 = os.path.abspath(model0)
         ensemble = True
-        if args.fullstack:
+        if fullstack:
             model0 = ''
         else:
-            model0 = args.model0
+            model0 = model0
     else:
         ensemble = False
         model0 = ''
 
-    if args.nozero:
+    if nozero:
         E0 = 0
     else:
         E0 = None
 
-    if args.hotstart == 0:
-        if args.data:
+    pre = json.loads(open(preprocessor, 'r').read())
+    if hotstart == 0:
+        if data:
             mkdir('it0')
-            shcopy(args.data, 'it0/data.hdf5')
-            shcopy(args.preprocessor, 'it0/pre.json')
-            shcopy(args.config, 'it0/hyper.json')
+            shcopy(data, 'it0/data.hdf5')
+            shcopy(preprocessor, 'it0/pre.json')
+            shcopy(config, 'it0/hyper.json')
             os.chdir('it0')
             open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/base',
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/base',
+                    'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model=model0,
-                   ensemble=ensemble,
-                   sets='sets.inp',
-                   hyperopt=True))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        hyperopt=True)
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            convert_tf(SN(tf='best_model', np='merged_new'))
+            convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
         else:
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             if ensemble:
-                shcopytree(args.model0, 'it0/nxc')
+                shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
-            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
+            shcopy(config, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            engine_kwargs = pre.get('engine_kwargs', {})
+            driver(read(pre['traj_path'], ':'),
+                   pre['basis'].get('application', 'siesta'),
+                   workdir='workdir',
+                   nworkers=pre.get('n_workers', 1),
+                   kwargs=engine_kwargs)
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
             add_data_driver(
@@ -450,52 +420,50 @@ def workflow_driver(args):
                    slice=':',
                    zero=E0))
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model=model0,
-                   ensemble=ensemble,
-                   sets='sets.inp',
-                   hyperopt=True))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        hyperopt=True)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            convert_tf(SN(tf='best_model', np='merged_new'))
+            convert_tf(tf_path='best_model', np_path='merged_new')
 
             os.chdir('../')
-        args.hotstart += 1
-    engine_cont = open(args.engine, 'r').read()
-    if not '--nxc' in engine_cont:
-        open(args.engine, 'w').write(engine_cont.strip() + ' --nxc ../../nxc')
-    if not args.hotstart == -1:
-        for iteration in range(args.hotstart, args.maxit + 1):
+        hotstart += 1
+    if not hotstart == -1:
+        for iteration in range(hotstart, maxit + 1):
             print('====== Iteration {} ======'.format(iteration))
             mkdir('it{}'.format(iteration))
             shcopy('it{}/data.hdf5'.format(iteration - 1), 'it{}/data.hdf5'.format(iteration))
-            shcopy(args.preprocessor, 'it{}/pre.json'.format(iteration))
-            if args.config2:
-                shcopy(args.config2, 'it{}/hyper.json'.format(iteration))
+            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
+            if config2:
+                shcopy(config2, 'it{}/hyper.json'.format(iteration))
             else:
-                shcopy(args.config, 'it{}/hyper.json'.format(iteration))
+                shcopy(config, 'it{}/hyper.json'.format(iteration))
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
-                ensemble_driver(
-                    SN(operation='sum', dest='nxc', models=[args.model0, 'merged'], estonly=not args.fullstack))
+                ensemble_driver(dest='nxc', models=[model0, 'merged'], estonly=not fullstack)
             else:
                 shcopytree('merged', 'nxc')
 
             open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
-            if args.sets:
-                open('sets.inp', 'a').write('\n' + open(args.sets, 'r').read())
+            if sets:
+                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../sampled.traj', shell=True).wait()
+            engine_kwargs = {'nxc': '../../nxc'}
+            engine_kwargs.update(pre.get('engine_kwargs', {}))
+            driver(read(pre['traj_path'], ':'),
+                   pre['basis'].get('application', 'siesta'),
+                   workdir='workdir',
+                   nworkers=pre.get('n_workers', 1),
+                   kwargs=engine_kwargs)
             pre_driver(
                 SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
 
@@ -511,12 +479,12 @@ def workflow_driver(args):
                    zero=E0))
             old_statistics = dict(statistics_sc)
             statistics_sc = \
-            eval_driver(SN(model = '',hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'],plot=False,savefig=False,cutoff=0.0,predict=False))
+            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+                    'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
 
-            if old_statistics['mae'] - statistics_sc['mae'] < args.tol:
+            if old_statistics['mae'] - statistics_sc['mae'] < tol:
                 if old_statistics['mae'] - statistics_sc['mae'] < 0:
                     print('Self-consistent error increased in this iteration: dMAE = {} eV'.format(
                         old_statistics['mae'] - statistics_sc['mae']))
@@ -528,24 +496,19 @@ def workflow_driver(args):
                     os.chdir('../')
                 break
 
-            chain_driver(SN(config='hyper.json', model='merged', dest='chained'))
-            statistics_fit = fit_driver(
-                SN(preprocessor='pre.json',
-                   config='hyper.json',
-                   mask=False,
-                   sample='',
-                   cutoff=0.0,
-                   model='chained',
-                   ensemble=False,
-                   sets='sets.inp',
-                   hyperopt=True))
+            chain_driver(config='hyper.json', model='merged', dest='chained')
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        config='hyper.json',
+                                        model='chained',
+                                        sets='sets.inp',
+                                        hyperopt=True)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             if statistics_fit['mae'] > statistics_sc['mae']:
                 print('Stopping iterative training because fitting error is larger than self-consistent error')
                 os.chdir('../')
                 break
-            merge_driver(SN(chained='best_model', merged='merged_new'))
+            merge_driver(chained='best_model', merged='merged_new')
 
             os.chdir('../')
         else:
@@ -560,8 +523,14 @@ def workflow_driver(args):
     shcopytree('it{}/nxc'.format(iteration), 'testing/nxc')
     os.chdir('testing')
     mkdir('workdir')
-    subprocess.Popen(open('../' + args.engine, 'r').read().strip() + ' ../testing.traj', shell=True).wait()
 
+    engine_kwargs = {'nxc': '../../nxc'}
+    engine_kwargs.update(pre.get('engine_kwargs', {}))
+    driver(read(pre['traj_path'], ':'),
+           pre['basis'].get('application', 'siesta'),
+           workdir='workdir',
+           nworkers=pre.get('n_workers', 1),
+           kwargs=engine_kwargs)
     add_data_driver(
         SN(hdf5='data.hdf5',
            system='system',
@@ -583,28 +552,32 @@ def workflow_driver(args):
            slice=':',
            zero=E0))
 
-    statistics_test = eval_driver(
-        SN(model='',
-           hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'],
-           plot=False,
-           savefig=False,
-           cutoff=0.0,
-           predict=False))
+    statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
     open('statistics_test', 'w').write(json.dumps(statistics_test))
 
 
-def fit_driver(args):
+def fit_driver(preprocessor,
+               config,
+               hdf5=None,
+               mask=False,
+               sets='',
+               sample='',
+               cutoff=0.0,
+               model='',
+               ensemble=False,
+               hyperopt=False,
+               b=-1):
     """ Fits a NXCPipeline to the provided data
     """
-    inputfile = args.config
-    preprocessor = args.preprocessor
+    inputfile = config
+    preprocessor = preprocessor
 
-    if args.sets != '':
-        hdf5 = parse_sets_input(args.sets)
+    if sets != '':
+        hdf5 = parse_sets_input(sets)
     else:
-        hdf5 = args.hdf5
+        hdf5 = hdf5
 
-    mask = args.mask
+    mask = mask
 
     if not mask:
         inp = json.loads(open(inputfile, 'r').read())
@@ -627,17 +600,17 @@ def fit_driver(args):
     param_grid = {key: param_grid[key][0] for key in param_grid}
     new_model.set_params(**param_grid)
 
-    if args.model:
-        if args.ensemble:
-            new_model.steps[-1][1].steps[2:-1] = xc.ml.network.load_pipeline(args.model).steps[:-1]
+    if model:
+        if ensemble:
+            new_model.steps[-1][1].steps[2:-1] = xc.ml.network.load_pipeline(model).steps[:-1]
         else:
-            new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(args.model).steps
+            new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
 
     datafile = h5py.File(hdf5[0], 'r')
     basis_key = basis_to_hash(pre['basis'])
-    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, args.cutoff)
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
 
-    if args.model:
+    if model:
         # if new_model.steps[-1][1].steps[-1][1]._network == None:
         #     pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
         # else:
@@ -654,8 +627,8 @@ def fit_driver(args):
             data[selection, -1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:, -1])))
 
-    if args.sample != '':
-        sample = np.load(args.sample)
+    if sample != '':
+        sample = np.load(sample)
         data = data[sample]
         print("Using sample of size {}".format(len(sample)))
 
@@ -678,16 +651,17 @@ def fit_driver(args):
             return self.pipeline.transform(X)
 
     np.random.shuffle(data)
-    if args.hyperopt:
-        if args.model:
-            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator) or args.ensemble:
+    if hyperopt:
+        if model:
+            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator) or ensemble:
                 new_param_grid = {key[len('ml__'):]: value for key,value in  grid_cv.param_grid.items()\
                     if 'ml__estimator' in key}
 
                 pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
                 estimator = GridSearchCV(
-                    Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
-                                                                 ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                    Pipeline(new_model.steps[-1][1].steps[:2] +
+                             [('file_pipe',
+                               FilePipeline('.tmp.pckl')), ('estimator', new_model.steps[-1][1].steps[-1][1])]),
                     new_param_grid,
                     cv=inp.get('cv', 2))
 
@@ -727,7 +701,7 @@ def fit_driver(args):
         'max': np.max(dev0).round(4)
     }
 
-    if args.hyperopt:
+    if hyperopt:
         open('best_params.json', 'w').write(json.dumps(estimator.best_params_, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
         best_params_ = estimator.best_params_
@@ -744,9 +718,9 @@ def fit_driver(args):
     return results
 
 
-def chain_driver(args):
+def chain_driver(config, model, dest='chained_estimator'):
 
-    inputfile = args.config
+    inputfile = config
 
     inp = json.loads(open(inputfile, 'r').read())
 
@@ -756,7 +730,7 @@ def chain_driver(args):
     }
     new_model = NetworkWrapper(**param_grid)
 
-    old_model = xc.ml.network.load_pipeline(args.model)
+    old_model = xc.ml.network.load_pipeline(model)
 
     old_estimator = old_model.steps[-1][1]
     if not isinstance(old_estimator, xc.ml.network.NumpyNetworkEstimator):
@@ -765,23 +739,23 @@ def chain_driver(args):
 
     old_model.steps[-1] = ('frozen_estimator', old_model.steps[-1][1])
     old_model.steps += [('estimator', new_model)]
-    old_model.save(args.dest, True)
+    old_model.save(dest, True)
 
 
-def eval_driver(args):
+def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
-    hdf5 = args.hdf5
+    hdf5 = hdf5
 
-    if args.predict:
+    if predict:
         hdf5.append(hdf5[1])
         cutoff = 0
     else:
-        cutoff = args.cutoff
+        cutoff = cutoff
     datafile = h5py.File(hdf5[0], 'r')
 
-    if not args.model == '':
-        model = xc.NeuralXC(args.model)._pipeline
+    if not model == '':
+        model = xc.NeuralXC(model)._pipeline
         basis = model.get_basis_instructions()
         basis_key = basis_to_hash(basis)
     else:
@@ -789,26 +763,25 @@ def eval_driver(args):
 
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
     results = {}
-    if not args.model == '':
+    if not model == '':
         symmetrizer_instructions = model.get_symmetrize_instructions()
         symmetrizer_instructions.update({'basis': basis})
         species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
         spec_group = SpeciesGrouper(basis, species)
         symmetrizer = symmetrizer_factory(symmetrizer_instructions)
         print('Symmetrizer instructions', symmetrizer_instructions)
-        pipeline = NXCPipeline(
-            [('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
-            basis_instructions=basis,
-            symmetrize_instructions=symmetrizer_instructions)
+        pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
+                               basis_instructions=basis,
+                               symmetrize_instructions=symmetrizer_instructions)
 
         targets = data[:, -1].real
         predictions = pipeline.predict(data)[0]
-        if args.predict:
-            np.save(args.dest, predictions)
+        if predict:
+            np.save(dest, predictions)
             return 0
         dev = (predictions.flatten() - targets.flatten())
     else:
-        if args.predict:
+        if predict:
             raise Exception('Must provide a model to make predictions')
         dev = data[:, -1].real
         # predictions = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)[:,-1].flatten()
@@ -836,8 +809,8 @@ def eval_driver(args):
         'max': np.max(dev0).round(4)
     })
     pprint(results)
-    if args.plot:
-        if args.model == '':
+    if plot:
+        if model == '':
             plt.figure(figsize=(10, 8))
             plt.subplot(2, 1, 1)
             plt.hist(dev.flatten())
@@ -855,10 +828,10 @@ def eval_driver(args):
     return results
 
 
-def ensemble_driver(args):
+def ensemble_driver(models, operation='sum', estonly=False, dest='stacked_ensemble'):
 
     all_pipelines = []
-    for model_path in args.models:
+    for model_path in models:
         all_pipelines.append(xc.ml.network.load_pipeline(model_path))
 
     #Check for consistency
@@ -867,13 +840,13 @@ def ensemble_driver(args):
     # if not pickle.dumps(step0[1]) == pickle.dumps(step1[1]):
     # raise Exception('Parameters for {} in model {} inconsistent'.format(type(step0[1]), pidx))
 
-    if args.estonly:
+    if estonly:
         all_networks = [pipeline.steps[-1][1] for pipeline in all_pipelines]
-        ensemble = StackedEstimator(all_networks, operation=args.operation)
+        ensemble = StackedEstimator(all_networks, operation=operation)
         pipeline = all_pipelines[0]
         pipeline.steps[-1] = ('estimator', ensemble)
     else:
-        ensemble = StackedEstimator(all_pipelines, operation=args.operation)
+        ensemble = StackedEstimator(all_pipelines, operation=operation)
         pipeline = xc.ml.network.load_pipeline(model_path)
         pipeline.steps = [('estimator', ensemble)]
-    pipeline.save(args.dest, override=True)
+    pipeline.save(dest, override=True)
