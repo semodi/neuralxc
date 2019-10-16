@@ -79,7 +79,8 @@ def get_real_basis(atoms, basis):
 def fetch_default_driver(kind, hint='',out=''):
 
     from collections import abc
-    hint_cont = json.load(open(hint,'r'))
+    if hint:
+        hint_cont = json.load(open(hint,'r'))
 
     def nested_dict_iter(nested):
         for key, value in nested.items():
@@ -98,7 +99,7 @@ def fetch_default_driver(kind, hint='',out=''):
         if os.path.isfile(val) or os.path.isdir(val):
             val = os.path.abspath(val)
         return val
-        
+
     if kind =='pre':
         app = 'siesta'
         for key, value in nested_dict_iter(hint_cont):
@@ -108,20 +109,21 @@ def fetch_default_driver(kind, hint='',out=''):
     else:
         df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json','r'))
 
-    for key1 in df_cont:
-        if isinstance(df_cont[key1], dict):
-            for key2 in df_cont[key1]:
-                found = find_value_in_nested(hint_cont, key2)
-                if found:
-                    df_cont[key1][key2] = make_absolute(found)
-                elif isinstance(df_cont[key1][key2],str):
-                    df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
-        else:
-            found = find_value_in_nested(hint_cont, key1)
-            if found:
-                df_cont[key1] = make_absolute(found)
+    if hint:
+        for key1 in df_cont:
+            if isinstance(df_cont[key1], dict):
+                for key2 in df_cont[key1]:
+                    found = find_value_in_nested(hint_cont, key2)
+                    if found:
+                        df_cont[key1][key2] = make_absolute(found)
+                    elif isinstance(df_cont[key1][key2],str):
+                        df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
             else:
-                df_cont[key1] = make_absolute(df_cont[key1])
+                found = find_value_in_nested(hint_cont, key1)
+                if found:
+                    df_cont[key1] = make_absolute(found)
+                else:
+                    df_cont[key1] = make_absolute(df_cont[key1])
 
     if out == '':
         out = kind + '.json'
