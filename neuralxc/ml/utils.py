@@ -313,7 +313,7 @@ def get_basis_grid(preprocessor):
     of basis sets that can be used for hyperparameter optimization
     """
 
-    basis = preprocessor['basis']
+    basis = preprocessor['preprocessor']
 
     from collections import abc
 
@@ -355,13 +355,9 @@ def get_basis_grid(preprocessor):
     return basis_grid
 
 
-def get_grid_cv(hdf5, preprocessor, inputfile, mask=False, spec_agnostic=False):
-    if not mask:
-        inp = json.loads(open(inputfile, 'r').read())
-        pre = json.loads(open(preprocessor, 'r').read())
-    else:
-        inp = {}
-        pre = {}
+def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
+    inp = json.loads(open(inputfile, 'r').read())
+    pre = json.loads(open(preprocessor, 'r').read())
 
     datafile = h5py.File(hdf5[0], 'r')
 
@@ -374,38 +370,30 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False, spec_agnostic=False):
 
     datafile.close()
     if pre:
-        basis = pre['basis']
+        basis = pre['preprocessor']
     else:
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
         basis.update({'extension': 'DRHO'})
     pipeline = get_default_pipeline(basis, all_species, spec_agnostic=spec_agnostic)
 
-    if mask:
-        params = {key: value for key, value in pipeline.start_at(2).get_params().items() if '__' in key}
-        inp.update({'hyperparameters': params})
-        inp.update({'cv': 2, 'n_workers': 1, 'threads_per_worker': 1, 'n_jobs': 1})
-        open(inputfile, 'w').write(json.dumps(inp, indent=4))
-        open(preprocessor, 'w').write(json.dumps({'basis': basis}, indent=4))
-        return None, None
+    if 'hyperparameters' in inp:
+        hyper = inp['hyperparameters']
     else:
-        if 'hyperparameters' in inp:
-            hyper = inp['hyperparameters']
-        else:
-            print('No hyperparameters specified, fitting default pipeline to data')
-            pipeline.fit(data)
-            sys.exit()
+        print('No hyperparameters specified, fitting default pipeline to data')
+        pipeline.fit(data)
+        sys.exit()
 
-        hyper = to_full_hyperparameters(hyper, pipeline.get_params())
+    hyper = to_full_hyperparameters(hyper, pipeline.get_params())
 
-        cv = inp.get('cv', 2)
-        n_workers = inp.get('n_workers', 1)
-        n_jobs = inp.get('n_jobs', 1)
-        n_threads = inp.get('threads_per_worker', 1)
-        verbose = inp.get('verbose', 10)
+    cv = inp.get('cv', 2)
+    n_workers = inp.get('n_workers', 1)
+    n_jobs = inp.get('n_jobs', 1)
+    n_threads = inp.get('threads_per_worker', 1)
+    verbose = inp.get('verbose', 10)
 
-        pipe = Pipeline([('ml', pipeline)])
-        grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=4)
-        return grid_cv
+    pipe = Pipeline([('ml', pipeline)])
+    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=4)
+    return grid_cv
 
 
 def get_preprocessor(preprocessor, atoms, src_path):

@@ -1,0 +1,17 @@
+{
+    "hyperparameters": {
+        "estimator__n_nodes": 4,
+        "estimator__n_layers": 1,
+        "estimator__b": 1e-3,
+        "estimator__alpha": 0.001,
+        "estimator__max_steps": 1001,
+        "estimator__test_size": 0.0,
+        "estimator__valid_size": 0,
+        "estimator__random_seed": null,
+        "estimator__batch_size": 0,
+        "estimator__activation": "sigmoid",
+        "estimator__optimizer": null,
+        "estimator__target_loss": 0.0005
+    },
+    "cv": 2
+}

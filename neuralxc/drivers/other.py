@@ -76,64 +76,102 @@ def get_real_basis(atoms, basis):
 
     return real_basis
 
+def fetch_default_driver(kind, hint='',out=''):
 
-def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/', mask=False ):
+    from collections import abc
+    hint_cont = json.load(open(hint,'r'))
+
+    def nested_dict_iter(nested):
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                yield from nested_dict_iter(value)
+            else:
+                yield key, value
+
+    def find_value_in_nested(nested, truekey):
+        for key, value in nested_dict_iter(nested):
+            if key == truekey:
+                return value
+        return None
+
+    if kind =='pre':
+        app = 'siesta'
+        for key, value in nested_dict_iter(hint_cont):
+            if key == 'application':
+                app = value
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/pre_{}.json'.format(app),'r'))
+    else:
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json','r'))
+
+    for key1 in df_cont:
+        if isinstance(df_cont[key1], dict):
+            for key2 in df_cont[key1]:
+                found = find_value_in_nested(hint_cont, key2)
+                if found:
+                    df_cont[key1][key2] = found
+        else:
+            found = find_value_in_nested(hint_cont, key1)
+            if found:
+                df_cont[key1] = found
+
+    if out == '':
+        out = kind + '.json'
+
+    open(out,'w').write(json.dumps(df_cont, indent=4))
+
+def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/' ):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
     preprocessor_path = preprocessor
 
-    if not mask:
-        pre = json.loads(open(preprocessor, 'r').read())
-    else:
-        pre = {}
+    pre = json.loads(open(preprocessor, 'r').read())
 
     atoms = read(xyz, ':')
 
     preprocessor = get_preprocessor(preprocessor, atoms, srcdir)
-    if not mask:
-        start = time.time()
+    start = time.time()
 
+    if 'hdf5' in dest:
+        dest_split = dest.split('/')
+        file, system, method = dest_split + [''] * (3 - len(dest_split))
+        workdir = '.tmp'
+        delete_workdir = True
+    else:
+        workdir = dest
+        delete_workdir = False
+
+    try:
+        os.mkdir(workdir)
+    except FileExistsError:
+        delete_workdir = False
+        pass
+    print('======Projecting onto basis sets======')
+    basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
+
+    for basis_instr in basis_grid:
+        preprocessor.basis_instructions = basis_instr
+        print('BI', basis_instr)
+
+        if basis_instr.get('application', 'siesta') == 'pyscf':
+            real_basis = get_real_basis(atoms, basis_instr['basis'])
+            for key in real_basis:
+                basis_instr[key] = real_basis[key]
+            open(preprocessor_path, 'w').write(json.dumps({'preprocessor': basis_instr}))
+        filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
+        data = preprocessor.fit_transform(None)
+        np.save(filename, data)
         if 'hdf5' in dest:
-            dest_split = dest.split('/')
-            file, system, method = dest_split + [''] * (3 - len(dest_split))
-            workdir = '.tmp'
-            delete_workdir = True
-        else:
-            workdir = dest
-            delete_workdir = False
+            add_data_driver(hdf5=file,
+                            system=system,
+                            method=method,
+                            density=filename,
+                            add=[],
+                            traj=xyz,
+                            override=True)
 
-        try:
-            os.mkdir(workdir)
-        except FileExistsError:
-            delete_workdir = False
-            pass
-        print('======Projecting onto basis sets======')
-        basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
-
-        for basis_instr in basis_grid:
-            preprocessor.basis_instructions = basis_instr
-            print('BI', basis_instr)
-
-            if basis_instr.get('application', 'siesta') == 'pyscf':
-                real_basis = get_real_basis(atoms, basis_instr['basis'])
-                for key in real_basis:
-                    basis_instr[key] = real_basis[key]
-                open(preprocessor_path, 'w').write(json.dumps({'basis': basis_instr}))
-            filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
-            data = preprocessor.fit_transform(None)
-            np.save(filename, data)
-            if 'hdf5' in dest:
-                add_data_driver(hdf5=file,
-                                system=system,
-                                method=method,
-                                density=filename,
-                                add=[],
-                                traj=xyz,
-                                override=True)
-
-                f = h5py.File(file)
-                f[system].attrs.update({'species': preprocessor.species_string})
-                f.close()
-        if delete_workdir:
-            shutil.rmtree(workdir)
+            f = h5py.File(file)
+            f[system].attrs.update({'species': preprocessor.species_string})
+            f.close()
+    if delete_workdir:
+        shutil.rmtree(workdir)

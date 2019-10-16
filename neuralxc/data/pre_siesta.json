@@ -1,0 +1,12 @@
+{
+"preprocessor":
+{
+     "X": {"n":1,"l":2,"r_o":1,"help":"replace X by species (unless agnostic)"},
+     "extension": "DRHO",
+     "application": "siesta",
+     "spec_agnostic": false
+},
+"engine_kwargs": {"pseudoloc" : ".",
+                  "fdf_path" : null},
+"n_workers" : 1
+}

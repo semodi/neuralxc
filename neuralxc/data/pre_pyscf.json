@@ -1,0 +1,9 @@
+{
+"preprocessor":
+{
+     "basis": "ccpvtz-jkfit",
+     "extension": "chkpt",
+     "application": "pyscf"
+},
+"n_workers" : 1
+}

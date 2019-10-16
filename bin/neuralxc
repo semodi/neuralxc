@@ -98,8 +98,7 @@ if __name__ == '__main__':
 
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
     fit.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
-    fit.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    fit.add_argument('--mask', action=('store_true'), help='Create a config file mask')
+    fit.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
     fit.add_argument('--hdf5',
                      metavar='hdf5',
                      type=str,
@@ -133,14 +132,14 @@ if __name__ == '__main__':
     ad = subparser.add_parser('adiabatic', description='Fit a NeuralXC model adiabatically')
     ad.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
-    ad.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    ad.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
     ad.add_argument('--data',
                     metavar='data',
                     type=str,
                     default='',
                     help='Start from this dataset instead of computing iteration 0')
-    ad.add_argument('--config2',
-                    metavar='config2',
+    ad.add_argument('--hyper2',
+                    metavar='hyper2',
                     type=str,
                     default='',
                     help='Path to .json configuration file setting hyperparameters used for iteration > 0')
@@ -179,14 +178,14 @@ if __name__ == '__main__':
     wf = subparser.add_parser('workflow', description='Fit a NeuralXC model iteratively')
     wf.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     wf.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
-    wf.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    wf.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('--data',
                     metavar='data',
                     type=str,
                     default='',
                     help='Start from this dataset instead of computing iteration 0')
-    wf.add_argument('--config2',
-                    metavar='config2',
+    wf.add_argument('--hyper2',
+                    metavar='hyper2',
                     type=str,
                     default='',
                     help='Path to .json configuration file setting hyperparameters used for iteration > 0')
@@ -259,7 +258,7 @@ if __name__ == '__main__':
     # ============= Chain ================
 
     chain = subparser.add_parser('chain', description='Chain NeuralXC models')
-    chain.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
+    chain.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
     chain.add_argument('--model', metavar='model', type=str, help='Continue training model found at this location')
     chain.add_argument('--dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
     chain.set_defaults(func=chain_driver)
@@ -290,10 +289,25 @@ if __name__ == '__main__':
                      help='Destination where to store data,\
                                                                         can be either a directory or an .hdf5 file (with groups)'
                      )
-    pre.add_argument('--mask', action=('store_true'), help='Create a config file mask')
     pre.add_argument('--xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
     pre.set_defaults(func=pre_driver)
 
+    df = subparser.add_parser('default', description='Fetch default configuration files')
+    df.add_argument('kind', action='store', help='Preprocessor (pre) or hyperparameter (hyper) config file',
+        choices=['pre','hyper'])
+    df.add_argument('--hint',
+                     metavar='hint',
+                     type=str,
+                     default='',
+                     help='Partially complete config file to fill with defaults'
+                     )
+    df.add_argument('--out',
+                     metavar='out',
+                     type=str,
+                     default='',
+                     help='Store to (default pre.json/hyper.json)'
+                     )
+    df.set_defaults(func=fetch_default_driver)
     args = parser.parse_args()
 
     args_dict = args.__dict__

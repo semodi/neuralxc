@@ -143,9 +143,9 @@ def merge_driver(chained, merged):
 
 def adiabatic_driver(xyz,
                      preprocessor,
-                     config,
+                     hyper,
                      data='',
-                     config2='',
+                     hyper2='',
                      maxit=5,
                      tol=0.0005,
                      b0=1,
@@ -183,7 +183,7 @@ def adiabatic_driver(xyz,
             mkdir('it0')
             shcopy(data, 'it0/data.hdf5')
             shcopy(preprocessor, 'it0/pre.json')
-            shcopy(config, 'it0/hyper.json')
+            shcopy(hyper, 'it0/hyper.json')
             os.chdir('it0')
             open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
             if sets:
@@ -193,7 +193,7 @@ def adiabatic_driver(xyz,
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model=model0,
                                         ensemble=ensemble,
                                         sets='sets.inp',
@@ -209,14 +209,14 @@ def adiabatic_driver(xyz,
                 shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(config, 'it{}/hyper.json'.format(iteration))
+            shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
             driver(read(xyz, ':'),
-                   pre['basis'].get('application', 'siesta'),
+                   pre['preprocessor'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=pre.get('engine_kwargs', {}))
@@ -241,7 +241,7 @@ def adiabatic_driver(xyz,
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model=model0,
                                         ensemble=ensemble,
                                         sets='sets.inp',
@@ -259,7 +259,7 @@ def adiabatic_driver(xyz,
             print('====== Iteration {} ======'.format(iteration))
             mkdir('it{}'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(config, 'it{}/hyper.json'.format(iteration))
+            shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
             if sets:
@@ -269,7 +269,7 @@ def adiabatic_driver(xyz,
             engine_kwargs = {'nxc': '../../best_model'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
             driver(read(xyz, ':'),
-                   pre['basis'].get('application', 'siesta'),
+                   pre['preprocessor'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
@@ -290,7 +290,7 @@ def adiabatic_driver(xyz,
             open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
 
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model='best_model',
                                         sets='sets.inp',
                                         b=b)
@@ -303,9 +303,9 @@ def adiabatic_driver(xyz,
 
 def workflow_driver(xyz,
                     preprocessor,
-                    config,
+                    hyper,
                     data='',
-                    config2='',
+                    hyper2='',
                     maxit=5,
                     tol=0.0005,
                     hotstart=0,
@@ -339,7 +339,7 @@ def workflow_driver(xyz,
             mkdir('it0')
             shcopy(data, 'it0/data.hdf5')
             shcopy(preprocessor, 'it0/pre.json')
-            shcopy(config, 'it0/hyper.json')
+            shcopy(hyper, 'it0/hyper.json')
             os.chdir('it0')
             open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
             if sets:
@@ -350,7 +350,7 @@ def workflow_driver(xyz,
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model=model0,
                                         ensemble=ensemble,
                                         sets='sets.inp',
@@ -365,7 +365,7 @@ def workflow_driver(xyz,
                 shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(config, 'it{}/hyper.json'.format(iteration))
+            shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
             if sets:
@@ -373,7 +373,7 @@ def workflow_driver(xyz,
             mkdir('workdir')
             engine_kwargs = pre.get('engine_kwargs', {})
             driver(read(xyz, ':'),
-                   pre['basis'].get('application', 'siesta'),
+                   pre['preprocessor'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
@@ -398,7 +398,7 @@ def workflow_driver(xyz,
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model=model0,
                                         ensemble=ensemble,
                                         sets='sets.inp',
@@ -415,10 +415,10 @@ def workflow_driver(xyz,
             mkdir('it{}'.format(iteration))
             shcopy('it{}/data.hdf5'.format(iteration - 1), 'it{}/data.hdf5'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            if config2:
-                shcopy(config2, 'it{}/hyper.json'.format(iteration))
+            if hyper2:
+                shcopy(hyper2, 'it{}/hyper.json'.format(iteration))
             else:
-                shcopy(config, 'it{}/hyper.json'.format(iteration))
+                shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
@@ -433,7 +433,7 @@ def workflow_driver(xyz,
             engine_kwargs = {'nxc': '../../nxc'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
             driver(read(xyz, ':'),
-                   pre['basis'].get('application', 'siesta'),
+                   pre['preprocessor'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
@@ -465,9 +465,9 @@ def workflow_driver(xyz,
                     os.chdir('../')
                 break
 
-            chain_driver(config='hyper.json', model='merged', dest='chained')
+            chain_driver(hyper='hyper.json', model='merged', dest='chained')
             statistics_fit = fit_driver(preprocessor='pre.json',
-                                        config='hyper.json',
+                                        hyper='hyper.json',
                                         model='chained',
                                         sets='sets.inp',
                                         hyperopt=True)
@@ -496,7 +496,7 @@ def workflow_driver(xyz,
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
     driver(read(xyz, ':'),
-           pre['basis'].get('application', 'siesta'),
+           pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
            kwargs=engine_kwargs)
@@ -520,9 +520,8 @@ def workflow_driver(xyz,
 
 
 def fit_driver(preprocessor,
-               config,
+               hyper,
                hdf5=None,
-               mask=False,
                sets='',
                sample='',
                cutoff=0.0,
@@ -532,22 +531,16 @@ def fit_driver(preprocessor,
                b=-1):
     """ Fits a NXCPipeline to the provided data
     """
-    inputfile = config
-    preprocessor = preprocessor
+    inputfile = hyper
 
     if sets != '':
         hdf5 = parse_sets_input(sets)
     else:
         hdf5 = hdf5
 
-    mask = mask
 
-    if not mask:
-        inp = json.loads(open(inputfile, 'r').read())
-        pre = json.loads(open(preprocessor, 'r').read())
-    else:
-        inp = {}
-        pre = {}
+    inp = json.loads(open(inputfile, 'r').read())
+    pre = json.loads(open(preprocessor, 'r').read())
 
     apply_to = []
     for pidx, path in enumerate(hdf5[1]):
@@ -555,8 +548,7 @@ def fit_driver(preprocessor,
             apply_to.append(pidx)
             hdf5[1][pidx] = path[1:]
 
-    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, mask, spec_agnostic=pre['basis'].get('spec_agnostic', False))
-    if mask: return 0
+    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=pre['preprocessor'].get('spec_agnostic', False))
 
     new_model = grid_cv.estimator
     param_grid = grid_cv.param_grid
@@ -570,7 +562,7 @@ def fit_driver(preprocessor,
             new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
 
     datafile = h5py.File(hdf5[0], 'r')
-    basis_key = basis_to_hash(pre['basis'])
+    basis_key = basis_to_hash(pre['preprocessor'])
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
 
     if model:
@@ -676,9 +668,9 @@ def fit_driver(preprocessor,
     return results
 
 
-def chain_driver(config, model, dest='chained_estimator'):
+def chain_driver(hyper, model, dest='chained_estimator'):
 
-    inputfile = config
+    inputfile = hyper
 
     inp = json.loads(open(inputfile, 'r').read())
 
