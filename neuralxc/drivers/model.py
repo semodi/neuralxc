@@ -141,7 +141,8 @@ def merge_driver(chained, merged):
     nxc_tf._pipeline.save(merged, True, True)
 
 
-def adiabatic_driver(preprocessor,
+def adiabatic_driver(xyz,
+                     preprocessor,
                      config,
                      data='',
                      config2='',
@@ -171,6 +172,7 @@ def adiabatic_driver(preprocessor,
         ensemble = False
         model0 = ''
 
+    xyz = os.path.abspath(xyz)
     if nozero:
         E0 = 0
     else:
@@ -213,12 +215,12 @@ def adiabatic_driver(preprocessor,
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            driver(read(pre['traj_path'], ':'),
+            driver(read(xyz, ':'),
                    pre['basis'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=pre.get('engine_kwargs', {}))
-            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz,'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(hdf5='data.hdf5',
                             system='system',
                             method='it0',
@@ -266,12 +268,12 @@ def adiabatic_driver(preprocessor,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../best_model'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            driver(read(pre['traj_path'], ':'),
+            driver(read(xyz, ':'),
                    pre['basis'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz, 'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
                             system='system',
@@ -299,7 +301,8 @@ def adiabatic_driver(preprocessor,
             print('Maximum number of iterations reached. Proceeding to test set...')
 
 
-def workflow_driver(preprocessor,
+def workflow_driver(xyz,
+                    preprocessor,
                     config,
                     data='',
                     config2='',
@@ -329,7 +332,7 @@ def workflow_driver(preprocessor,
         E0 = 0
     else:
         E0 = None
-
+    xyz = os.path.abspath(xyz)
     pre = json.loads(open(preprocessor, 'r').read())
     if hotstart == 0:
         if data:
@@ -369,12 +372,12 @@ def workflow_driver(preprocessor,
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
             engine_kwargs = pre.get('engine_kwargs', {})
-            driver(read(pre['traj_path'], ':'),
+            driver(read(xyz, ':'),
                    pre['basis'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(hdf5='data.hdf5',
                             system='system',
                             method='it0',
@@ -429,12 +432,12 @@ def workflow_driver(preprocessor,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../nxc'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            driver(read(pre['traj_path'], ':'),
+            driver(read(xyz, ':'),
                    pre['basis'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz,'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
                             system='system',
@@ -492,7 +495,7 @@ def workflow_driver(preprocessor,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read(pre['traj_path'], ':'),
+    driver(read(xyz, ':'),
            pre['basis'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),

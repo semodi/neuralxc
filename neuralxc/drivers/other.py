@@ -77,30 +77,20 @@ def get_real_basis(atoms, basis):
     return real_basis
 
 
-def pre_driver(preprocessor, dest='.tmp/', mask=False, xyz=''):
+def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/', mask=False ):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
     preprocessor_path = preprocessor
-    dest = dest
-    xyz = xyz
-    mask = mask
 
     if not mask:
         pre = json.loads(open(preprocessor, 'r').read())
     else:
         pre = {}
 
-    if 'traj_path' in pre and pre['traj_path'] != '':
-        atoms = read(pre['traj_path'], ':')
-        trajectory_path = pre['traj_path']
-    elif xyz != '':
-        atoms = read(xyz, ':')
-        trajectory_path = xyz
-    else:
-        raise ValueError('Must specify path to to xyz file')
+    atoms = read(xyz, ':')
 
-    preprocessor = get_preprocessor(preprocessor, mask, xyz)
+    preprocessor = get_preprocessor(preprocessor, atoms, srcdir)
     if not mask:
         start = time.time()
 
@@ -134,21 +124,14 @@ def pre_driver(preprocessor, dest='.tmp/', mask=False, xyz=''):
             data = preprocessor.fit_transform(None)
             np.save(filename, data)
             if 'hdf5' in dest:
-                data_args = namedtuple(\
-                'data_ns','hdf5 system method density slice add traj override')(\
-                file,system,method,filename, ':',[],trajectory_path, True)
                 add_data_driver(hdf5=file,
                                 system=system,
                                 method=method,
                                 density=filename,
                                 add=[],
-                                traj=trajectory_path,
+                                traj=xyz,
                                 override=True)
 
-                # data_args = namedtuple(\
-                # 'data_ns','hdf5 system method density slice add traj override')(\
-                # file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
-                # add_data_driver(data_args)
                 f = h5py.File(file)
                 f[system].attrs.update({'species': preprocessor.species_string})
                 f.close()

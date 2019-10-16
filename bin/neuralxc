@@ -131,6 +131,7 @@ if __name__ == '__main__':
 
     # =============  Adiabatic  ====================
     ad = subparser.add_parser('adiabatic', description='Fit a NeuralXC model adiabatically')
+    ad.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     ad.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
     ad.add_argument('--data',
@@ -176,6 +177,7 @@ if __name__ == '__main__':
 
     # ============= Workflow ====================
     wf = subparser.add_parser('workflow', description='Fit a NeuralXC model iteratively')
+    wf.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     wf.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     wf.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
     wf.add_argument('--data',

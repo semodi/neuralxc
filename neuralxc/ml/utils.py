@@ -408,36 +408,22 @@ def get_grid_cv(hdf5, preprocessor, inputfile, mask=False, spec_agnostic=False):
         return grid_cv
 
 
-def get_preprocessor(preprocessor, mask=False, xyz=''):
-    if not mask:
-        pre = json.loads(open(preprocessor, 'r').read())
-    else:
-        pre = {}
+def get_preprocessor(preprocessor, atoms, src_path):
+    pre = json.loads(open(preprocessor, 'r').read())
 
-    if 'traj_path' in pre:
-        atoms = read(pre['traj_path'], '0')
-    elif xyz != '':
-        atoms = read(xyz, '0')
-    else:
-        raise ValueError('Must specify path to to xyz file')
+    species = ''.join(atoms[0].get_chemical_symbols())
 
-    species = ''.join(atoms.get_chemical_symbols())
+    for a in atoms:
+        species2 = ''.join(a.get_chemical_symbols())
+        if not species2 == species:
+            print('Warning (in get_preprocessor): Dataset not homogeneous')
+
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
 
-    if mask:
-        open(preprocessor,
-             'w').write(json.dumps({
-                 'basis': basis,
-                 'src_path': '',
-                 'traj_path': xyz,
-                 'n_workers': 1
-             }, indent=4))
-        return None, None
-    else:
-        basis_grid = get_basis_grid(pre)
+    basis_grid = get_basis_grid(pre)
 
-        preprocessor = Preprocessor(basis, pre['src_path'], pre['traj_path'], pre.get('n_workers', 1))
-        return preprocessor
+    preprocessor = Preprocessor(basis, src_path, atoms, pre.get('n_workers', 1))
+    return preprocessor
 
 
 class SampleSelector(BaseEstimator):

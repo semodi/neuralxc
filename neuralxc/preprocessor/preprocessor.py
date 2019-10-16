@@ -15,10 +15,10 @@ from dask.distributed import Client, LocalCluster
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):
-    def __init__(self, basis_instructions, src_path, traj_path, target_path, num_workers=1):
+    def __init__(self, basis_instructions, src_path, atoms, target_path, num_workers=1):
         self.basis_instructions = basis_instructions
         self.src_path = src_path
-        self.traj_path = traj_path
+        self.atoms = atoms
         self.computed_basis = {}
         self.num_workers = num_workers
 
@@ -79,8 +79,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         if self.num_workers == 1:
             client = FakeClient()
 
-        atoms = read(self.traj_path, ':')
-        self.atoms = atoms
+        atoms = self.atoms
         extension = self.basis_instructions.get('extension', 'RHOXC')
         if extension[0] != '.':
             extension = '.' + extension
