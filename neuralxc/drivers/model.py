@@ -32,7 +32,6 @@ import neuralxc as xc
 import sys
 import copy
 import pickle
-from types import SimpleNamespace as SN
 from .data import *
 from .other import *
 from neuralxc.preprocessor import driver
@@ -230,28 +229,22 @@ def adiabatic_driver(preprocessor,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=pre.get('engine_kwargs', {}))
-            pre_driver(
-                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+            pre_driver(preprocessor='pre.json',
+                dest='data.hdf5/system/it{}'.format(iteration))
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='it0',
                    add=['energy'],
                    traj='workdir/results.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+                   zero=E0)
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='ref',
                    add=['energy'],
                    traj='../sampled.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
+                   zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
@@ -290,19 +283,15 @@ def adiabatic_driver(preprocessor,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(
-                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
+            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='it{}'.format(iteration),
                    add=['energy'],
                    traj='workdir/results.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
+                   zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -397,28 +386,21 @@ def workflow_driver(preprocessor,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(
-                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='it0',
                    add=['energy'],
                    traj='workdir/results.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+                   zero=E0)
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='ref',
                    add=['energy'],
                    traj='../sampled.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
+                   zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
@@ -464,19 +446,15 @@ def workflow_driver(preprocessor,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(
-                SN(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration), mask=False, xyz=False))
+            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
-            add_data_driver(
-                SN(hdf5='data.hdf5',
+            add_data_driver(hdf5='data.hdf5',
                    system='system',
                    method='it{}'.format(iteration),
                    add=['energy'],
                    traj='workdir/results.traj',
-                   density='',
                    override=True,
-                   slice=':',
-                   zero=E0))
+                   zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -531,26 +509,20 @@ def workflow_driver(preprocessor,
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
            kwargs=engine_kwargs)
-    add_data_driver(
-        SN(hdf5='data.hdf5',
+    add_data_driver(hdf5='data.hdf5',
            system='system',
            method='testing/ref',
            add=['energy'],
            traj='../testing.traj',
-           density='',
            override=True,
-           slice=':',
-           zero=E0))
-    add_data_driver(
-        SN(hdf5='data.hdf5',
+           zero=E0)
+    add_data_driver(hdf5='data.hdf5',
            system='system',
            method='testing/nxc',
            add=['energy'],
            traj='workdir/results.traj',
-           density='',
            override=True,
-           slice=':',
-           zero=E0))
+           zero=E0)
 
     statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
     open('statistics_test', 'w').write(json.dumps(statistics_test))
@@ -742,7 +714,7 @@ def chain_driver(config, model, dest='chained_estimator'):
     old_model.save(dest, True)
 
 
-def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False):
+def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction'):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5

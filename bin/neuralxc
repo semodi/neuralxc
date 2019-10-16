@@ -31,11 +31,11 @@ if __name__ == '__main__':
                         type=str,
                         nargs='*',
                         help='Which quantities to add (energy, forces, density)')
-    adddat.add_argument('-traj', metavar='traj', type=str, default='', help='Path to .xyz/.traj file')
-    adddat.add_argument('-density', metavar='density', type=str, default='', help='Path to basis representation file')
-    adddat.add_argument('-override', action=('store_true'), help='If exists, override?')
-    adddat.add_argument('-slice', metavar='slice', type=str, default=':', help='Only add slice of dataset')
-    adddat.add_argument('-zero',
+    adddat.add_argument('--traj', metavar='traj', type=str, default='', help='Path to .xyz/.traj file')
+    adddat.add_argument('--density', metavar='density', type=str, default='', help='Path to basis representation file')
+    adddat.add_argument('--override', action=('store_true'), help='If exists, override?')
+    adddat.add_argument('--slice', metavar='slice', type=str, default=':', help='Only add slice of dataset')
+    adddat.add_argument('--zero',
                         metavar='zero',
                         type=int,
                         default=None,
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     mergedat.add_argument('file', action='store', type=str, help='Path to hdf5 file')
     mergedat.add_argument('--base', action='store', type=str, nargs='+', help='Baseline sets', required=True)
     mergedat.add_argument('--ref', action='store', type=str, nargs='+', help='Reference sets', required=True)
-    mergedat.add_argument('--o', action='store', type=str, help='Destination', required=True)
+    mergedat.add_argument('--out', action='store', type=str, help='Destination', required=True)
     mergedat.add_argument('--optE0', action='store_true', help='Optimize energy offset across datasets (recommended)')
     mergedat.add_argument('--pre', action='store', default='', type=str, help='Preprocessor file defining basis set')
 
@@ -105,13 +105,13 @@ if __name__ == '__main__':
                      type=str,
                      nargs=3,
                      help='Path to hdf5 file, baseline data, reference data')
-    fit.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    fit.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     fit.add_argument('--sample',
                      metavar='sample',
                      type=str,
                      default='',
                      help='Only use a subsample of data contained in hdf5 file')
-    fit.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    fit.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     fit.add_argument('--model',
                      metavar='model',
                      type=str,
@@ -160,7 +160,7 @@ if __name__ == '__main__':
                     type=int,
                     default='0',
                     help='Continue workflow at this iteration ( -1: only do testing )')
-    ad.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    ad.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     ad.add_argument('--nozero',
                     action='store_true',
                     help='Do not automatically set energy origins for every dataset by using min')
@@ -199,7 +199,7 @@ if __name__ == '__main__':
                     type=int,
                     default='0',
                     help='Continue workflow at this iteration ( -1: only do testing )')
-    wf.add_argument('-sets', metavar='sets', type=str, default='', help='Path to file defining sets')
+    wf.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     wf.add_argument('--nozero',
                     action='store_true',
                     help='Do not automatically set energy origins for every dataset by using min')
@@ -216,41 +216,41 @@ if __name__ == '__main__':
     # =============== Evaluate =====================
 
     eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
-    eval.add_argument('-model', metavar='model', default='', help='Path to NeuralXC model')
-    eval.add_argument('-hdf5',
+    eval.add_argument('--model', metavar='model', default='', help='Path to NeuralXC model')
+    eval.add_argument('--hdf5',
                       metavar='hdf5',
                       type=str,
                       nargs=3,
                       help='Path to hdf5 file, baseline data, reference data')
-    eval.add_argument('-plot', action='store_true', help='Create scatterplot?')
-    eval.add_argument('-savefig', action='store', type=str, default='', help='Save scatterplot?')
-    eval.add_argument('-cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    eval.add_argument('--plot', action='store_true', help='Create scatterplot?')
+    eval.add_argument('--savefig', action='store', type=str, default='', help='Save scatterplot?')
+    eval.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     eval.set_defaults(predict=False)
     eval.set_defaults(func=eval_driver)
 
     # =============== Predict =====================
 
     pred = subparser.add_parser('predict', description='Predict energies with NeuralXC model')
-    pred.add_argument('-model', metavar='model', help='Path to NeuralXC model')
-    pred.add_argument('-hdf5',
+    pred.add_argument('--model', metavar='model', help='Path to NeuralXC model')
+    pred.add_argument('--hdf5',
                       metavar='hdf5',
                       type=str,
                       nargs=2,
                       help='Path to hdf5 file, baseline data, reference data')
-    pred.add_argument('-dest', metavar='dest', type=str, default='prediction', help='Destination where to store data')
+    pred.add_argument('--dest', metavar='dest', type=str, default='prediction', help='Destination where to store data')
     pred.set_defaults(predict=True)
     pred.set_defaults(func=eval_driver)
 
     # ============= Stack ================
 
     ens = subparser.add_parser('stack', description='Stack mutltiple NeuralXC models')
-    ens.add_argument('-operation',
+    ens.add_argument('--operation',
                      metavar='operation',
                      type=str,
                      default='sum',
                      help='Operation to combine estimator outputs')
-    ens.add_argument('-dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
-    ens.add_argument('-estonly', action=('store_true'), help='Only stack the final estimators')
+    ens.add_argument('--dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
+    ens.add_argument('--estonly', action=('store_true'), help='Only stack the final estimators')
     ens.add_argument('models', action='store', type=str, nargs='+', help='Paths to models to combine')
     ens.set_defaults(func=ensemble_driver)
 
@@ -258,8 +258,8 @@ if __name__ == '__main__':
 
     chain = subparser.add_parser('chain', description='Chain NeuralXC models')
     chain.add_argument('config', action='store', help='Path to .json configuration file setting hyperparameters')
-    chain.add_argument('-model', metavar='model', type=str, help='Continue training model found at this location')
-    chain.add_argument('-dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
+    chain.add_argument('--model', metavar='model', type=str, help='Continue training model found at this location')
+    chain.add_argument('--dest', metavar='dest', type=str, default='chained_estimator', help='Model destination')
     chain.set_defaults(func=chain_driver)
 
     #================ Merge ==========
@@ -272,8 +272,8 @@ if __name__ == '__main__':
     #================ Tensorflow model converter ==========
 
     tfcon = subparser.add_parser('convert-tf', description='Converts a tensorflow NeuralXC into a numpy NeuralXC')
-    tfcon.add_argument('tf', action='store', help='Path to tensorflow model')
-    tfcon.add_argument('np', action='store', help='Destination for numpy model')
+    tfcon.add_argument('tf_path', action='store', help='Path to tensorflow model')
+    tfcon.add_argument('np_path', action='store', help='Destination for numpy model')
     tfcon.set_defaults(func=convert_tf)
 
     # =======================================================
@@ -281,15 +281,15 @@ if __name__ == '__main__':
     # =======================================================
     pre = subparser.add_parser('pre', description='Preprocess electron density')
     pre.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
-    pre.add_argument('-dest',
+    pre.add_argument('--dest',
                      metavar='dest',
                      type=str,
                      default='.tmp/',
                      help='Destination where to store data,\
                                                                         can be either a directory or an .hdf5 file (with groups)'
                      )
-    pre.add_argument('-mask', action=('store_true'), help='Create a config file mask')
-    pre.add_argument('-xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
+    pre.add_argument('--mask', action=('store_true'), help='Create a config file mask')
+    pre.add_argument('--xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
     pre.set_defaults(func=pre_driver)
 
     args = parser.parse_args()

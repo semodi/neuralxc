@@ -39,10 +39,10 @@ os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
-def plot_basis(args):
+def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
-    basis_instructions = json.loads(open(args.basis, 'r').read())
+    basis_instructions = json.loads(open(basis, 'r').read())
     projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['basis'])
 
     for spec in basis_instructions['basis']:
@@ -77,14 +77,14 @@ def get_real_basis(atoms, basis):
     return real_basis
 
 
-def pre_driver(args):
+def pre_driver(preprocessor, dest='.tmp/', mask = False, xyz = ''):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
-    preprocessor = args.preprocessor
-    dest = args.dest
-    xyz = args.xyz
-    mask = args.mask
+    preprocessor = preprocessor
+    dest = dest
+    xyz = xyz
+    mask = mask
 
     if not mask:
         pre = json.loads(open(preprocessor, 'r').read())
@@ -129,7 +129,7 @@ def pre_driver(args):
                 real_basis = get_real_basis(atoms, basis_instr['basis'])
                 for key in real_basis:
                     basis_instr[key] = real_basis[key]
-                open(args.preprocessor, 'w').write(json.dumps({'basis': basis_instr}))
+                open(preprocessor, 'w').write(json.dumps({'basis': basis_instr}))
             filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
             data = preprocessor.fit_transform(None)
             np.save(filename, data)
