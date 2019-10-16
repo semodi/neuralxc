@@ -59,7 +59,7 @@ class SiestaEngine(BaseEngine):
         # Defaults
         kwargs['label'] = kwargs.get('label', 'siesta')
         kwargs['xc'] = kwargs.get('xc', 'PBE')
-        kwargs['basis_set'] = kwargs.get('basis_set', 'DZP')
+        kwargs['basis_set'] = kwargs.get('basis', 'DZP')
         kwargs['fdf_arguments'] = kwargs.get('fdf_arguments', {'MaxSCFIterations': 200})
         kwargs['pseudo_qualifier'] = kwargs.get('pseudo_qualifier', '')
 
