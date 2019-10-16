@@ -547,6 +547,7 @@ class Energy_Network():
                 each subnetwork belongs to a single atom inside the system
                 and computes the atomic contributio to the total energy
     """
+
     def __init__(self, subnets):
 
         if not isinstance(subnets, list):

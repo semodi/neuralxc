@@ -38,6 +38,7 @@ class DocInherit():
 
     The class itself is also used as a decorator
     """
+
     def __init__(self, mthd):
         self.mthd = mthd
         self.name = mthd.__name__

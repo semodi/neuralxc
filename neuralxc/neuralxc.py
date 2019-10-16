@@ -29,6 +29,7 @@ def prints_error(method):
     """ Decorator:forpy only prints stdout, no error messages,
     therefore print each error message to stdout instead
     """
+
     def wrapper_print_error(*args, **kwargs):
         try:
             return method(*args, **kwargs)

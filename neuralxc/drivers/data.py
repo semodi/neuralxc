@@ -41,8 +41,7 @@ os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
-def add_data_driver(hdf5, system, method, add, traj='',
-    density='', override=False, slice = ':', zero=None):
+def add_data_driver(hdf5, system, method, add, traj='', density='', override=False, slice=':', zero=None):
     """ Adds data to hdf5 file"""
     try:
         file = h5py.File(hdf5, 'r+')
@@ -87,8 +86,7 @@ def add_data_driver(hdf5, system, method, add, traj='',
             add_species(file, system, traj)
             species = file[system].attrs['species']
             data = np.load(density)[ijk]
-            add_density((density.split('/')[-1]).split('.')[0], file, data, system, method,
-                        override)
+            add_density((density.split('/')[-1]).split('.')[0], file, data, system, method, override)
         else:
             raise Exception('Option {} not recognized'.format(which))
 
@@ -100,7 +98,7 @@ def add_data_driver(hdf5, system, method, add, traj='',
     file.close()
 
 
-def merge_data_driver(file, base , ref, out, optE0=False, pre=''):
+def merge_data_driver(file, base, ref, out, optE0=False, pre=''):
 
     if pre:
         pre = json.loads(open(pre, 'r').read())
@@ -123,7 +121,7 @@ def merge_data_driver(file, base , ref, out, optE0=False, pre=''):
     merge_sets(datafile, ref, None, new_name=out + '/ref', E0=E0)
 
 
-def split_data_driver(hdf5, group, label, slice = ':', comp = ''):
+def split_data_driver(hdf5, group, label, slice=':', comp=''):
     """ Split dataset (or all data inside a group) by providing slices"""
     file = h5py.File(hdf5, 'r+')
 
@@ -184,8 +182,7 @@ def delete_data_driver(hdf5, group):
     del file[root]
 
 
-def sample_driver(preprocessor, size, hdf5, dest='sample.npy',
-     cutoff = 0.0):
+def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     """ Given a dataset, perform sampling in feature space"""
 
     preprocessor = preprocessor

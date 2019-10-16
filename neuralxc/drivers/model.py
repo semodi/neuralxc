@@ -95,17 +95,6 @@ def convert_tf(tf_path, np_path):
     nxc_tf = xc.NeuralXC(tf_path)
     pipeline = nxc_tf._pipeline
 
-    #Needs to do a fake run to build the tensorflow graph
-    # unitcell = np.eye(3) * 20
-    # grid = [40] * 3
-    # rho = np.zeros(grid)
-
-    # species = [key for key in pipeline.get_basis_instructions() if len(key) < 3]
-    # positions = np.zeros([len(species), 3])
-
-    # nxc_tf.initialize(unitcell, grid, positions, species)
-    # nxc_tf.get_V(rho)
-    # C = nxc_tf.projector.get_basis_rep(rho, positions, species)
     C = {}
     basis = pipeline.get_basis_instructions()
     for sym in basis:
@@ -229,22 +218,21 @@ def adiabatic_driver(preprocessor,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=pre.get('engine_kwargs', {}))
-            pre_driver(preprocessor='pre.json',
-                dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='it0',
-                   add=['energy'],
-                   traj='workdir/results.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='it0',
+                            add=['energy'],
+                            traj='workdir/results.traj',
+                            override=True,
+                            zero=E0)
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='ref',
-                   add=['energy'],
-                   traj='../sampled.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='ref',
+                            add=['energy'],
+                            traj='../sampled.traj',
+                            override=True,
+                            zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
@@ -286,12 +274,12 @@ def adiabatic_driver(preprocessor,
             pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='it{}'.format(iteration),
-                   add=['energy'],
-                   traj='workdir/results.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='it{}'.format(iteration),
+                            add=['energy'],
+                            traj='workdir/results.traj',
+                            override=True,
+                            zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -388,19 +376,19 @@ def workflow_driver(preprocessor,
                    kwargs=engine_kwargs)
             pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='it0',
-                   add=['energy'],
-                   traj='workdir/results.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='it0',
+                            add=['energy'],
+                            traj='workdir/results.traj',
+                            override=True,
+                            zero=E0)
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='ref',
-                   add=['energy'],
-                   traj='../sampled.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='ref',
+                            add=['energy'],
+                            traj='../sampled.traj',
+                            override=True,
+                            zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
@@ -449,12 +437,12 @@ def workflow_driver(preprocessor,
             pre_driver(preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
-                   system='system',
-                   method='it{}'.format(iteration),
-                   add=['energy'],
-                   traj='workdir/results.traj',
-                   override=True,
-                   zero=E0)
+                            system='system',
+                            method='it{}'.format(iteration),
+                            add=['energy'],
+                            traj='workdir/results.traj',
+                            override=True,
+                            zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -510,19 +498,19 @@ def workflow_driver(preprocessor,
            nworkers=pre.get('n_workers', 1),
            kwargs=engine_kwargs)
     add_data_driver(hdf5='data.hdf5',
-           system='system',
-           method='testing/ref',
-           add=['energy'],
-           traj='../testing.traj',
-           override=True,
-           zero=E0)
+                    system='system',
+                    method='testing/ref',
+                    add=['energy'],
+                    traj='../testing.traj',
+                    override=True,
+                    zero=E0)
     add_data_driver(hdf5='data.hdf5',
-           system='system',
-           method='testing/nxc',
-           add=['energy'],
-           traj='workdir/results.traj',
-           override=True,
-           zero=E0)
+                    system='system',
+                    method='testing/nxc',
+                    add=['energy'],
+                    traj='workdir/results.traj',
+                    override=True,
+                    zero=E0)
 
     statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
     open('statistics_test', 'w').write(json.dumps(statistics_test))
@@ -583,15 +571,10 @@ def fit_driver(preprocessor,
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
 
     if model:
-        # if new_model.steps[-1][1].steps[-1][1]._network == None:
-        #     pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
-        # else:
-        #     pipeline = new_model
         if not new_model.steps[-1][1].steps[-1][1].fitted:
             pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
         else:
             pipeline = new_model
-        # pipeline = new_model
         for set in apply_to:
             selection = (data[:, 0] == set)
             prediction = pipeline.predict(data)[set]
@@ -805,12 +788,6 @@ def ensemble_driver(models, operation='sum', estonly=False, dest='stacked_ensemb
     all_pipelines = []
     for model_path in models:
         all_pipelines.append(xc.ml.network.load_pipeline(model_path))
-
-    #Check for consistency
-    # for pidx, pipeline in enumerate(all_pipelines):
-    # for step0, step1 in zip(all_pipelines[0].steps[:-1], pipeline.steps[:-1]):
-    # if not pickle.dumps(step0[1]) == pickle.dumps(step1[1]):
-    # raise Exception('Parameters for {} in model {} inconsistent'.format(type(step0[1]), pidx))
 
     if estonly:
         all_networks = [pipeline.steps[-1][1] for pipeline in all_pipelines]

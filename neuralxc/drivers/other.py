@@ -77,11 +77,11 @@ def get_real_basis(atoms, basis):
     return real_basis
 
 
-def pre_driver(preprocessor, dest='.tmp/', mask = False, xyz = ''):
+def pre_driver(preprocessor, dest='.tmp/', mask=False, xyz=''):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
-    preprocessor = preprocessor
+    preprocessor_path = preprocessor
     dest = dest
     xyz = xyz
     mask = mask
@@ -129,7 +129,7 @@ def pre_driver(preprocessor, dest='.tmp/', mask = False, xyz = ''):
                 real_basis = get_real_basis(atoms, basis_instr['basis'])
                 for key in real_basis:
                     basis_instr[key] = real_basis[key]
-                open(preprocessor, 'w').write(json.dumps({'basis': basis_instr}))
+                open(preprocessor_path, 'w').write(json.dumps({'basis': basis_instr}))
             filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
             data = preprocessor.fit_transform(None)
             np.save(filename, data)
@@ -137,7 +137,13 @@ def pre_driver(preprocessor, dest='.tmp/', mask = False, xyz = ''):
                 data_args = namedtuple(\
                 'data_ns','hdf5 system method density slice add traj override')(\
                 file,system,method,filename, ':',[],trajectory_path, True)
-                add_data_driver(data_args)
+                add_data_driver(hdf5=file,
+                                system=system,
+                                method=method,
+                                density=filename,
+                                add=[],
+                                traj=trajectory_path,
+                                override=True)
 
                 # data_args = namedtuple(\
                 # 'data_ns','hdf5 system method density slice add traj override')(\

@@ -38,21 +38,10 @@ def test_fit():
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
-    fit_driver(preprocessor='pre.json',
-           config='hyper.json',
-           sets='sets.inp',
-           hyperopt=True)
+    fit_driver(preprocessor='pre.json', config='hyper.json', sets='sets.inp', hyperopt=True)
 
-    fit_driver(preprocessor='pre.json',
-           config='hyper.json',
-           model='model',
-           ensemble=True,
-           sets='sets.inp')
-    fit_driver(preprocessor='pre.json',
-           config='hyper.json',
-           model='best_model',
-           ensemble=True,
-           sets='sets.inp')
+    fit_driver(preprocessor='pre.json', config='hyper.json', model='model', ensemble=True, sets='sets.inp')
+    fit_driver(preprocessor='pre.json', config='hyper.json', model='best_model', ensemble=True, sets='sets.inp')
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
@@ -66,15 +55,11 @@ def test_eval():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    eval_driver( hdf5=['data.hdf5', 'system/it1', 'system/ref'])
+    eval_driver(hdf5=['data.hdf5', 'system/it1', 'system/ref'])
 
-    eval_driver(model='model',
-           hdf5=['data.hdf5', 'system/it0', 'system/ref'])
+    eval_driver(model='model', hdf5=['data.hdf5', 'system/it0', 'system/ref'])
 
-    eval_driver(model='model',
-           hdf5=['data.hdf5', 'system/it0', 'system/ref'],
-           predict=True,
-           dest='prediction')
+    eval_driver(model='model', hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='prediction')
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
@@ -89,10 +74,7 @@ def test_convert():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    fit_driver(preprocessor='pre.json',
-           config='hyper.json',
-           sets='sets.inp',
-           hyperopt=True)
+    fit_driver(preprocessor='pre.json', config='hyper.json', sets='sets.inp', hyperopt=True)
     convert_tf(tf_path='best_model', np_path='converted')
 
     os.chdir(cwd)
@@ -109,11 +91,7 @@ def test_chain_merge():
     os.chdir(test_dir + '/driver_data_tmp')
 
     chain_driver(config='hyper.json', model='model', dest='chained')
-    fit_driver(preprocessor='pre.json',
-           config='hyper.json',
-           model='chained',
-           sets='sets.inp',
-           hyperopt=True)
+    fit_driver(preprocessor='pre.json', config='hyper.json', model='chained', sets='sets.inp', hyperopt=True)
 
     merge_driver(chained='best_model', merged='merged')
 
@@ -134,15 +112,9 @@ def test_ensemble(operation, estonly):
 
     ensemble_driver(operation=operation, dest=operation, models=['model', 'model'], estonly=estonly)
 
-    eval_driver(model='model',
-           hdf5=['data.hdf5', 'system/it0', 'system/ref'],
-           predict=True,
-           dest='single_pred')
+    eval_driver(model='model', hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='single_pred')
 
-    eval_driver(model=operation,
-           hdf5=['data.hdf5', 'system/it0', 'system/ref'],
-           predict=True,
-           dest='ensemble_pred')
+    eval_driver(model=operation, hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='ensemble_pred')
 
     if operation == 'sum':
         assert np.allclose(np.load('single_pred.npy') * 2, np.load('ensemble_pred.npy'), atol=1e-8, rtol=1e-5)
@@ -162,22 +134,21 @@ def test_data():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    add_data_driver(
-           hdf5='data.hdf5',
-           system='system',
-           method='test',
-           add=['energy', 'forces'],
-           traj='results.traj',
-           override=True,
-           zero=10)
+    add_data_driver(hdf5='data.hdf5',
+                    system='system',
+                    method='test',
+                    add=['energy', 'forces'],
+                    traj='results.traj',
+                    override=True,
+                    zero=10)
 
     add_data_driver(hdf5='data.hdf5',
-           system='system',
-           method='test',
-           add=['energy', 'forces'],
-           traj='results.traj',
-           override=True,
-           zero=None)
+                    system='system',
+                    method='test',
+                    add=['energy', 'forces'],
+                    traj='results.traj',
+                    override=True,
+                    zero=None)
 
     split_data_driver(hdf5='data.hdf5', group='system/it0', label='training', slice=':3', comp='testing')
 
