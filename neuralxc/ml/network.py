@@ -94,10 +94,9 @@ class NXCPipeline(Pipeline):
             Use all steps following and including step with index step_idx
         """
 
-        return NXCPipeline(
-            self.steps[step_idx:],
-            basis_instructions=self.basis_instructions,
-            symmetrize_instructions=self.symmetrize_instructions)
+        return NXCPipeline(self.steps[step_idx:],
+                           basis_instructions=self.basis_instructions,
+                           symmetrize_instructions=self.symmetrize_instructions)
 
     def _make_serializable(self, path):
         return self.steps[-1][-1]._make_serializable(os.path.join(path, 'network'))
@@ -354,6 +353,7 @@ class NetworkEstimator(BaseEstimator):
         self.optimizer = optimizer
         self.target_loss = target_loss
         self.verbose = False
+        self.fitted = False
 
     def get_params(self, *args, **kwargs):
         return {
@@ -406,15 +406,15 @@ class NetworkEstimator(BaseEstimator):
 
         #TODO: Currently does not allow to continue training
         self.build_network(X, y)
-        self._network.train(
-            step_size=self.alpha,
-            max_steps=self.max_steps,
-            b_=self.b,
-            train_valid_split=1 - self.valid_size,
-            optimizer=self.optimizer,
-            random_seed=self.random_seed,
-            batch_size=self.batch_size,
-            target_loss=self.target_loss)
+        self._network.train(step_size=self.alpha,
+                            max_steps=self.max_steps,
+                            b_=self.b,
+                            train_valid_split=1 - self.valid_size,
+                            optimizer=self.optimizer,
+                            random_seed=self.random_seed,
+                            batch_size=self.batch_size,
+                            target_loss=self.target_loss)
+        self.fitted = True
 
     def get_gradient(self, X, *args, **kwargs):
 
@@ -439,8 +439,11 @@ class NetworkEstimator(BaseEstimator):
                     old_shape = feat.shape
                     feat = feat.reshape(-1, feat.shape[-1])
 
-                predictions[sys_idx][spec] = self._network.predict(
-                    feat, species=spec.lower(), *args, return_gradient=True, **kwargs)[1].reshape(*old_shape)
+                predictions[sys_idx][spec] = self._network.predict(feat,
+                                                                   species=spec.lower(),
+                                                                   *args,
+                                                                   return_gradient=True,
+                                                                   **kwargs)[1].reshape(*old_shape)
 
         if made_list:
             predictions = predictions[0]
@@ -477,11 +480,12 @@ class NetworkEstimator(BaseEstimator):
                 if kwargs.get('partial', False):
                     fit_kwargs = dict(kwargs)
                     fit_kwargs.pop('partial')
-                    prediction[spec] = self._network.predict(
-                        feat, species=spec.lower(), *args, **fit_kwargs).reshape(n_sys, -1)
+                    prediction[spec] = self._network.predict(feat, species=spec.lower(), *args,
+                                                             **fit_kwargs).reshape(n_sys, -1)
                 else:
-                    prediction += np.sum(
-                        self._network.predict(feat, species=spec.lower(), *args, **kwargs).reshape(n_sys, -1), axis=-1)
+                    prediction += np.sum(self._network.predict(feat, species=spec.lower(), *args,
+                                                               **kwargs).reshape(n_sys, -1),
+                                         axis=-1)
 
             predictions.append(prediction)
 
@@ -757,11 +761,10 @@ class Energy_Network():
             build_graph = False
 
         with self.graph.as_default():
-            config = tf.ConfigProto(
-                intra_op_parallelism_threads=1,
-                inter_op_parallelism_threads=1,
-                device_count={"CPU": 1},
-                use_per_session_threads=True)
+            config = tf.ConfigProto(intra_op_parallelism_threads=1,
+                                    inter_op_parallelism_threads=1,
+                                    device_count={"CPU": 1},
+                                    use_per_session_threads=True)
             # log_device_placement=True)
             config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
             pool = config.session_inter_op_thread_pool.add()
@@ -1222,14 +1225,15 @@ def fc_nn_g(network, i, mean=0, std=1):
 
     for l in range(1, n):
         W.append(
-            tf.get_variable(
-                initializer=tf.truncated_normal_initializer(), shape=[layers[l - 1], layers[l]],
-                name='W' + str(l + 1)))
+            tf.get_variable(initializer=tf.truncated_normal_initializer(),
+                            shape=[layers[l - 1], layers[l]],
+                            name='W' + str(l + 1)))
         b.append(tf.get_variable(initializer=tf.constant_initializer(0), shape=[layers[l]], name='b' + str(l + 1)))
 
     W.append(
-        tf.get_variable(
-            initializer=tf.random_normal_initializer(0, std), shape=[layers[n - 1], targets], name='W' + str(n + 1)))
+        tf.get_variable(initializer=tf.random_normal_initializer(0, std),
+                        shape=[layers[n - 1], targets],
+                        name='W' + str(n + 1)))
     b.append(tf.get_variable(initializer=tf.constant_initializer(mean), shape=[targets], name='b' + str(n + 1)))
 
     for n_g in range(n_copies):
@@ -1239,7 +1243,7 @@ def fc_nn_g(network, i, mean=0, std=1):
             # hidden.append(activations[l+1](tf.matmul(hidden[n_g*n+l],W[l+1])/layers[l]*10 + b[l+1]))
             hidden.append(activations[l + 1](tf.matmul(hidden[n_g * n + l], W[l + 1]) + b[l + 1]))
 
-        mask = tf.reduce_all(tf.equal(tf.gather(x, n_g), np.zeros_like(tf.gather(x, n_g))),axis = -1)
+        mask = tf.reduce_all(tf.equal(tf.gather(x, n_g), np.zeros_like(tf.gather(x, n_g))), axis=-1)
         if n_g == 0:
             e = tf.matmul(hidden[n_g * n + n - 1], W[n]) + b[n]
             e = tf.where(mask, tf.zeros_like(e), e)

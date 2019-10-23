@@ -85,7 +85,7 @@ class GroupedTransformer(ABC):
                       **self.get_kwargs())
                     self._spec_dict[spec].__dict__.update(self.get_params())
                     # Due to padding some rows might be zero, exclude those during fit:
-                    mask= ~np.all(atomic_shape(super_X[spec])==0, axis = -1)
+                    mask = ~np.all(atomic_shape(super_X[spec]) == 0, axis=-1)
                     self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])[mask]))
                 return self
             else:
@@ -176,14 +176,13 @@ class GroupedPCA(GroupedTransformer, PCA):
         super().__init__(**self.get_kwargs())
 
     def get_kwargs(self):
-        return dict(
-            n_components=self.n_components,
-            copy=self.copy,
-            whiten=self.whiten,
-            svd_solver=self.svd_solver,
-            tol=self.tol,
-            iterated_power=self.iterated_power,
-            random_state=self.random_state)
+        return dict(n_components=self.n_components,
+                    copy=self.copy,
+                    whiten=self.whiten,
+                    svd_solver=self.svd_solver,
+                    tol=self.tol,
+                    iterated_power=self.iterated_power,
+                    random_state=self.random_state)
 
     def fit(self, *args, **kwargs):
         if self.n_components == 1:

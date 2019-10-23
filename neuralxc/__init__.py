@@ -13,6 +13,7 @@ from . import ml
 from . import base
 from . import datastructures
 from . import drivers
+from . import pyscf
 # from . import formatter
 #from .projector import *
 #from .mlpipeline import *

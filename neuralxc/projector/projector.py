@@ -12,6 +12,7 @@ from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
 
+
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
 
@@ -75,20 +76,38 @@ class BaseProjector(metaclass=ProjectorRegistry):
         pass
 
 
-class DensityProjector(BaseProjector):
+def DensityProjector(unitcell=None, grid=None, basis_instructions=None):
+
+    application = basis_instructions.get('application', 'siesta')
+    projector_type = basis_instructions.get('projector_type', 'ortho')
+    if application == 'pyscf':
+        projector_type = 'pyscf'
+
+    registry = BaseProjector.get_registry()
+    if not projector_type in registry:
+        raise Exception('Projector: {} not registered'.format(projector_type))
+
+    return registry[projector_type](unitcell, grid, basis_instructions)
+
+
+class DefaultProjector(BaseProjector):
 
     _registry_name = 'default'
 
     #TODO: Make some functions private
-    # @doc_inherit
-    def __init__(self, unitcell, grid, basis_instructions):
+    def __init__(self, unitcell=None, grid=None, basis_instructions=None):
+        """
+        Parameters
+        ------------------
+        unitcell, array float
+        	Unitcell in bohr
+        grid, array float
+        	Grid points per unitcell
+        basis_instructions, dict
+        	Instructions that defines basis
+        """
+        self.basis = basis_instructions
 
-        projector_type = basis_instructions.get('projector_type', 'ortho')
-        registry = BaseProjector.get_registry()
-        if not projector_type in registry:
-            raise Exception('Projector: {} not registered'.format(projector_type))
-
-        self.projector = registry[projector_type](basis_instructions)
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
@@ -107,28 +126,37 @@ class DensityProjector(BaseProjector):
         self.U = U.T
         self.U_inv = np.linalg.inv(U)
         self.a = a
-        self.basis = basis_instructions
         self.W = W
         self.all_angs = {}
 
-    def __getattr__(self, attr):
-        return getattr(self.projector, attr)
-
-    # @doc_inherit
     def get_basis_rep(self, rho, positions, species):
+        """Calculates the basis representation for a given real space density
 
+        Parameters
+        ------------------
+        rho, array, float
+        	Electron density in real space
+        positions, array float
+        	atomic positions
+        species, list string
+        	atomic species (chem. symbols)
+
+        Returns
+        ------------
+        c, dict of np.ndarrays
+        	Basis representation, dict keys correspond to atomic species.
+        """
         basis_rep = {}
         for pos, spec in zip(positions, species):
             if not spec in basis_rep:
                 basis_rep[spec] = []
 
-            idx = '{}{}{}{}'.format(spec,pos[0],pos[1],pos[2])
+            idx = '{}{}{}{}'.format(spec, pos[0], pos[1], pos[2])
             if not idx in self.all_angs:
                 print('NEURALXC: Wrong allocation, recalculating for {}'.format(idx))
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
-            projection, angs = self.project(rho, box, basis, self.W[spec],
-                angs=self.all_angs.get(idx,None))
+            projection, angs = self.project(rho, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
 
             basis_rep[spec].append(projection)
 
@@ -158,8 +186,23 @@ class DensityProjector(BaseProjector):
 
         return basis_rep
 
-    # @doc_inherit
     def get_V(self, dEdC, positions, species, calc_forces=False, rho=None):
+        """Calculates the basis representation for a given real space density
+
+        Parameters
+        ------------------
+        dEdc , dict of numpy.ndarray
+
+        positions, array float
+        	atomic positions
+        species, list string
+        	atomic species (chem. symbols)
+        calc_forces, bool
+        	Calc. and return force corrections + stress corrections (concatenated)
+        Returns
+        ------------
+        V, (force_correction) np.ndarray
+        """
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
 
@@ -176,18 +219,21 @@ class DensityProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
 
-            idx = '{}{}{}{}'.format(spec,pos[0],pos[1],pos[2])
-            V[tuple(box['mesh'])] += self.build(coeffs, box, basis, self.W[spec],
-                angs=self.all_angs.get(idx,None))
+            idx = '{}{}{}{}'.format(spec, pos[0], pos[1], pos[2])
+            V[tuple(box['mesh'])] += self.build(coeffs, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.get_force_correction(rho, coeffs, box,
-                    basis, self.W[spec],angs=self.all_angs.get(idx,None))
+                force_corrections[i] = self.get_force_correction(rho,
+                                                                 coeffs,
+                                                                 box,
+                                                                 basis,
+                                                                 self.W[spec],
+                                                                 angs=self.all_angs.get(idx, None))
 
         stress_correction = np.einsum('ij,ik-> jk', force_corrections, positions)
 
-        force_corrections = np.concatenate([force_corrections, stress_correction], axis = 0)
+        force_corrections = np.concatenate([force_corrections, stress_correction], axis=0)
         if calc_forces:
             return V.real, force_corrections
         else:
@@ -267,7 +313,7 @@ class DensityProjector(BaseProjector):
         dangs = np.zeros([3, n_l**2, len(X.flatten())])
 
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
-            dangs[:,:,ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
+            dangs[:, :, ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
 
         dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
 
@@ -299,9 +345,9 @@ class DensityProjector(BaseProjector):
         timer.start('force:integrals:precomp')
         # Precomputing common factors in loops below (saves factor 3 comp. time)
         RtoL = [R**l for l in range(n_l)]
-        radbyrl = [[rads[n]/RtoL[l] for l in range(n_l)] for n in range(n_rad)]
-        vmult0 = [[(drads[n] - l*radsr[n]) for l in range(n_l)] for n in range(n_rad)]
-        vmult = [[[angs[l][m] * vmult0[n][l] for m in range(2 * l +1)] for l in range(n_l)] for n in range(n_rad)]
+        radbyrl = [[rads[n] / RtoL[l] for l in range(n_l)] for n in range(n_rad)]
+        vmult0 = [[(drads[n] - l * radsr[n]) for l in range(n_l)] for n in range(n_rad)]
+        vmult = [[[angs[l][m] * vmult0[n][l] for m in range(2 * l + 1)] for l in range(n_l)] for n in range(n_rad)]
         timer.stop('force:integrals:precomp')
 
         for ix in range(3):
@@ -321,7 +367,7 @@ class DensityProjector(BaseProjector):
         timer.stop('force:integrals')
         return force
 
-    def build(self, coeffs, box, basis, W=None, angs= None):
+    def build(self, coeffs, box, basis, W=None, angs=None):
         """ Build the contribution from this atom to the potential V in a
         provided bounding box
 
@@ -357,8 +403,8 @@ class DensityProjector(BaseProjector):
         # Automatically detect whether entire charge density or only surrounding
         # box was provided
 
-        timer.start('build:basis_functions',False)
-        timer.start('build:basis_functions:angular',False)
+        timer.start('build:basis_functions', False)
+        timer.start('build:basis_functions:angular', False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -368,36 +414,35 @@ class DensityProjector(BaseProjector):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
                     angs[l].append(self.angulars(l, m, Theta, Phi))
 
-        timer.stop('build:basis_functions:angular',False)
-        timer.start('build:basis_functions:radial',False)
+        timer.stop('build:basis_functions:angular', False)
+        timer.start('build:basis_functions:radial', False)
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
             W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('build:basis_functions:radial',False)
+        timer.stop('build:basis_functions:radial', False)
         v = np.zeros_like(Xm, dtype=complex)
         idx = 0
 
-        timer.stop('build:basis_functions',False)
-        timer.start('build:build',False)
+        timer.stop('build:basis_functions', False)
+        timer.start('build:build', False)
         for n in range(n_rad):
             for l in range(n_l):
                 for m in range(2 * l + 1):
                     v += coeffs[idx] * angs[l][m] * rads[n]
                     idx += 1
 
-
         # coeffs_rs = coeffs.reshape(n_rad,n_l**2)
         # angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
         # rads = np.array(rads)
         #
         # v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads, optimize=False)
-        timer.stop('build:build',False)
+        timer.stop('build:build', False)
         return v
 
-    def project(self, rho, box, basis, W=None, return_dict=False, angs = None):
+    def project(self, rho, box, basis, W=None, return_dict=False, angs=None):
         '''
             Project the real space density rho onto a set of basis functions
 
@@ -436,7 +481,6 @@ class DensityProjector(BaseProjector):
         else:
             small_rho = False
 
-        timer.start('project:basis_functions',False)
         #Build angular part of basis functions
         if not isinstance(angs, list):
             angs = []
@@ -452,11 +496,10 @@ class DensityProjector(BaseProjector):
 
         rads = self.radials(R, basis, W)
 
-        timer.stop('project:basis_functions',False)
-        timer.start('project:project',False)
+        timer.start('project:project', False)
 
         if not small_rho:
-            srho = rho[Xm,Ym,Zm]
+            srho = rho[Xm, Ym, Zm]
 
         #zero_pad_angs (so that it can be converted to numpy array):
         zeropad = np.zeros_like(Xm)
@@ -465,19 +508,18 @@ class DensityProjector(BaseProjector):
             angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
         angs_padded = np.array(angs_padded)
 
-
         rads = np.array(rads) * self.V_cell
-        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm',angs_padded,rads,srho,optimize=True)
+        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho, optimize=True)
         coeff = []
 
         #remove zero padding from m
         for n in range(n_rad):
             for l in range(n_l):
                 for m in range(2 * n_l + 1):
-                    if abs(m-n_l) <= l:
-                        coeff.append(coeff_array[n,l,m])
+                    if abs(m - n_l) <= l:
+                        coeff.append(coeff_array[n, l, m])
 
-        timer.stop('project:project',False)
+        timer.stop('project:project', False)
         if return_dict:
             return coeff_dict, angs
         else:
@@ -528,12 +570,9 @@ class DensityProjector(BaseProjector):
         return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
 
 
-class OrthoProjector(DensityProjector):
+class OrthoProjector(DefaultProjector):
 
     _registry_name = 'ortho'
-
-    def __init__(self, *args, **kwargs):
-        pass
 
     @classmethod
     def dg(cls, r, basis, a):

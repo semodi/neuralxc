@@ -2,6 +2,7 @@ name: test
 channels:
   - conda-forge
   - defaults
+  - pyscf
 dependencies:
   - ase
   - pip
@@ -25,6 +26,7 @@ dependencies:
   - tensorflow
   - pytest
   - pytest-cov
+  - pyscf
   - pip:
     - codecov 
     - tabulate

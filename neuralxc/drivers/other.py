@@ -39,10 +39,10 @@ os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
-def plot_basis(args):
+def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
-    basis_instructions = json.loads(open(args.basis, 'r').read())
+    basis_instructions = json.loads(open(basis, 'r').read())
     projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['basis'])
 
     for spec in basis_instructions['basis']:
@@ -57,67 +57,132 @@ def plot_basis(args):
         plt.show()
 
 
-def pre_driver(args):
+def get_real_basis(atoms, basis):
+    from pyscf import gto
+    from ..pyscf import BasisPadder
+    real_basis = {}
+    for a in atoms:
+        symbols = a.get_chemical_symbols()
+        atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
+        auxmol = gto.M(atom=atom, basis=basis)
+        bp = BasisPadder(auxmol)
+        padded_basis = bp.get_basis_json()
+        for sym in padded_basis:
+            if sym in real_basis:
+                if real_basis[sym] != padded_basis[sym]:
+                    raise Exception('Different basis sets across systems currently not supported')
+
+            real_basis[sym] = padded_basis[sym]
+
+    return real_basis
+
+def fetch_default_driver(kind, hint='',out=''):
+
+    from collections import abc
+    if hint:
+        hint_cont = json.load(open(hint,'r'))
+
+    def nested_dict_iter(nested):
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                yield from nested_dict_iter(value)
+            else:
+                yield key, value
+
+    def find_value_in_nested(nested, truekey):
+        for key, value in nested_dict_iter(nested):
+            if key == truekey:
+                return value
+        return None
+
+    def make_absolute(val):
+        if os.path.isfile(val) or os.path.isdir(val):
+            val = os.path.abspath(val)
+        return val
+
+    if kind =='pre':
+        app = 'siesta'
+        for key, value in nested_dict_iter(hint_cont):
+            if key == 'application':
+                app = value
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/pre_{}.json'.format(app),'r'))
+    else:
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json','r'))
+
+    if hint:
+        for key1 in df_cont:
+            if isinstance(df_cont[key1], dict):
+                for key2 in df_cont[key1]:
+                    found = find_value_in_nested(hint_cont, key2)
+                    if found:
+                        df_cont[key1][key2] = make_absolute(found)
+                    elif isinstance(df_cont[key1][key2],str):
+                        df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
+            else:
+                found = find_value_in_nested(hint_cont, key1)
+                if found:
+                    df_cont[key1] = make_absolute(found)
+                else:
+                    df_cont[key1] = make_absolute(df_cont[key1])
+
+    if out == '':
+        out = kind + '.json'
+
+    open(out,'w').write(json.dumps(df_cont, indent=4))
+
+def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/' ):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
-    preprocessor = args.preprocessor
-    dest = args.dest
-    xyz = args.xyz
-    mask = args.mask
+    preprocessor_path = preprocessor
 
-    if not mask:
-        pre = json.loads(open(preprocessor, 'r').read())
+    pre = json.loads(open(preprocessor, 'r').read())
+
+    atoms = read(xyz, ':')
+
+    preprocessor = get_preprocessor(preprocessor, atoms, srcdir)
+    start = time.time()
+
+    if 'hdf5' in dest:
+        dest_split = dest.split('/')
+        file, system, method = dest_split + [''] * (3 - len(dest_split))
+        workdir = '.tmp'
+        delete_workdir = True
     else:
-        pre = {}
+        workdir = dest
+        delete_workdir = False
 
-    if 'traj_path' in pre and pre['traj_path'] != '':
-        atoms = read(pre['traj_path'], ':')
-        trajectory_path = pre['traj_path']
-    elif xyz != '':
-        atoms = read(xyz, ':')
-        trajectory_path = xyz
-    else:
-        raise ValueError('Must specify path to to xyz file')
+    try:
+        os.mkdir(workdir)
+    except FileExistsError:
+        delete_workdir = False
+        pass
+    print('======Projecting onto basis sets======')
+    basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
 
-    preprocessor = get_preprocessor(preprocessor, mask, xyz)
-    if not mask:
-        start = time.time()
+    for basis_instr in basis_grid:
+        preprocessor.basis_instructions = basis_instr
+        print('BI', basis_instr)
 
+        if basis_instr.get('application', 'siesta') == 'pyscf':
+            real_basis = get_real_basis(atoms, basis_instr['basis'])
+            for key in real_basis:
+                basis_instr[key] = real_basis[key]
+            open(preprocessor_path, 'w').write(json.dumps({'preprocessor': basis_instr}))
+        filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
+        data = preprocessor.fit_transform(None)
+        np.save(filename, data)
         if 'hdf5' in dest:
-            dest_split = dest.split('/')
-            file, system, method = dest_split + [''] * (3 - len(dest_split))
-            workdir = '.tmp'
-            delete_workdir = True
-        else:
-            workdir = dest
-            delete_workdir = False
+            add_data_driver(hdf5=file,
+                            system=system,
+                            method=method,
+                            density=filename,
+                            add=[],
+                            traj=xyz,
+                            override=True)
 
-        try:
-            os.mkdir(workdir)
-        except FileExistsError:
-            delete_workdir = False
-            pass
-        print('======Projecting onto basis sets======')
-        basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
-
-        for basis_instr in basis_grid:
-            preprocessor.basis_instructions = basis_instr
-            filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
-            data = preprocessor.fit_transform(None)
-            np.save(filename, data)
-            if 'hdf5' in dest:
-                data_args = namedtuple(\
-                'data_ns','hdf5 system method density slice add traj override')(\
-                file,system,method,filename, ':',[],trajectory_path, True)
-                add_data_driver(data_args)
-
-                # data_args = namedtuple(\
-                # 'data_ns','hdf5 system method density slice add traj override')(\
-                # file,system,method,'', ':',['energy','forces'],pre['src_path'] + '/results.traj', True)
-                # add_data_driver(data_args)
-                f = h5py.File(file)
-                f[system].attrs.update({'species': preprocessor.species_string})
-                f.close()
-        if delete_workdir:
-            shutil.rmtree(workdir)
+            f = h5py.File(file)
+            f[system].attrs.update({'species': preprocessor.species_string})
+            f.close()
+    if delete_workdir:
+        shutil.rmtree(workdir)
