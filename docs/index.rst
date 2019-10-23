@@ -11,6 +11,7 @@ Welcome to neuralxc's documentation!
    :caption: Contents:
 
 
+   apidoc/neuralxc
 
 Indices and tables
 ==================
