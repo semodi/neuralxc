@@ -1,4 +1,4 @@
-neuralxc
+NeuralXC
 ==============================
 [//]: # (Badges)
 [![Build Status](https://travis-ci.org/semodi/neuralxc.svg?branch=master)](https://travis-ci.org/semodi/neuralxc)
