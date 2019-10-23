@@ -10,6 +10,18 @@ NeuralXC
 Implementation of a machine learned density functional
 
 
+### Installation
+
+Installation of NeuralXC requires anaconda.
+To install NeuralXC, navigate into the root directory of the repository and run 
+```
+sh install.sh 
+```
+The installation can be tested by running
+```
+pytest -v
+``` 
+in the same directory. 
 
 ### Reference
 
