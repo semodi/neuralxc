@@ -175,7 +175,7 @@ if __name__ == '__main__':
     ad.set_defaults(func=adiabatic_driver)
 
     # ============= Workflow ====================
-    wf = subparser.add_parser('workflow', description='Fit a NeuralXC model iteratively')
+    wf = subparser.add_parser('iterative', description='Fit a NeuralXC model iteratively')
     wf.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     wf.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     wf.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
@@ -308,6 +308,20 @@ if __name__ == '__main__':
                      help='Store to (default pre.json/hyper.json)'
                      )
     df.set_defaults(func=fetch_default_driver)
+
+    eng = subparser.add_parser('engine', description='Run engine for structures stored in .xyz/.traj file')
+    eng.add_argument('preprocessor',
+                     metavar='preprocessor',
+                     type=str,
+                     help='Config file for preprocessor'
+                     )
+    eng.add_argument('xyz',
+                     metavar='xyz',
+                     type=str,
+                     help='.xyz or .traj file containing structures'
+                     )
+    eng.set_defaults(func=run_engine_driver)
+
     args = parser.parse_args()
 
     args_dict = args.__dict__

@@ -1,5 +1,5 @@
 {
-    "basis": {
+    "preprocessor": {
         "C": {
             "n": 4,
             "l": 5,
@@ -16,4 +16,3 @@
     "traj_path": "../sampled.traj",
     "n_workers": -1
 }
-

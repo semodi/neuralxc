@@ -34,6 +34,7 @@ import copy
 import pickle
 from types import SimpleNamespace as SN
 from .data import *
+from neuralxc.preprocessor import driver
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -76,6 +77,18 @@ def get_real_basis(atoms, basis):
 
     return real_basis
 
+def run_engine_driver(xyz, preprocessor):
+
+    pre = json.load(open(preprocessor,'r'))
+    os.mkdir('.tmp/')
+    driver(read(xyz, ':'),
+           pre['preprocessor'].get('application', 'siesta'),
+                   workdir='.tmp/',
+                   nworkers=pre.get('n_workers', 1),
+                   kwargs=pre.get('engine_kwargs', {}))
+    shutil.move('.tmp/results.traj','./results.traj')
+    shutil.rmtree('.tmp')
+    
 def fetch_default_driver(kind, hint='',out=''):
 
     from collections import abc
@@ -162,24 +175,26 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/' ):
 
     for basis_instr in basis_grid:
         preprocessor.basis_instructions = basis_instr
-        print('BI', basis_instr)
+        print('BI',basis_instr)
 
-        if basis_instr.get('application', 'siesta') == 'pyscf':
+        if basis_instr.get('application','siesta') == 'pyscf':
             real_basis = get_real_basis(atoms, basis_instr['basis'])
             for key in real_basis:
                 basis_instr[key] = real_basis[key]
-            open(preprocessor_path, 'w').write(json.dumps({'preprocessor': basis_instr}))
+            pre.update({'preprocessor':basis_instr})
+            open(preprocessor_path,'w').write(json.dumps(pre))
+
         filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
         data = preprocessor.fit_transform(None)
         np.save(filename, data)
         if 'hdf5' in dest:
             add_data_driver(hdf5=file,
-                            system=system,
-                            method=method,
-                            density=filename,
-                            add=[],
-                            traj=xyz,
-                            override=True)
+                        system=system,
+                        method=method,
+                        density=filename,
+                        add=[],
+                        traj=xyz,
+                        override=True)
 
             f = h5py.File(file)
             f[system].attrs.update({'species': preprocessor.species_string})

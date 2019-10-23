@@ -191,9 +191,9 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     pre = json.loads(open(preprocessor, 'r').read())
 
     datafile = h5py.File(hdf5[0], 'r')
-    basis_key = basis_to_hash(pre['basis'])
+    basis = pre['preprocessor']
+    basis_key = basis_to_hash(basis)
     data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)
-    basis = pre['basis']
     symmetrizer_instructions = {'symmetrizer_type': 'casimir'}
     symmetrizer_instructions.update({'basis': basis})
     species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]

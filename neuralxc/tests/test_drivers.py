@@ -38,10 +38,10 @@ def test_fit():
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
-    fit_driver(preprocessor='pre.json', config='hyper.json', sets='sets.inp', hyperopt=True)
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', sets='sets.inp', hyperopt=True)
 
-    fit_driver(preprocessor='pre.json', config='hyper.json', model='model', ensemble=True, sets='sets.inp')
-    fit_driver(preprocessor='pre.json', config='hyper.json', model='best_model', ensemble=True, sets='sets.inp')
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', model='model', ensemble=True, sets='sets.inp')
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', ensemble=True, sets='sets.inp')
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
@@ -74,7 +74,7 @@ def test_convert():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    fit_driver(preprocessor='pre.json', config='hyper.json', sets='sets.inp', hyperopt=True)
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', sets='sets.inp', hyperopt=True)
     convert_tf(tf_path='best_model', np_path='converted')
 
     os.chdir(cwd)
@@ -90,8 +90,8 @@ def test_chain_merge():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    chain_driver(config='hyper.json', model='model', dest='chained')
-    fit_driver(preprocessor='pre.json', config='hyper.json', model='chained', sets='sets.inp', hyperopt=True)
+    chain_driver(hyper='hyper.json', model='model', dest='chained')
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', model='chained', sets='sets.inp', hyperopt=True)
 
     merge_driver(chained='best_model', merged='merged')
 
