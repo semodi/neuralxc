@@ -1,0 +1,9 @@
+{
+"preprocessor":
+{
+     "basis": "sto3g",
+     "application": "pyscf"
+},
+"engine_kwargs": {"xc": "PBE",
+                  "basis" : "ccpvdz"}
+}

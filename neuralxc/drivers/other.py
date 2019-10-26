@@ -77,23 +77,25 @@ def get_real_basis(atoms, basis):
 
     return real_basis
 
+
 def run_engine_driver(xyz, preprocessor):
 
-    pre = json.load(open(preprocessor,'r'))
+    pre = json.load(open(preprocessor, 'r'))
     os.mkdir('.tmp/')
     driver(read(xyz, ':'),
            pre['preprocessor'].get('application', 'siesta'),
-                   workdir='.tmp/',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=pre.get('engine_kwargs', {}))
-    shutil.move('.tmp/results.traj','./results.traj')
+           workdir='.tmp/',
+           nworkers=pre.get('n_workers', 1),
+           kwargs=pre.get('engine_kwargs', {}))
+    shutil.move('.tmp/results.traj', './results.traj')
     shutil.rmtree('.tmp')
-    
-def fetch_default_driver(kind, hint='',out=''):
+
+
+def fetch_default_driver(kind, hint='', out=''):
 
     from collections import abc
     if hint:
-        hint_cont = json.load(open(hint,'r'))
+        hint_cont = json.load(open(hint, 'r'))
 
     def nested_dict_iter(nested):
         for key, value in nested.items():
@@ -109,19 +111,23 @@ def fetch_default_driver(kind, hint='',out=''):
         return None
 
     def make_absolute(val):
-        if os.path.isfile(val) or os.path.isdir(val):
+        if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
+            print(os.path.isfile(val))
+            print(os.path.isdir(val))
+            print('DIR', val)
             val = os.path.abspath(val)
         return val
 
-    if kind =='pre':
+    if kind == 'pre':
         app = 'siesta'
         for key, value in nested_dict_iter(hint_cont):
             if key == 'application':
                 app = value
-        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/pre_{}.json'.format(app),'r'))
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/pre_{}.json'.format(app), 'r'))
     else:
-        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json','r'))
+        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json', 'r'))
 
+    print(df_cont)
     if hint:
         for key1 in df_cont:
             if isinstance(df_cont[key1], dict):
@@ -129,7 +135,7 @@ def fetch_default_driver(kind, hint='',out=''):
                     found = find_value_in_nested(hint_cont, key2)
                     if found:
                         df_cont[key1][key2] = make_absolute(found)
-                    elif isinstance(df_cont[key1][key2],str):
+                    elif isinstance(df_cont[key1][key2], str):
                         df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
             else:
                 found = find_value_in_nested(hint_cont, key1)
@@ -141,9 +147,10 @@ def fetch_default_driver(kind, hint='',out=''):
     if out == '':
         out = kind + '.json'
 
-    open(out,'w').write(json.dumps(df_cont, indent=4))
+    open(out, 'w').write(json.dumps(df_cont, indent=4))
 
-def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/' ):
+
+def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     """ Preprocess electron densities obtained from electronic structure
     calculations
     """
@@ -175,26 +182,20 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/' ):
 
     for basis_instr in basis_grid:
         preprocessor.basis_instructions = basis_instr
-        print('BI',basis_instr)
+        print('BI', basis_instr)
 
-        if basis_instr.get('application','siesta') == 'pyscf':
+        if basis_instr.get('application', 'siesta') == 'pyscf':
             real_basis = get_real_basis(atoms, basis_instr['basis'])
             for key in real_basis:
                 basis_instr[key] = real_basis[key]
-            pre.update({'preprocessor':basis_instr})
-            open(preprocessor_path,'w').write(json.dumps(pre))
+            pre.update({'preprocessor': basis_instr})
+            open(preprocessor_path, 'w').write(json.dumps(pre))
 
         filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
         data = preprocessor.fit_transform(None)
         np.save(filename, data)
         if 'hdf5' in dest:
-            add_data_driver(hdf5=file,
-                        system=system,
-                        method=method,
-                        density=filename,
-                        add=[],
-                        traj=xyz,
-                        override=True)
+            add_data_driver(hdf5=file, system=system, method=method, density=filename, add=[], traj=xyz, override=True)
 
             f = h5py.File(file)
             f[system].attrs.update({'species': preprocessor.species_string})

@@ -47,7 +47,7 @@ def temp_cd():
 # Args
 parser = argparse.ArgumentParser(description='Creates a conda environment from file for a given Python version.')
 parser.add_argument('-n', '--name', type=str, help='The name of the created Python environment')
-parser.add_argument('-p', '--python', type=str,default='3.7', help='The version of the created Python environment')
+parser.add_argument('-p', '--python', type=str, default='3.7', help='The version of the created Python environment')
 parser.add_argument('conda_file', help='The file for the created Python environment')
 
 args = parser.parse_args()

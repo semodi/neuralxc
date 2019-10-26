@@ -293,33 +293,21 @@ if __name__ == '__main__':
     pre.set_defaults(func=pre_driver)
 
     df = subparser.add_parser('default', description='Fetch default configuration files')
-    df.add_argument('kind', action='store', help='Preprocessor (pre) or hyperparameter (hyper) config file',
-        choices=['pre','hyper'])
+    df.add_argument('kind',
+                    action='store',
+                    help='Preprocessor (pre) or hyperparameter (hyper) config file',
+                    choices=['pre', 'hyper'])
     df.add_argument('--hint',
-                     metavar='hint',
-                     type=str,
-                     default='',
-                     help='Partially complete config file to fill with defaults'
-                     )
-    df.add_argument('--out',
-                     metavar='out',
-                     type=str,
-                     default='',
-                     help='Store to (default pre.json/hyper.json)'
-                     )
+                    metavar='hint',
+                    type=str,
+                    default='',
+                    help='Partially complete config file to fill with defaults')
+    df.add_argument('--out', metavar='out', type=str, default='', help='Store to (default pre.json/hyper.json)')
     df.set_defaults(func=fetch_default_driver)
 
     eng = subparser.add_parser('engine', description='Run engine for structures stored in .xyz/.traj file')
-    eng.add_argument('preprocessor',
-                     metavar='preprocessor',
-                     type=str,
-                     help='Config file for preprocessor'
-                     )
-    eng.add_argument('xyz',
-                     metavar='xyz',
-                     type=str,
-                     help='.xyz or .traj file containing structures'
-                     )
+    eng.add_argument('preprocessor', metavar='preprocessor', type=str, help='Config file for preprocessor')
+    eng.add_argument('xyz', metavar='xyz', type=str, help='.xyz or .traj file containing structures')
     eng.set_defaults(func=run_engine_driver)
 
     args = parser.parse_args()
