@@ -5,6 +5,8 @@
 !  or http://www.gnu.org/copyleft/gpl.txt.
 ! See Docs/Contributors.txt for a list of contributors.
 !
+! Modified by Sebastian Dick, 2019
+
       subroutine rlylm( lmax, r, rly )
 
       implicit none
