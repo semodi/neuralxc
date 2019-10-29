@@ -44,12 +44,12 @@ def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
     basis_instructions = json.loads(open(basis, 'r').read())
-    projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['basis'])
+    projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['preprocessor'])
 
-    for spec in basis_instructions['basis']:
+    for spec in basis_instructions['preprocessor']:
         if not len(spec) == 1: continue
-        basis = basis_instructions['basis'][spec]
-        n = basis_instructions['basis'][spec]['n']
+        basis = basis_instructions['preprocessor'][spec]
+        n = basis_instructions['preprocessor'][spec]['n']
         W = projector.get_W(basis)
         r = np.linspace(0, basis['r_o'], 500)
         radials = projector.radials(r, basis, W)
@@ -88,7 +88,7 @@ def run_engine_driver(xyz, preprocessor):
                    kwargs=pre.get('engine_kwargs', {}))
     shutil.move('.tmp/results.traj','./results.traj')
     shutil.rmtree('.tmp')
-    
+
 def fetch_default_driver(kind, hint='',out=''):
 
     from collections import abc
