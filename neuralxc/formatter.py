@@ -106,7 +106,10 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         self._attrs = attrs
         # print(self._attrs)
         if spec_agnostic:
-            self._attrs['X'] = self._attrs[list(self._attrs.keys())[0]]
+            for key in list(self._attrs.keys()):
+                if len(key) < 4 and key != 'X':
+                    self._attrs.pop(key)
+            print(self._attrs)
         if not isinstance(sys_species, list):
             raise ValueError('sys_species must be a list but is {}'.format(sys_species))
         self._sys_species = sys_species

@@ -54,7 +54,7 @@ class SiestaEngine(BaseEngine):
     _registry_name = 'siesta'
 
     def __init__(self, **kwargs):
-        fdf_path = kwargs.pop('fdf_path',None)
+        fdf_path = kwargs.pop('fdf_path', None)
 
         # Defaults
         kwargs['label'] = kwargs.get('label', 'siesta')

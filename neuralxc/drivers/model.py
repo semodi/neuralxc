@@ -220,7 +220,7 @@ def adiabatic_driver(xyz,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=pre.get('engine_kwargs', {}))
-            pre_driver(xyz,'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(hdf5='data.hdf5',
                             system='system',
                             method='it0',
@@ -232,7 +232,7 @@ def adiabatic_driver(xyz,
                             system='system',
                             method='ref',
                             add=['energy'],
-                            traj='../sampled.traj',
+                            traj=xyz,
                             override=True,
                             zero=E0)
             statistics_sc = \
@@ -273,7 +273,7 @@ def adiabatic_driver(xyz,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(xyz, 'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
                             system='system',
@@ -312,7 +312,8 @@ def workflow_driver(xyz,
                     sets='',
                     nozero=False,
                     model0='',
-                    fullstack=False):
+                    fullstack=False,
+                    stop_early=True):
     statistics_sc = {'mae': 1000}
     if sets:
         sets = os.path.abspath(sets)
@@ -389,7 +390,7 @@ def workflow_driver(xyz,
                             system='system',
                             method='ref',
                             add=['energy'],
-                            traj='../sampled.traj',
+                            traj=xyz,
                             override=True,
                             zero=E0)
             statistics_sc = \
@@ -437,7 +438,7 @@ def workflow_driver(xyz,
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
-            pre_driver(xyz,'workdir',preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
                             system='system',
@@ -453,7 +454,7 @@ def workflow_driver(xyz,
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
 
-            if old_statistics['mae'] - statistics_sc['mae'] < tol:
+            if old_statistics['mae'] - statistics_sc['mae'] < tol and stop_early:
                 if old_statistics['mae'] - statistics_sc['mae'] < 0:
                     print('Self-consistent error increased in this iteration: dMAE = {} eV'.format(
                         old_statistics['mae'] - statistics_sc['mae']))
@@ -473,7 +474,7 @@ def workflow_driver(xyz,
                                         hyperopt=True)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            if statistics_fit['mae'] > statistics_sc['mae']:
+            if statistics_fit['mae'] > statistics_sc['mae'] and stop_early:
                 print('Stopping iterative training because fitting error is larger than self-consistent error')
                 os.chdir('../')
                 break
@@ -537,7 +538,6 @@ def fit_driver(preprocessor,
         hdf5 = parse_sets_input(sets)
     else:
         hdf5 = hdf5
-
 
     inp = json.loads(open(inputfile, 'r').read())
     pre = json.loads(open(preprocessor, 'r').read())

@@ -45,7 +45,16 @@ class PySCFProjector(BaseProjector):
         self.initialize(mol)
 
     def initialize(self, mol, *args, **kwargs):
-        auxmol = gto.M(atom=mol.atom, basis=self.basis['basis'])
+        self.spec_agnostic = self.basis.get('spec_agnostic',False)
+        if self.spec_agnostic:
+            basis = {}
+            for atom_idx, _ in enumerate(mol.atom_charges()):
+                sym = mol.atom_pure_symbol(atom_idx)
+                basis[sym] = gto.basis.load(self.basis['basis'],'O')
+        else:
+            basis = self.basis['basis']
+
+        auxmol = gto.M(atom=mol.atom, basis=basis)
         self.bp = BasisPadder(auxmol)
         self.eri3c = get_eri3c(mol, auxmol)
         self.mol = mol
@@ -56,10 +65,22 @@ class PySCFProjector(BaseProjector):
         #     self.initialize(mol)
         coeff = get_coeff(dm, self.eri3c)
         coeff = self.bp.pad_basis(coeff)
-        # print(coeff['Mimu'])
+
+        if self.spec_agnostic:
+            self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
+            coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis = 0)
+            coeff = {'X' : coeff_agn}
+
         return coeff
 
     def get_V(self, dEdC, positions=None, species=None, calc_forces=False, rho=None):
+        if self.spec_agnostic:
+            running_idx = 0
+            for sym in self.spec_partition:
+                dEdC[sym] = dEdC['X'][:,running_idx:running_idx + self.spec_partition[sym]]
+                running_idx += self.spec_partition[sym]
+
+            dEdC.pop('X')
         dEdC = self.bp.unpad_basis(dEdC)
         V = np.einsum('ijk, k', self.eri3c, dEdC)
         return V
@@ -125,6 +146,10 @@ class BasisPadder():
 
         for sym in self.sym_cnt:
             basis[sym] = {'n': self.max_n[sym], 'l': self.max_l[sym] + 1}
+
+        if 'O' in basis:
+            basis['X'] = {'n': self.max_n['O'], 'l': self.max_l['O'] + 1}
+
 
         return basis
 

@@ -41,7 +41,7 @@ conda install -y -c pyscf -c defaults -c conda-forge  \
    seaborn \
    statsmodels \
    sympy \
-   tensorflow \
+   tensorflow=1 \
    pytest \
    pytest-cov \
    pyscf 

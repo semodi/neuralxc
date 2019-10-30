@@ -42,4 +42,5 @@ Copyright (c) 2019, Sebastian Dick
 #### Acknowledgements
  
 Project based on the 
-[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.0.
+[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.0. 
+This project uses an implementation of the gradient of spherical harmonics created by the SIESTA group.
