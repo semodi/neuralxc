@@ -172,6 +172,8 @@ if __name__ == '__main__':
     ad.add_argument('--fullstack',
                     action='store_true',
                     help='If model0 specified do full stack instead of stacking estimators')
+    ad.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
+    ad.add_argument('--max_epochs', metavar='max_epochs',type=int,default=0, help='Maximum number of epochs in adiabatic training')
     ad.set_defaults(func=adiabatic_driver)
 
     # ============= Workflow ====================

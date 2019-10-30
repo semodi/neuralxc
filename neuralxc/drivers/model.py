@@ -154,7 +154,9 @@ def adiabatic_driver(xyz,
                      sets='',
                      nozero=False,
                      model0='',
-                     fullstack=False):
+                     fullstack=False,
+                     hyperopt=False,
+                     max_epochs=0):
 
     statistics_sc = {'mae': 1000}
     if sets:
@@ -245,7 +247,22 @@ def adiabatic_driver(xyz,
                                         model=model0,
                                         ensemble=ensemble,
                                         sets='sets.inp',
-                                        b=b)
+                                        b=b,
+                                        hyperopt=hyperopt)
+            if hyperopt:
+                shcopy('hyper.json','hyper_old.json')
+                best_pars = json.load(open('best_params.json','r'))
+                if max_epochs > 0:
+                    best_pars['hyperparameters']['estimator__max_steps'] = max_epochs
+                with open('hyper.json','w') as file:
+                    file.write(json.dumps(best_pars, indent=4))
+
+                statistics_fit = fit_driver(preprocessor='pre.json',
+                                            hyper='hyper.json',
+                                            model=model0,
+                                            ensemble=ensemble,
+                                            sets='sets.inp',
+                                            b=b)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
@@ -257,9 +274,9 @@ def adiabatic_driver(xyz,
             b = b * b_decay
             iteration = 0
             print('====== Iteration {} ======'.format(iteration))
-            mkdir('it{}'.format(iteration))
-            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(hyper, 'it{}/hyper.json'.format(iteration))
+            # mkdir('it{}'.format(iteration))
+            # shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
+            # shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
             if sets:
@@ -289,6 +306,7 @@ def adiabatic_driver(xyz,
 
             open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
 
+            print(json.load(open('hyper.json','r')))
             statistics_fit = fit_driver(preprocessor='pre.json',
                                         hyper='hyper.json',
                                         model='best_model',
@@ -300,6 +318,38 @@ def adiabatic_driver(xyz,
         else:
             print('Maximum number of iterations reached. Proceeding to test set...')
 
+    print('====== Testing ======'.format(iteration))
+    mkdir('testing')
+
+    shcopy('it{}/data.hdf5'.format(iteration), 'testing/data.hdf5')
+    shcopytree('it{}/best_model'.format(iteration), 'testing/nxc')
+    os.chdir('testing')
+    mkdir('workdir')
+
+    engine_kwargs = {'nxc': '../../nxc'}
+    engine_kwargs.update(pre.get('engine_kwargs', {}))
+    driver(read(xyz, ':'),
+           pre['preprocessor'].get('application', 'siesta'),
+           workdir='workdir',
+           nworkers=pre.get('n_workers', 1),
+           kwargs=engine_kwargs)
+    add_data_driver(hdf5='data.hdf5',
+                    system='system',
+                    method='testing/ref',
+                    add=['energy'],
+                    traj='../testing.traj',
+                    override=True,
+                    zero=E0)
+    add_data_driver(hdf5='data.hdf5',
+                    system='system',
+                    method='testing/nxc',
+                    add=['energy'],
+                    traj='workdir/results.traj',
+                    override=True,
+                    zero=E0)
+
+    statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
+    open('statistics_test', 'w').write(json.dumps(statistics_test))
 
 def workflow_driver(xyz,
                     preprocessor,
@@ -652,7 +702,9 @@ def fit_driver(preprocessor,
     }
 
     if hyperopt:
-        open('best_params.json', 'w').write(json.dumps(estimator.best_params_, indent=4))
+        bp = estimator.best_params_
+        bp = {key[len('ml__'):]:bp[key] for key in bp}
+        open('best_params.json', 'w').write(json.dumps({'hyperparameters':bp}, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
         best_params_ = estimator.best_params_
         if do_concat:
