@@ -328,7 +328,7 @@ def adiabatic_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read(xyz, ':'),
+    driver(read('../testing.traj', ':'),
            pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
@@ -546,7 +546,7 @@ def workflow_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read(xyz, ':'),
+    driver(read('../testing.traj', ':'),
            pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
