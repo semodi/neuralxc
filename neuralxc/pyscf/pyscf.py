@@ -15,7 +15,7 @@ from numba import jit
 from ..timer import timer
 from ..projector import DefaultProjector, BaseProjector
 
-l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
+l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5,'i':6,'j':7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
