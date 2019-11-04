@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pyscf import gto
-from pyscf.scf import hf
+from pyscf.scf import hf,RHF
 import numpy as np
 from scipy.special import sph_harm
 import scipy.linalg
@@ -19,12 +19,17 @@ l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
-def get_eri3c(mol, auxmol):
+def get_eri3c(mol, auxmol, op):
     pmol = mol + auxmol
     nao = mol.nao_nr()
     naux = auxmol.nao_nr()
+    if op == 'rij':
+        eri3c = pmol.intor('int3c2e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
+    elif op == 'delta':
+        eri3c = pmol.intor('int3c1e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
+    else:
+        raise ValueError('Operator {} not implemented'.format(op))
 
-    eri3c = pmol.intor('int3c2e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
     return eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
 
 
@@ -46,6 +51,13 @@ class PySCFProjector(BaseProjector):
 
     def initialize(self, mol, *args, **kwargs):
         self.spec_agnostic = self.basis.get('spec_agnostic',False)
+        self.op = self.basis.get('operator','rij').lower()
+        self.delta = self.basis.get('delta', False)
+
+        if self.delta:
+            mf = RHF(mol)
+            self.dm_init = mf.init_guess_by_atom()
+
         if self.spec_agnostic:
             basis = {}
             for atom_idx, _ in enumerate(mol.atom_charges()):
@@ -56,13 +68,15 @@ class PySCFProjector(BaseProjector):
 
         auxmol = gto.M(atom=mol.atom, basis=basis)
         self.bp = BasisPadder(auxmol)
-        self.eri3c = get_eri3c(mol, auxmol)
+        self.eri3c = get_eri3c(mol, auxmol, self.op)
         self.mol = mol
         self.auxmol = auxmol
 
     def get_basis_rep(self, dm, mol=None, auxmol=None):
         # if not mol is None and mol.atom != self.mol.atom:
         #     self.initialize(mol)
+        if self.delta:
+            dm = dm - self.dm_init
         coeff = get_coeff(dm, self.eri3c)
         coeff = self.bp.pad_basis(coeff)
 
