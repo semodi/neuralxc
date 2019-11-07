@@ -180,6 +180,7 @@ def adiabatic_driver(xyz,
     else:
         E0 = None
     b = b0
+    iteration = 0
     if hotstart == 0:
         if data:
             mkdir('it0')
@@ -205,7 +206,6 @@ def adiabatic_driver(xyz,
             convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
         else:
-            iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             if ensemble:
                 shcopytree(model0, 'it0/nxc')
@@ -328,7 +328,7 @@ def adiabatic_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read(xyz, ':'),
+    driver(read('../testing.traj', ':'),
            pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
@@ -385,6 +385,7 @@ def workflow_driver(xyz,
         E0 = None
     xyz = os.path.abspath(xyz)
     pre = json.loads(open(preprocessor, 'r').read())
+    iteration = 0
     if hotstart == 0:
         if data:
             mkdir('it0')
@@ -410,7 +411,6 @@ def workflow_driver(xyz,
             convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
         else:
-            iteration = 0
             print('====== Iteration {} ======'.format(iteration))
             if ensemble:
                 shcopytree(model0, 'it0/nxc')
@@ -546,7 +546,7 @@ def workflow_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read(xyz, ':'),
+    driver(read('../testing.traj', ':'),
            pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
