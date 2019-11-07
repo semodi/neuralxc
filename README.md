@@ -23,6 +23,22 @@ pytest -v
 ``` 
 in the same directory. 
 
+#### Electronic structure code installation
+
+At the moment NeuralXC has been implemented to work with SIESTA (Spanish Initiative for Electronic Simulations with Thousands of Atoms). PySCF is also supported but has not been thoroughly tested.
+So far, the only way to install the NeuralXC extension is by applying a patch that can be found in `src/siesta_patch.tar`. 
+
+To install please download the 4.1-b4 version of SIESTA [here](https://launchpad.net/siesta) and unpack it at a location of your preference.
+Proceed by copying `src/siesta_patch.tar` into the `Src/` directory inside your SIESTA installation.
+Unpack the patch by running `tar -xf siesta_patch.tar` (inside `Src/`) and run `sh apply_patch.sh`. This will apply the patch file and download [Forpy](https://github.com/ylikx/forpy), a library that is needed for SIESTA to access Python code. During compilation, Forpy requires the flags 
+```
+-fno-lto `python3-config --ldflags`
+```
+.We have provided an example arch.make file in the installation.
+
+
+SIESTA can now be compiled as usual. Please refer to their manual regarding details about the installation.
+
 ### Reference
 
 If you use this code in your work, please cite it as 
