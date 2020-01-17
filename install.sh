@@ -22,7 +22,7 @@ if ! [ -x "$(command -v pip)" ]; then
 fi
 yes | pip install --upgrade pip
 
-conda install -y -c pyscf -c defaults -c conda-forge  \
+conda install -y -c pyscf -c conda-forge -c defaults  \
    ase \
    dask \
    h5py=2.9.0 \
@@ -33,7 +33,7 @@ conda install -y -c pyscf -c defaults -c conda-forge  \
    keras \
    matplotlib \
    numba \
-   numpy \
+   numpy=1.15.4 \
    pandas \
    periodictable \
    scikit-learn=0.20 \
@@ -41,12 +41,12 @@ conda install -y -c pyscf -c defaults -c conda-forge  \
    seaborn \
    statsmodels \
    sympy \
-   tensorflow=1 \
+   tensorflow=1.1.0 \
    pytest \
    pytest-cov \
-   pyscf 
 
 yes |  pip install codecov
+yes |  pip install pyscf
 yes |  pip install tabulate
 export NPY_DISTUTILS_APPEND_FLAGS=1
 pip install -e .
