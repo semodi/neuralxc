@@ -33,10 +33,10 @@ conda install -y -c pyscf -c conda-forge -c defaults  \
    keras \
    matplotlib \
    numba \
-   numpy=1.15.4 \
+   numpy\
    pandas \
    periodictable \
-   scikit-learn=0.20 \
+   scikit-learn=0.20.3 \
    scipy \
    seaborn \
    statsmodels \
