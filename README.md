@@ -12,7 +12,8 @@ Implementation of a machine learned density functional
 
 ### Installation
 
-Installation of NeuralXC requires anaconda.
+Installation of NeuralXC requires anaconda. 
+NeuralXC has only been tested on Linux and Mac OS X.
 To install NeuralXC, navigate into the root directory of the repository and run 
 ```
 sh install.sh 
@@ -25,7 +26,7 @@ in the same directory.
 
 #### Electronic structure code installation
 
-At the moment NeuralXC has been implemented to work with SIESTA (Spanish Initiative for Electronic Simulations with Thousands of Atoms). PySCF is also supported but has not been thoroughly tested.
+At the moment NeuralXC has been implemented to work with SIESTA (Spanish Initiative for Electronic Simulations with Thousands of Atoms).
 So far, the only way to install the NeuralXC extension is by applying a patch that can be found in `src/siesta_patch.tar`. 
 
 - To install please download the 4.1-b4 version of SIESTA [here](https://launchpad.net/siesta) and unpack it at a location of your preference.
