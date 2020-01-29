@@ -4,14 +4,13 @@ language: python
 
 matrix:
   include:
-    # Extra includes for OSX since python language is not available by default on OSX
-    #    - os: osx
-    #      language: generic
-    #      env: PYTHON_VER=3.6
-    #    - os: osx
-    #      language: generic
-    #      env: PYTHON_VER=3.7
-    #
+
+    - os: osx
+      language: generic
+      env: PYTHON_VER=3.6
+    - os: osx
+      language: generic
+      env: PYTHON_VER=3.7
 
     - os: linux
       language: generic  # No need to set Python version since its conda

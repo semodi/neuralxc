@@ -1,10 +1,9 @@
 name: test
 channels:
-  - pyscf
   - defaults
   - conda-forge
 dependencies:
-  - ase
+  - ase=3.17
   - pip
   - dask
   - h5py=2.9.0
@@ -18,17 +17,17 @@ dependencies:
   - numpy
   - pandas
   - periodictable
-  - scikit-learn=0.20
+  - scikit-learn=0.20.3
   - scipy
   - seaborn
   - statsmodels
   - sympy
-  - tensorflow=1
+  - tensorflow=1.1.0
   - pytest
   - pytest-cov
-  - pyscf
   - pip:
     - codecov 
     - tabulate
+    - pyscf
 
 

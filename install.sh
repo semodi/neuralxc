@@ -23,7 +23,7 @@ fi
 yes | pip install --upgrade pip
 
 conda install -y -c pyscf -c conda-forge -c defaults  \
-   ase \
+   ase=3.17 \
    dask \
    h5py=2.9.0 \
    hdf5=1.10.4 \
@@ -33,10 +33,10 @@ conda install -y -c pyscf -c conda-forge -c defaults  \
    keras \
    matplotlib \
    numba \
-   numpy=1.15.4 \
+   numpy\
    pandas \
    periodictable \
-   scikit-learn=0.20 \
+   scikit-learn=0.20.3 \
    scipy \
    seaborn \
    statsmodels \
