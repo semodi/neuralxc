@@ -23,7 +23,7 @@ fi
 yes | pip install --upgrade pip
 
 conda install -y -c pyscf -c conda-forge -c defaults  \
-   ase \
+   ase=3.17 \
    dask \
    h5py=2.9.0 \
    hdf5=1.10.4 \

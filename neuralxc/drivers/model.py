@@ -469,7 +469,10 @@ def workflow_driver(xyz,
             if hyper2:
                 shcopy(hyper2, 'it{}/hyper.json'.format(iteration))
             else:
-                shcopy(hyper, 'it{}/hyper.json'.format(iteration))
+                hyp = json.load(open(hyper,'r'))
+                hyp['hyperparameters']['estimator__b'] = 0
+                json.dump(hyp, open('it{}/hyper.json'.format(iteration), 'w'), indent=4)
+
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:

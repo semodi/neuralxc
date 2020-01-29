@@ -152,8 +152,6 @@ class DefaultProjector(BaseProjector):
                 basis_rep[spec] = []
 
             idx = '{}{}{}{}'.format(spec, pos[0], pos[1], pos[2])
-            if not idx in self.all_angs:
-                print('NEURALXC: Wrong allocation, recalculating for {}'.format(idx))
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
             projection, angs = self.project(rho, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))

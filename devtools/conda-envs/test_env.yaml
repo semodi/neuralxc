@@ -3,7 +3,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - ase
+  - ase=3.17
   - pip
   - dask
   - h5py=2.9.0
