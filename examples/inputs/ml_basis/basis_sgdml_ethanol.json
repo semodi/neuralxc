@@ -1,0 +1,32 @@
+{
+    "preprocessor": {
+        "O": {
+            "n": 4,
+            "l": 3,
+            "r_o": 2.5
+        },
+        "C": {
+            "n": 4,
+            "l": 3,
+            "r_o": 2.5
+        },
+        "H": {
+            "n": 4,
+            "l": 3,
+            "r_o": 2.5
+        },
+        "extension": "DRHO",
+        "application": "siesta",
+        "spec_agnostic": false
+    },
+    "engine_kwargs": {
+        "pseudoloc": null,
+        "fdf_path": null,
+        "xc": "PBE",
+        "basis": "DZP",
+        "fdf_arguments": {
+            "MaxSCFIterations": 200
+        }
+    },
+    "n_workers": 1
+}

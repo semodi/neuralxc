@@ -1,13 +1,5 @@
 #!/bin/bash
 
-if [ -z "$python_version" ]
-then
-    echo "Using python 3.6 by default"
-    export python_version=3.6
-else
-    echo "Using python "$python_version". But recommended to use python 3.6."
-fi
-
 if [ -z "$1" ]
 then
     echo "Installing NeuralXC in current env"
@@ -20,9 +12,8 @@ fi
 if ! [ -x "$(command -v pip)" ]; then
 	conda install -y pip
 fi
-yes | pip install --upgrade pip
 
-conda install -y -c pyscf -c conda-forge -c defaults  \
+conda install -y  -c conda-forge -c defaults  \
    ase=3.17 \
    dask \
    h5py=2.9.0 \

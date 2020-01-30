@@ -1,0 +1,52 @@
+systemname 2h2o
+systemlabel 2h2o
+numberofspecies 2
+numberofatoms 6
+%block chemicalspecieslabel
+    1 8 O
+    2 1 H
+%endblock chemicalspecieslabel
+atomiccoordinatesformat Ang
+%block atomiccoordinatesandatomicspecies
+    -0.702196054     -0.056060256      0.009942262 1
+    -1.022193224      0.846775782     -0.011488714 2
+     0.257521062      0.042121496      0.005218999 2
+     2.369548767      0.025550247      0.000272246 1
+     2.746170382     -0.412829819      0.766396628 2
+     2.741813084     -0.450662728     -0.745130256 2
+%endblock atomiccoordinatesandatomicspecies
+
+LatticeConstant  1.0 Ang
+%block LatticeVectors
+    15.000000000000000     0.000000000000000     0.000000000000000
+    0.000000000000000     15.000000000000000     0.000000000000000
+    0.000000000000000     0.000000000000000     15.000000000000000
+%endblock LatticeVectors
+
+%block PAO.Basis # QZDPQ-8.5
+O 3
+n=2 0 4 E 50. 7.5
+    8.0 5.0 3.5 2.0
+n=2 1 4 E 10. 8.3
+    8.5 5.0 3.5 2.0
+n=3 2 2 E 40. 8.3 Q 6.
+    8.5 2.2
+H 2
+n=1 0 4 E 50. 8.3
+    8.5 5.0 3.5 2.0
+n=2 1 2 E 20. 7.8 Q 3.5
+    8.0 2.0
+%endblock PAO.Basis
+
+XC.authors  PBE
+MeshCutoff  300 Ry
+XC.functional  GGA
+SCF.Mixer.Method Pulay
+SCF.Mixer.Weight 0.3
+SCF.Mixer.History 7
+SCF.DM.Tolerance 0.0002
+SCF.H.Converge F
+SCF.EDM.Converge F
+SCF.FreeE.Converge T
+
+neuralxc ../../../models/MB-pol/model

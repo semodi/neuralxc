@@ -1,0 +1,30 @@
+{
+    "hyperparameters": {
+        "var_selector__threshold": 1e-10,
+        "scaler__threshold": null,
+        "pca__copy": true,
+        "pca__iterated_power": "auto",
+        "pca__n_components":[0.99,0.999,1],
+        "pca__random_state": null,
+        "pca__svd_solver": "full",
+        "pca__tol": 0.0,
+        "pca__whiten": false,
+        "estimator__n_nodes": [4, 8, 16],
+        "estimator__n_layers": 1,
+        "estimator__b": [1e-2,1e-3,1e-4,1e-5],
+        "estimator__alpha": 0.001,
+        "estimator__max_steps": 20001,
+        "estimator__test_size": 0.0,
+        "estimator__valid_size": 0,
+        "estimator__random_seed": null,
+        "estimator__batch_size": 0,
+        "estimator__activation": "sigmoid",
+        "estimator__optimizer": null,
+        "estimator__target_loss": 0.0005
+    },
+    "cv": 3,
+    "n_workers": 1,
+    "threads_per_worker": 1,
+    "n_jobs": 1
+}
+
