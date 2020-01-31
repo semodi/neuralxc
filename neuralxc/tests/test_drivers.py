@@ -134,21 +134,23 @@ def test_data():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='test',
-                    add=['energy', 'forces'],
-                    traj='results.traj',
-                    override=True,
-                    zero=10)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='test',
+        add=['energy', 'forces'],
+        traj='results.traj',
+        override=True,
+        zero=10)
 
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='test',
-                    add=['energy', 'forces'],
-                    traj='results.traj',
-                    override=True,
-                    zero=None)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='test',
+        add=['energy', 'forces'],
+        traj='results.traj',
+        override=True,
+        zero=None)
 
     split_data_driver(hdf5='data.hdf5', group='system/it0', label='training', slice=':3', comp='testing')
 

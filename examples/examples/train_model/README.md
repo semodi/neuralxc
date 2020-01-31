@@ -17,10 +17,12 @@ The script does the following:
     This iteratively trains the functional on the reference data contained in `train.traj` (.traj is a ASE native trajectory file) using the basis and dft parameters specified in `basis_sgdml_benzene.json` and the hyperparameters specified in `hyperparameters.json`. `--maxit` sets the maximum number of iterations, however the training should converge within the tolerance `--tol` (in eV) before reaching 5 iterations.
     
 1. Test the trained model on the test-set
+1. Save the trained model in `final_model` along with train/test statistics (both in .csv and .html format)
 
-    The output should be similar to this :
+    The test performance should be similar to this :
     ``{'mae': 0.0046, 'max': 0.0108, 'mean deviation': -0.0, 'rmse': 0.0057}`` 
     Slight variations are possible due to the randomness of the fitting procedure.
+
 
 This is only a demonstration and the resulting functional won't be as accurate as reported in the manuscript. For more reliable results, the hyperparameters should be picked from a larger grid (see `/inputs/hyper/hyperparameters.json`), `sgdml.fdf` should be replaced by `/inputs/fdf/sgdml.fdf`, and the full test set should be used for evaluation.
 

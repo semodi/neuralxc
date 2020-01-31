@@ -35,6 +35,7 @@ import pickle
 from .data import *
 from .other import *
 from neuralxc.preprocessor import driver
+from glob import glob
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -59,6 +60,36 @@ def shcopytree(src, dest):
         shutil.copytree(src, dest)
     except FileExistsError:
         pass
+
+
+def create_report(path='.'):
+    paths = glob('*/stat*')
+
+    stats = []
+    for p in paths:
+        stats.append(json.load(open(p, 'r')))
+        stats[-1]['path'] = p
+
+    stats = pd.DataFrame(stats)
+
+    stats['kind'] = stats['path'].apply(lambda x: x.split('/')[1].split('_')[1])
+    stats['it'] = stats['path'].apply(lambda x: x.split('/')[0].strip('it'))
+
+    stats.loc[stats['kind'] == 'test', 'it'] = 999
+    stats['it'] = stats['it'].astype(int)
+    stats.loc[stats['kind'] == 'fit', 'it'] += 1
+    stats = stats.sort_values(['it', 'kind'])
+    stats.loc[stats['kind'] == 'test', 'it'] = -1
+    stats = stats.reset_index(drop=True)
+    stats = stats.drop(len(stats) - 2, axis=0).drop('path', axis=1).drop('mean deviation', axis=1)
+
+    stats.columns = [{'it': 'Iteration', 'kind': 'Kind'}.get(x, x.upper() + ' (eV)') for x in stats.columns]
+    stats.loc[stats['Kind'] == 'test', 'Iteration'] = ''
+    stats.index = [k + '_' + str(it) for k, it in zip(stats['Kind'], stats['Iteration'])]
+    stats.index = [{'test_': 'test'}.get(i, i) for i in stats.index]
+    stats['Kind'] = stats['Kind'].apply(lambda x: {'sc': 'Self-consistent', 'fit': 'Fitting', 'test': 'Testing'}[x])
+
+    return stats
 
 
 def parse_sets_input(path):
@@ -195,13 +226,14 @@ def adiabatic_driver(xyz,
             eval_driver(hdf5=['data.hdf5','system/base','system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model=model0,
-                                        ensemble=ensemble,
-                                        sets='sets.inp',
-                                        hyperopt=True,
-                                        b=b)
+            statistics_fit = fit_driver(
+                preprocessor='pre.json',
+                hyper='hyper.json',
+                model=model0,
+                ensemble=ensemble,
+                sets='sets.inp',
+                hyperopt=True,
+                b=b)
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
@@ -217,52 +249,46 @@ def adiabatic_driver(xyz,
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=pre.get('engine_kwargs', {}))
+            driver(
+                read(xyz, ':'),
+                pre['preprocessor'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=pre.get('engine_kwargs', {}))
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it0',
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='ref',
-                            add=['energy'],
-                            traj=xyz,
-                            override=True,
-                            zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5',
+                system='system',
+                method='it0',
+                add=['energy'],
+                traj='workdir/results.traj',
+                override=True,
+                zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5', system='system', method='ref', add=['energy'], traj=xyz, override=True, zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model=model0,
-                                        ensemble=ensemble,
-                                        sets='sets.inp',
-                                        b=b,
-                                        hyperopt=hyperopt)
+            statistics_fit = fit_driver(
+                preprocessor='pre.json',
+                hyper='hyper.json',
+                model=model0,
+                ensemble=ensemble,
+                sets='sets.inp',
+                b=b,
+                hyperopt=hyperopt)
             if hyperopt:
-                shcopy('hyper.json','hyper_old.json')
-                best_pars = json.load(open('best_params.json','r'))
+                shcopy('hyper.json', 'hyper_old.json')
+                best_pars = json.load(open('best_params.json', 'r'))
                 if max_epochs > 0:
                     best_pars['hyperparameters']['estimator__max_steps'] = max_epochs
-                with open('hyper.json','w') as file:
+                with open('hyper.json', 'w') as file:
                     file.write(json.dumps(best_pars, indent=4))
 
-                statistics_fit = fit_driver(preprocessor='pre.json',
-                                            hyper='hyper.json',
-                                            model=model0,
-                                            ensemble=ensemble,
-                                            sets='sets.inp',
-                                            b=b)
+                statistics_fit = fit_driver(
+                    preprocessor='pre.json', hyper='hyper.json', model=model0, ensemble=ensemble, sets='sets.inp', b=b)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
@@ -285,20 +311,22 @@ def adiabatic_driver(xyz,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../best_model'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=engine_kwargs)
+            driver(
+                read(xyz, ':'),
+                pre['preprocessor'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=engine_kwargs)
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it{}'.format(iteration),
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5',
+                system='system',
+                method='it{}'.format(iteration),
+                add=['energy'],
+                traj='workdir/results.traj',
+                override=True,
+                zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -306,12 +334,9 @@ def adiabatic_driver(xyz,
 
             open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
 
-            print(json.load(open('hyper.json','r')))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model='best_model',
-                                        sets='sets.inp',
-                                        b=b)
+            print(json.load(open('hyper.json', 'r')))
+            statistics_fit = fit_driver(
+                preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp', b=b)
 
             open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
             os.chdir('../')
@@ -328,28 +353,32 @@ def adiabatic_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read('../testing.traj', ':'),
-           pre['preprocessor'].get('application', 'siesta'),
-           workdir='workdir',
-           nworkers=pre.get('n_workers', 1),
-           kwargs=engine_kwargs)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='testing/ref',
-                    add=['energy'],
-                    traj='../testing.traj',
-                    override=True,
-                    zero=E0)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='testing/nxc',
-                    add=['energy'],
-                    traj='workdir/results.traj',
-                    override=True,
-                    zero=E0)
+    driver(
+        read('../testing.traj', ':'),
+        pre['preprocessor'].get('application', 'siesta'),
+        workdir='workdir',
+        nworkers=pre.get('n_workers', 1),
+        kwargs=engine_kwargs)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='testing/ref',
+        add=['energy'],
+        traj='../testing.traj',
+        override=True,
+        zero=E0)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='testing/nxc',
+        add=['energy'],
+        traj='workdir/results.traj',
+        override=True,
+        zero=E0)
 
     statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
     open('statistics_test', 'w').write(json.dumps(statistics_test))
+
 
 def workflow_driver(xyz,
                     preprocessor,
@@ -401,12 +430,13 @@ def workflow_driver(xyz,
                     'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model=model0,
-                                        ensemble=ensemble,
-                                        sets='sets.inp',
-                                        hyperopt=True)
+            statistics_fit = fit_driver(
+                preprocessor='pre.json',
+                hyper='hyper.json',
+                model=model0,
+                ensemble=ensemble,
+                sets='sets.inp',
+                hyperopt=True)
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
@@ -423,37 +453,35 @@ def workflow_driver(xyz,
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
             engine_kwargs = pre.get('engine_kwargs', {})
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=engine_kwargs)
+            driver(
+                read(xyz, ':'),
+                pre['preprocessor'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=engine_kwargs)
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it0',
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='ref',
-                            add=['energy'],
-                            traj=xyz,
-                            override=True,
-                            zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5',
+                system='system',
+                method='it0',
+                add=['energy'],
+                traj='workdir/results.traj',
+                override=True,
+                zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5', system='system', method='ref', add=['energy'], traj=xyz, override=True, zero=E0)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                     'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model=model0,
-                                        ensemble=ensemble,
-                                        sets='sets.inp',
-                                        hyperopt=True)
+            statistics_fit = fit_driver(
+                preprocessor='pre.json',
+                hyper='hyper.json',
+                model=model0,
+                ensemble=ensemble,
+                sets='sets.inp',
+                hyperopt=True)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
@@ -469,7 +497,7 @@ def workflow_driver(xyz,
             if hyper2:
                 shcopy(hyper2, 'it{}/hyper.json'.format(iteration))
             else:
-                hyp = json.load(open(hyper,'r'))
+                hyp = json.load(open(hyper, 'r'))
                 hyp['hyperparameters']['estimator__b'] = 0
                 json.dump(hyp, open('it{}/hyper.json'.format(iteration), 'w'), indent=4)
 
@@ -486,20 +514,22 @@ def workflow_driver(xyz,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../nxc'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=engine_kwargs)
+            driver(
+                read(xyz, ':'),
+                pre['preprocessor'].get('application', 'siesta'),
+                workdir='workdir',
+                nworkers=pre.get('n_workers', 1),
+                kwargs=engine_kwargs)
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it{}'.format(iteration),
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
+            add_data_driver(
+                hdf5='data.hdf5',
+                system='system',
+                method='it{}'.format(iteration),
+                add=['energy'],
+                traj='workdir/results.traj',
+                override=True,
+                zero=E0)
             old_statistics = dict(statistics_sc)
             statistics_sc = \
             eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
@@ -514,17 +544,14 @@ def workflow_driver(xyz,
                     iteration -= 1
                     os.chdir('../')
                 else:
-                    print('Iterative training converged: dMAE = {} eV'.format(old_statistics['mae'] -
-                                                                              statistics_sc['mae']))
+                    print('Iterative training converged: dMAE = {} eV'.format(
+                        old_statistics['mae'] - statistics_sc['mae']))
                     os.chdir('../')
                 break
 
             chain_driver(hyper='hyper.json', model='merged', dest='chained')
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model='chained',
-                                        sets='sets.inp',
-                                        hyperopt=True)
+            statistics_fit = fit_driver(
+                preprocessor='pre.json', hyper='hyper.json', model='chained', sets='sets.inp', hyperopt=True)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             if statistics_fit['mae'] > statistics_sc['mae'] and stop_early:
@@ -549,28 +576,38 @@ def workflow_driver(xyz,
 
     engine_kwargs = {'nxc': '../../nxc'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read('../testing.traj', ':'),
-           pre['preprocessor'].get('application', 'siesta'),
-           workdir='workdir',
-           nworkers=pre.get('n_workers', 1),
-           kwargs=engine_kwargs)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='testing/ref',
-                    add=['energy'],
-                    traj='../testing.traj',
-                    override=True,
-                    zero=E0)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='testing/nxc',
-                    add=['energy'],
-                    traj='workdir/results.traj',
-                    override=True,
-                    zero=E0)
+    driver(
+        read('../testing.traj', ':'),
+        pre['preprocessor'].get('application', 'siesta'),
+        workdir='workdir',
+        nworkers=pre.get('n_workers', 1),
+        kwargs=engine_kwargs)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='testing/ref',
+        add=['energy'],
+        traj='../testing.traj',
+        override=True,
+        zero=E0)
+    add_data_driver(
+        hdf5='data.hdf5',
+        system='system',
+        method='testing/nxc',
+        add=['energy'],
+        traj='workdir/results.traj',
+        override=True,
+        zero=E0)
 
     statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
+
     open('statistics_test', 'w').write(json.dumps(statistics_test))
+
+    os.chdir('..')
+    shcopytree('testing/nxc'.format(iteration), 'final_model')
+    stats = create_report()
+    stats.to_csv('final_model/stats.csv', index=True, index_label='Run')
+    open('final_model/stats.html', 'w').write(stats.to_html())
 
 
 def fit_driver(preprocessor,
@@ -662,9 +699,8 @@ def fit_driver(preprocessor,
 
                 pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
                 estimator = GridSearchCV(
-                    Pipeline(new_model.steps[-1][1].steps[:2] +
-                             [('file_pipe',
-                               FilePipeline('.tmp.pckl')), ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                    Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
+                                                                 ('estimator', new_model.steps[-1][1].steps[-1][1])]),
                     new_param_grid,
                     cv=inp.get('cv', 2))
 
@@ -706,8 +742,8 @@ def fit_driver(preprocessor,
 
     if hyperopt:
         bp = estimator.best_params_
-        bp = {key[len('ml__'):]:bp[key] for key in bp}
-        open('best_params.json', 'w').write(json.dumps({'hyperparameters':bp}, indent=4))
+        bp = {key[len('ml__'):]: bp[key] for key in bp}
+        open('best_params.json', 'w').write(json.dumps({'hyperparameters': bp}, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
         best_params_ = estimator.best_params_
         if do_concat:
@@ -775,9 +811,10 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         spec_group = SpeciesGrouper(basis, species)
         symmetrizer = symmetrizer_factory(symmetrizer_instructions)
         print('Symmetrizer instructions', symmetrizer_instructions)
-        pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
-                               basis_instructions=basis,
-                               symmetrize_instructions=symmetrizer_instructions)
+        pipeline = NXCPipeline(
+            [('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
+            basis_instructions=basis,
+            symmetrize_instructions=symmetrizer_instructions)
 
         targets = data[:, -1].real
         predictions = pipeline.predict(data)[0]

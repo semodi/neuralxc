@@ -98,15 +98,8 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrizer_instructions)
     var_selector = xc.ml.transformer.GroupedVarianceThreshold(threshold=1e-10)
 
-    estimator = xc.ml.NetworkEstimator(4,
-                                       1,
-                                       1e-3,
-                                       alpha=0.001,
-                                       max_steps=1001,
-                                       test_size=0.0,
-                                       valid_size=0.1,
-                                       random_seed=random_seed,
-                                       batch_size=0)
+    estimator = xc.ml.NetworkEstimator(
+        4, 1, 1e-3, alpha=0.001, max_steps=1001, test_size=0.0, valid_size=0.1, random_seed=random_seed, batch_size=0)
 
     pipeline_list = [('spec_group', spec_group), ('symmetrizer', symmetrizer), ('var_selector', var_selector)]
 
@@ -115,9 +108,8 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     pipeline_list.append(('scaler', xc.ml.transformer.GroupedStandardScaler()))
     pipeline_list.append(('estimator', estimator))
 
-    ml_pipeline = xc.ml.NXCPipeline(pipeline_list,
-                                    basis_instructions=basis_set,
-                                    symmetrize_instructions=symmetrizer_instructions)
+    ml_pipeline = xc.ml.NXCPipeline(
+        pipeline_list, basis_instructions=basis_set, symmetrize_instructions=symmetrizer_instructions)
     ml_pipeline.fit(data)
 
     #Subset of data for which to calculate gradient

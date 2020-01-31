@@ -78,17 +78,23 @@ def get_real_basis(atoms, basis):
     return real_basis
 
 
-def run_engine_driver(xyz, preprocessor):
+def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
 
     pre = json.load(open(preprocessor, 'r'))
-    os.mkdir('.tmp/')
-    driver(read(xyz, ':'),
-           pre['preprocessor'].get('application', 'siesta'),
-           workdir='.tmp/',
-           nworkers=pre.get('n_workers', 1),
-           kwargs=pre.get('engine_kwargs', {}))
-    shutil.move('.tmp/results.traj', './results.traj')
-    shutil.rmtree('.tmp')
+    try:
+        os.mkdir(workdir)
+    except FileExistsError:
+        pass
+
+    driver(
+        read(xyz, ':'),
+        pre['preprocessor'].get('application', 'siesta'),
+        workdir=workdir,
+        nworkers=pre.get('n_workers', 1),
+        kwargs=pre.get('engine_kwargs', {}))
+    shutil.move(workdir + '/results.traj', './results.traj')
+    if workdir == '.tmp/':
+        shutil.rmtree(workdir)
 
 
 def fetch_default_driver(kind, hint='', out=''):

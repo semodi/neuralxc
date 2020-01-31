@@ -21,7 +21,7 @@ cp ../../../inputs/psf/*.psf .
 python ../fix_paths.py
 
 # Run iterative training
-neuralxc iterative train.traj basis_sgdml_benzene.json hyperparameters.json --maxit 5 --tol 0.0005
+neuralxc iterative train.traj basis_sgdml_benzene.json hyperparameters.json --maxit 1 --tol 0.0005
 
 cd -
 

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pyscf import gto
-from pyscf.scf import hf,RHF
+from pyscf.scf import hf, RHF
 import numpy as np
 from scipy.special import sph_harm
 import scipy.linalg
@@ -15,7 +15,7 @@ from numba import jit
 from ..timer import timer
 from ..projector import DefaultProjector, BaseProjector
 
-l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5,'i':6,'j':7}
+l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
@@ -50,8 +50,8 @@ class PySCFProjector(BaseProjector):
         self.initialize(mol)
 
     def initialize(self, mol, *args, **kwargs):
-        self.spec_agnostic = self.basis.get('spec_agnostic',False)
-        self.op = self.basis.get('operator','rij').lower()
+        self.spec_agnostic = self.basis.get('spec_agnostic', False)
+        self.op = self.basis.get('operator', 'rij').lower()
         self.delta = self.basis.get('delta', False)
 
         if self.delta:
@@ -62,7 +62,7 @@ class PySCFProjector(BaseProjector):
             basis = {}
             for atom_idx, _ in enumerate(mol.atom_charges()):
                 sym = mol.atom_pure_symbol(atom_idx)
-                basis[sym] = gto.basis.load(self.basis['basis'],'O')
+                basis[sym] = gto.basis.load(self.basis['basis'], 'O')
         else:
             basis = self.basis['basis']
 
@@ -82,8 +82,8 @@ class PySCFProjector(BaseProjector):
 
         if self.spec_agnostic:
             self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
-            coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis = 0)
-            coeff = {'X' : coeff_agn}
+            coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis=0)
+            coeff = {'X': coeff_agn}
 
         return coeff
 
@@ -91,7 +91,7 @@ class PySCFProjector(BaseProjector):
         if self.spec_agnostic:
             running_idx = 0
             for sym in self.spec_partition:
-                dEdC[sym] = dEdC['X'][:,running_idx:running_idx + self.spec_partition[sym]]
+                dEdC[sym] = dEdC['X'][:, running_idx:running_idx + self.spec_partition[sym]]
                 running_idx += self.spec_partition[sym]
 
             dEdC.pop('X')
@@ -142,8 +142,8 @@ class BasisPadder():
                     for l in range(max_l[sym] + 1):
                         if any(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels]):
                             indexing_left[sym][-1] += [True] * (2 * l + 1)
-                            sidx = np.where(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab
-                                             for lab in labels])[0][0]
+                            sidx = np.where(
+                                ['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels])[0][0]
                             indexing_right[sym][-1] += np.arange(sidx, sidx + (2 * l + 1)).astype(int).tolist()
                         else:
                             indexing_left[sym][-1] += [False] * (2 * l + 1)
@@ -163,7 +163,6 @@ class BasisPadder():
 
         if 'O' in basis:
             basis['X'] = {'n': self.max_n['O'], 'l': self.max_l['O'] + 1}
-
 
         return basis
 
@@ -192,8 +191,8 @@ class BasisPadder():
             sym = self.mol.atom_pure_symbol(aidx)
             coeff_in = coeff[sym]
             if coeff_in.ndim == 3: coeff_in = coeff_in[0]
-            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]]) -
-                                           slice[-2]] = coeff_in[cnt[sym], self.indexing_l[sym][cnt[sym]]]
+            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]])
+                                           - slice[-2]] = coeff_in[cnt[sym], self.indexing_l[sym][cnt[sym]]]
             cnt[sym] += 1
 
         return coeff_out

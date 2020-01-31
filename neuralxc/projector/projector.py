@@ -222,12 +222,8 @@ class DefaultProjector(BaseProjector):
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.get_force_correction(rho,
-                                                                 coeffs,
-                                                                 box,
-                                                                 basis,
-                                                                 self.W[spec],
-                                                                 angs=self.all_angs.get(idx, None))
+                force_corrections[i] = self.get_force_correction(
+                    rho, coeffs, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
 
         stress_correction = np.einsum('ij,ik-> jk', force_corrections, positions)
 
