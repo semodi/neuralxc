@@ -4,6 +4,8 @@ Implementation of a machine learned density functional
 """
 
 # Add imports here
+import warnings
+warnings.filterwarnings("ignore")
 from .neuralxc import NeuralXC, SiestaNXC, get_nxc_adapter, verify_type, get_V
 from . import projector
 from . import utils
