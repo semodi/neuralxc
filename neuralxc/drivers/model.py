@@ -394,11 +394,16 @@ def workflow_driver(xyz,
                     fullstack=False,
                     stop_early=True):
     statistics_sc = {'mae': 1000}
+    xyz = os.path.abspath(xyz)
+    pre = json.loads(open(preprocessor, 'r').read())
+    engine_kwargs = pre.get('engine_kwargs', {})
     if sets:
         sets = os.path.abspath(sets)
 
     if model0:
         model0 = os.path.abspath(model0)
+        engine_kwargs = {'nxc': model0}
+        engine_kwargs.update(pre.get('engine_kwargs', {}))
         ensemble = True
         if fullstack:
             model0 = ''
@@ -412,8 +417,6 @@ def workflow_driver(xyz,
         E0 = 0
     else:
         E0 = None
-    xyz = os.path.abspath(xyz)
-    pre = json.loads(open(preprocessor, 'r').read())
     iteration = 0
     if hotstart == 0:
         if data:
@@ -442,7 +445,7 @@ def workflow_driver(xyz,
             os.chdir('../')
         else:
             print('====== Iteration {} ======'.format(iteration))
-            if ensemble:
+            if ensemble and not fullstack:
                 shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
@@ -452,7 +455,6 @@ def workflow_driver(xyz,
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             mkdir('workdir')
-            engine_kwargs = pre.get('engine_kwargs', {})
             driver(
                 read(xyz, ':'),
                 pre['preprocessor'].get('application', 'siesta'),
