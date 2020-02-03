@@ -9,7 +9,7 @@ class CustomSiesta(Siesta):
     def __init__(self, fdf_path=None, **kwargs):
         self.fdf_path = fdf_path
         self.nxc = kwargs.pop('nxc', '')
-
+        kwargs.pop('mbe','')
         if 'label' in kwargs:
             kwargs['label'] = kwargs['label'].lower()
         super().__init__(**kwargs)
