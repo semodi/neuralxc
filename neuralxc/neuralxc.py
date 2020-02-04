@@ -207,6 +207,9 @@ class NeuralXC():
         global element_dict
         print('NeuralXC: Instantiate NeuralXC')
         if isinstance(path, str):
+            if os.path.isfile(path):
+                # If path contains the pipeline.pckl, ignore it
+                path = os.path.dirname(path)
             print('NeuralXC: Load pipeline from ' + path)
             self._pipeline = load_pipeline(path)
         elif not (pipeline is None):

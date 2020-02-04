@@ -41,13 +41,51 @@ If you are using one of SIESTA's arch.make files simply add this line to `LIBS=`
 
 - SIESTA can now be compiled as usual (MPI is still supported). Please refer to their manual regarding details about the installation.
 
-### Examples
+### How-to
 
 Examples on how to train and deploy a machine learned functional can be found in [examples/example_scripts/](examples/example_scripts).
 
+#### Model training
+
+To train/fit a functional a set of structures and their associated reference energies is required. These structures need to be provided in an [ASE](https://wiki.fysik.dtu.dk/ase/) formatted `.xyz` or `.traj` file (in this example `training_structures.xyz`). Assuming that Siesta along with its NeuralXC extension was installed, iterative training can be performed by running
+
+`neuralxc iterative training_structures.xyz basis.json hyperparameters.json`
+
+- `basis.json` contains information regarding the basis set as well as the 'driver' program (SIESTA), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
+
+- `hyperparameters.json` contains the machine learning hyperparameters, examples can be found in [examples/inputs/hyper](examples/inputs/hyper).
+
+- For more options please refer to `neuralxc iterative --help`
+
+
+#### Model deployment
+
+To deploy a trained model in SIESTA simply add the line `neuralxc $PATH_TO_NXC_MODEL` (replace with actual path!) to your `.fdf` input file. 
+
+SIESTA can be used with MPI (if compiled accordingly) but the NeuralXC part will be computed in serial. To enable multi-threading in NeuralXC, the option `neuralxc.threads $N_THREADS` can be added to the `.fdf` input file.
+
+ 
+
 ### Reproducibility 
 
-Data (raw data, input files, trained models) needed to reproduce the results presented in \[2\] can be found in [examples/](examples) 
+Data (raw data, input files, trained models) needed to reproduce the results presented in \[2\] can be found in [examples/](examples).
+
+Data that has been obtained from other sources and which has been published in the past is not provided. However, where possible, we have included scripts to download data from the respective repositories.
+
+
+### Troubleshooting
+
+If the model fails during deployment (i.e. SIESTA crashes when using NeuralXC) try the following steps:
+
+- Run `siesta < $INPUT_FILE_FDF`, i.e. run your calculation while printing the ouput to your screen in real time. When piping the output to a file, siesta does not print python exceptions which makes debugging harder.
+
+- If the model crashes right after `Initializing NeuralXC from Fortran`, make sure you have activated the anaconda environment that contains your NeuralXC installation (if applicable).
+If error persists, try to recompile SIESTA while being in the same anaconda environment in which you installed NeuralXC. Compiling SIESTA with different libraries/compilers than are accessible to NeuralXC can cause compatibilty issues.
+
+- If the model crashes after `NeuralXC: Load pipeline from `, double check to make sure the path to the NeuralXC model you provided is correct.
+
+- If problems persist, please create an Issue on GitHub or contact me directly.
+
 
 ### Reference
 
