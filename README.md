@@ -3,7 +3,7 @@ NeuralXC
 [//]: # (Badges)
 [![Build Status](https://travis-ci.org/semodi/neuralxc.svg?branch=master)](https://travis-ci.org/semodi/neuralxc)
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
-
+[![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
 
 <img src="https://github.com/semodi/neuralxc/blob/master/NeuralXC.png" width="700" height="450" />
 
