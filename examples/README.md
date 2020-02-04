@@ -5,6 +5,6 @@ Supplemental material to accompany the paper "Machine learning an accurate excha
  - configs: Molecule geometries
  - models: Trained NeuralXC models
  - inputs: Input files for both SIESTA and NeuralXC
- - example_scripts: Ho to train and deploy a machine learned functional
+ - example_scripts: How to train and deploy a machine learned functional
  - scripts: Helper scripts
 
