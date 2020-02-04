@@ -37,7 +37,7 @@ So far, the only way to install the NeuralXC extension is by applying a patch th
 ```
 -fno-lto `python3-config --ldflags`
 ```
-If you are using one of SIESTA's arch.make files simply add this line to `LIBS=`.
+   If you are using one of SIESTA's arch.make files simply add the above line to `LIBS=`.
 
 - SIESTA can now be compiled as usual (MPI is still supported). Please refer to their manual regarding details about the installation.
 
