@@ -199,7 +199,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         max_vec_len = np.max([np.sum([feat[spec].shape[1]*feat[spec].shape[2] for spec in feat])\
                        for feat in features])
 
-        X = np.zeros([total_length, max_vec_len + 1], dtype=complex)
+        X = np.zeros([total_length, max_vec_len + 1])
         y = np.zeros(total_length)
 
         if not len(features) == len(targets) == len(sys_species):

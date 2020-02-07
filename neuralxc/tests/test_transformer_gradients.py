@@ -53,7 +53,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
     dEdC = {spec: np.zeros_like(C[spec]) for spec in C}
     for mod_spec in C:
         for mod_idx in range(C[mod_spec].shape[-1]):
-            for im in [1, 1j]:
+            for im in [1]:
                 Cp = copy.deepcopy(C)
                 Cm = copy.deepcopy(C)
                 Cp[mod_spec][:, mod_idx] += mod_incr * im
@@ -89,7 +89,7 @@ def test_symmetrizer_gradient(symmetrizer_type):
     xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
 def test_pipeline_gradient(random_seed, symmetrizer_type):
     # data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'), 'rb'))
-    data = np.load(os.path.join(test_dir, 'ml_data.npy'))
+    data = np.load(os.path.join(test_dir, 'ml_data.npy')).real
     basis_set = {'C': {'n': 6, 'l': 4, 'r_o': 2}, 'H': {'n': 6, 'l': 4, 'r_o': 2}}
     all_species = ['CCCCCCHHHHHH']
     symmetrizer_instructions = {'basis': basis_set, 'symmetrizer_type': symmetrizer_type}
@@ -116,10 +116,10 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     x = data[0:1]
     grad_analytic = ml_pipeline.get_gradient(x)
 
-    grad_fd = np.zeros_like(grad_analytic, dtype=complex)
-    incr = 0.0001
+    grad_fd = np.zeros_like(grad_analytic)
+    incr = 0.00001
     for ix in range(1, 20):
-        for im in [1, 1j]:
+        for im in [1]:
             xp = np.array(x)
             # incr = np.mean(np.abs(xp[:, ix])) / 1000
             xp[:, ix] += incr * im
@@ -132,7 +132,7 @@ def test_pipeline_gradient(random_seed, symmetrizer_type):
     print(grad_analytic[0, 1:20])
     print(grad_fd[0, 1:20])
     # assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-4, atol=1e-5)
-    assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-3, atol=1e-10)
+    assert np.allclose(grad_fd[0, 1:20], grad_analytic[0, 1:20], rtol=1e-2, atol=1e-3)
     # assert False
 
 

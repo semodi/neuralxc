@@ -204,7 +204,7 @@ class DefaultProjector(BaseProjector):
         if isinstance(dEdC, list):
             dEdC = dEdC[0]
 
-        V = np.zeros(self.grid, dtype=complex)
+        V = np.zeros(self.grid)
         spec_idx = {spec: -1 for spec in species}
         force_corrections = np.zeros([len(species), 3])
         for i, (pos, spec) in enumerate(zip(positions, species)):
@@ -229,13 +229,39 @@ class DefaultProjector(BaseProjector):
 
         force_corrections = np.concatenate([force_corrections, stress_correction], axis=0)
         if calc_forces:
-            return V.real, force_corrections
+            return V, force_corrections
         else:
-            return V.real
+            return V
+
+    def angulars(self, l, m, theta, phi):
+        """ Angular functions (uses physics convention for angles)
+        (For compatibility with complex version)
+        Parameters
+        ----------
+        l: int
+            angular momentum quantum number
+        m: int
+            angular momentum projection
+
+        theta: float or np.ndarray
+            longitudinal angle
+        phi: float or np.ndarray
+            azimuthal angle
+
+        Returns
+        -------
+        float or np.ndarray
+            Value of angular function at provided point(s)
+        """
+        # assert False
+        # return sph_harm(m, l, phi, theta)
+
+        angulars =  self.angulars_real(l, theta, phi)
+        return angulars[m+l]
 
     @staticmethod
-    def angulars(l, m, theta, phi):
-        """ Angular functions (uses physics convention for angles)
+    def angulars_real(l, theta, phi):
+        """ Angular function/angs (uses physics convention for angles)
 
         Parameters
         ----------
@@ -254,7 +280,19 @@ class DefaultProjector(BaseProjector):
         float or np.ndarray
             Value of angular function at provided point(s)
         """
-        return sph_harm(m, l, phi, theta)
+        if l > 0:
+            M = M_make_complex(l + 1)[-(2 * l + 1):, -(2 * l + 1):]
+            M = np.linalg.inv(M)
+        else:
+            M = np.eye(1)
+
+        shape = (2 * l + 1, ) + phi.shape
+        sh_list = np.zeros(shape, dtype=np.complex)
+        for i, m in enumerate(range(-l, l + 1)):
+            sh_list[i] = sph_harm(m, l, phi, theta)
+
+        ang = np.einsum('ij,j...-> i...', M, sh_list, optimize=True)
+        return ang.real
 
     def get_force_correction(self, rho, coeffs, box, basis, W=None, angs=None):
         """ Calculate the contribution to the forces that arises from the
@@ -297,20 +335,23 @@ class DefaultProjector(BaseProjector):
             angs = []
             for l in range(n_l):
                 angs.append([])
+                ang_l = self.angulars_real(l, Theta, Phi)
                 for m in range(-l, l + 1):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    angs[l].append(self.angulars(l, m, Theta, Phi))
+                    # angs[l].append(self.angulars(l, m, Theta, Phi))
+                    angs[l].append(ang_l[l + m])
 
         timer.start('force:basis_functions:dangular')
         # Derivatives of spherical harmonic
-        M = M_make_complex(n_l)
+        # M = M_make_complex(n_l)
         dangs = np.zeros([3, n_l**2, len(X.flatten())])
 
         for ir, r in enumerate(zip(X.flatten(), Y.flatten(), Z.flatten())):
             dangs[:, :, ir] = grlylm(n_l - 1, r)  # shape: (3, n_l*n_l)
 
-        dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
-
+        # dangs = np.einsum('ij,kjl -> ilk', M, dangs, optimize=True)
+        dangs = dangs.transpose((1, 2, 0))
+        # print(dangs.shape)
         dangs = dangs.reshape(len(dangs), *X.shape, 3)
 
         timer.stop('force:basis_functions:dangular')
@@ -324,11 +365,10 @@ class DefaultProjector(BaseProjector):
         radsr = np.array(rads)
         # radsr[R<1e-15] = 0
         radsr = radsr / R
-        radsr[:, R < 1e-15] = 0
+        # radsr[:, R < 1e-15] = 0
 
         rhat = np.array([X / R, Y / R, Z / R])
-        rhat[:, R < 1e-15] = 0
-
+        # rhat[:, R < 1e-15] = 0
         rho = rho[tuple(box['mesh'])]
         force = np.zeros(3)
 
@@ -345,7 +385,7 @@ class DefaultProjector(BaseProjector):
         timer.stop('force:integrals:precomp')
 
         for ix in range(3):
-            v = np.zeros_like(rho, dtype=complex)
+            v = np.zeros_like(rho)
             idx_coeff = 0
             for n in range(n_rad):
                 idx_l = 0
@@ -357,7 +397,8 @@ class DefaultProjector(BaseProjector):
                         idx_coeff += 1
 
             # assert np.allclose(v.imag, np.zeros_like(v))
-            force[ix] = np.sum(rho * v.real) * self.V_cell
+            v[R < 1e-15] = 0
+            force[ix] = np.sum(rho * v) * self.V_cell
         timer.stop('force:integrals')
         return force
 
@@ -404,9 +445,11 @@ class DefaultProjector(BaseProjector):
             angs = []
             for l in range(n_l):
                 angs.append([])
+                ang_l = self.angulars_real(l, Theta, Phi)
                 for m in range(-l, l + 1):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    angs[l].append(self.angulars(l, m, Theta, Phi))
+                    # angs[l].append(self.angulars(l, m, Theta, Phi))
+                    angs[l].append(ang_l[l + m])
 
         timer.stop('build:basis_functions:angular', False)
         timer.start('build:basis_functions:radial', False)
@@ -417,7 +460,7 @@ class DefaultProjector(BaseProjector):
         rads = self.radials(R, basis, W)
 
         timer.stop('build:basis_functions:radial', False)
-        v = np.zeros_like(Xm, dtype=complex)
+        v = np.zeros_like(Xm, dtype=np.float64)
         idx = 0
 
         timer.stop('build:basis_functions', False)
@@ -480,9 +523,11 @@ class DefaultProjector(BaseProjector):
             angs = []
             for l in range(n_l):
                 angs.append([])
+                ang_l = self.angulars_real(l, Theta, Phi)
                 for m in range(-l, l + 1):
                     # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    angs[l].append(sph_harm(m, l, Phi, Theta))
+                    # angs[l].append(self.angulars(l, m, Theta, Phi))
+                    angs[l].append(ang_l[l + m])
 
         #Build radial part of b.f.
         if not isinstance(W, np.ndarray):
@@ -496,7 +541,7 @@ class DefaultProjector(BaseProjector):
             srho = rho[Xm, Ym, Zm]
 
         #zero_pad_angs (so that it can be converted to numpy array):
-        zeropad = np.zeros_like(Xm)
+        zeropad = np.zeros_like(Xm, dtype=np.float64)
         angs_padded = []
         for l in range(n_l):
             angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))

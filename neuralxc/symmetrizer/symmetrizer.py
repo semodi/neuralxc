@@ -201,7 +201,7 @@ class CasimirSymmetrizer(BaseSymmetrizer):
         """
         dEdd_shape = dEdd.shape
         dEdd = dEdd.reshape(-1, dEdd.shape[-1])
-        c = np.conj(c.reshape(-1, c.shape[-1]))
+        c = c.reshape(-1, c.shape[-1])
         casimirs_mask = np.zeros_like(c)
         idx = 0
         cnt = 0
