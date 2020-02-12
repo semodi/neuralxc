@@ -36,6 +36,7 @@ from .data import *
 from .other import *
 from neuralxc.preprocessor import driver
 from glob import glob
+import tensorflow as tf
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -128,11 +129,10 @@ def convert_tf(tf_path, np_path):
 
     C = {}
     basis = pipeline.get_basis_instructions()
-    if not basis.get('spec_agnostic', False):
-        basis.pop('X',None)
-
     for sym in basis:
         if len(sym) > 2: continue
+        if sym == 'X' and not basis.get('spec_agnostic', False):
+            continue
         C[sym] = np.zeros([1, 1, basis[sym]['n'] * basis[sym]['l']**2])
     D = nxc_tf.symmetrizer.get_symmetrized(C)
     nxc_tf._pipeline.predict(D)
@@ -184,6 +184,7 @@ def adiabatic_driver(xyz,
                      tol=0.0005,
                      b0=1,
                      b_decay=0.1,
+                     b_min=0.0,
                      hotstart=0,
                      sets='',
                      nozero=False,
@@ -191,8 +192,7 @@ def adiabatic_driver(xyz,
                      fullstack=False,
                      hyperopt=False,
                      max_epochs=0,
-                     scale_targets=False,
-                     scale_exp=2):
+                     scale_targets=False):
 
     statistics_sc = {'mae': 1000}
     if sets:
@@ -217,7 +217,8 @@ def adiabatic_driver(xyz,
         E0 = None
     b = b0
     iteration = 0
-
+    if scale_targets:
+        target_scaler = 1 / (maxit - 3)
 
     if hotstart == 0:
         if data:
@@ -233,16 +234,31 @@ def adiabatic_driver(xyz,
             eval_driver(hdf5=['data.hdf5','system/base','system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                preprocessor='pre.json',
-                hyper='hyper.json',
-                model=model0,
-                ensemble=ensemble,
-                sets='sets.inp',
-                hyperopt=True,
-                b=b,
-                target_scale = \
-                    (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
+            if scale_targets:
+                # fit without scaling for linear model
+                hp = json.load(open('hyper.json', 'r'))
+                hp["hyperparameters"]["estimator__max_steps"] = 11
+                hp["hyperparameters"]["estimator__alpha"] = 0
+                json.dump(hp, open('hyper0.json', 'w'))
+                fit_driver(
+                    preprocessor='pre.json',
+                    hyper='hyper.json',
+                    model=model0,
+                    ensemble=ensemble,
+                    sets='sets.inp',
+                    hyperopt=True,
+                    b=b,
+                    target_scale=1)
+                model0 = 'best_model'
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        hyper='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        hyperopt=True,
+                                        b=b,
+                                        target_scale = \
+                                        (target_scaler*(iteration + 1) if scale_targets else 1))
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
             convert_tf(tf_path='best_model', np_path='merged_new')
             os.chdir('../')
@@ -280,16 +296,32 @@ def adiabatic_driver(xyz,
                     'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                preprocessor='pre.json',
-                hyper='hyper.json',
-                model=model0,
-                ensemble=ensemble,
-                sets='sets.inp',
-                b=b,
-                hyperopt=hyperopt,
-                target_scale = \
-                        (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
+            if scale_targets:
+                # fit without scaling for linear model
+                hp = json.load(open('hyper.json', 'r'))
+                hp["hyperparameters"]["estimator__max_steps"] = 11
+                hp["hyperparameters"]["estimator__alpha"] = 0
+                json.dump(hp, open('hyper0.json', 'w'))
+                fit_driver(
+                    preprocessor='pre.json',
+                    hyper='hyper.json',
+                    model=model0,
+                    ensemble=ensemble,
+                    sets='sets.inp',
+                    hyperopt=hyperopt,
+                    b=b,
+                    target_scale=1)
+                model0 = 'best_model'
+                # shutil.rmtree('hyper0.json')
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        hyper='hyper.json',
+                                        model=model0,
+                                        ensemble=ensemble,
+                                        sets='sets.inp',
+                                        b=b,
+                                        hyperopt=hyperopt,
+                                        target_scale = \
+                                        (target_scaler*(iteration + 1) if scale_targets else 1))
             if hyperopt:
                 if scale_targets:
                     raise Exception('Hyperpar optimization and scale_targets currently not supported')
@@ -308,12 +340,11 @@ def adiabatic_driver(xyz,
 
             os.chdir('../')
         hotstart += 1
-    it_label = 0
     if not hotstart == -1:
         for it in range(hotstart, maxit + 1):
-            b = b * b_decay
+            b = max(b_min, b * b_decay)
             iteration = 0
-            print('====== Iteration {} ======'.format(it_label))
+            print('====== Iteration {} ======'.format(iteration))
             # mkdir('it{}'.format(iteration))
             # shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
             # shcopy(hyper, 'it{}/hyper.json'.format(iteration))
@@ -325,8 +356,6 @@ def adiabatic_driver(xyz,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../best_model'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            shcopytree('best_model', 'model_it{}'.format(it_label))
-
             driver(
                 read(xyz, ':'),
                 pre['preprocessor'].get('application', 'siesta'),
@@ -349,16 +378,18 @@ def adiabatic_driver(xyz,
                     'system/ref'])
 
             open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
-            open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
 
             print(json.load(open('hyper.json', 'r')))
-            statistics_fit = fit_driver(
-                preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp', b=b,
-                target_scale = min(1,(1 - ((maxit - 3  - it)/(maxit - 2))**scale_exp if scale_targets else 1)))
+            statistics_fit = fit_driver(preprocessor='pre.json',
+                                        hyper='hyper.json',
+                                        model='best_model',
+                                        sets='sets.inp',
+                                        b=b,
+                                        target_scale = \
+                                        min(1,(target_scaler*(it + 1) if scale_targets else 1)))
 
             open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
             os.chdir('../')
-            it_label += 1
         else:
             print('Maximum number of iterations reached. Proceeding to test set...')
 
@@ -675,13 +706,19 @@ def fit_driver(preprocessor,
 
     datafile = h5py.File(hdf5[0], 'r')
     basis_key = basis_to_hash(pre['preprocessor'])
-    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
-
+    if sample != '':
+        sample = np.load(sample)
+    else:
+        sample = None
+        print("Using sample of size {}".format(len(sample)))
+    data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff, sample)
+    offset = 0
     if model:
         if not new_model.steps[-1][1].steps[-1][1].fitted:
             pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
         else:
             pipeline = new_model
+
         for set in apply_to:
             selection = (data[:, 0] == set)
             prediction = pipeline.predict(data)[set]
@@ -689,10 +726,7 @@ def fit_driver(preprocessor,
             data[selection, -1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:, -1])))
 
-    if sample != '':
-        sample = np.load(sample)
-        data = data[sample]
-        print("Using sample of size {}".format(len(sample)))
+    print('Offset ', offset)
 
     class FilePipeline():
         def __init__(self, path):
@@ -751,8 +785,12 @@ def fit_driver(preprocessor,
         else:
             passed_test = True
 
-
-
+    if model:
+        prediction = pipeline.predict(data)[0]
+        pipeline.steps[-1][1].steps[-1][1].use_offset = False
+        prediction_wo_offset = pipeline.predict(data)[0]
+        pipeline.steps[-1][1].steps[-1][1].use_offset = True
+        offset = prediction - prediction_wo_offset
 
     if not b == -1:
         print('Setting weight decay to b = {}'.format(b))
@@ -761,17 +799,22 @@ def fit_driver(preprocessor,
     if not target_scale == 1:
         print('Scaling targets by factor: {}'.format(target_scale))
     real_targets = np.array(data[:, -1]).real.flatten()
-    data[:, -1] = data[:, -1] * target_scale
-
+    # target_mean = np.mean(data[:,-1])
+    # data[:,-1] = (data[:,-1]-target_mean)*target_scale + target_mean
+    print('Target scaled wo offset', (data[:, -1] - offset) * target_scale)
+    data[:, -1] = (data[:, -1] - offset) * target_scale + offset
+    print(np.std(data[:, -1]))
+    print(np.std(data[:, -1] - offset))
+    print(data[:, -1])
     estimator.fit(data)
     set_selection = (data[:, 0] == 0)
     dev = estimator.predict(data)[0].flatten() - real_targets
     dev0 = np.abs(dev - np.mean(dev))
     results = {
-        'mean deviation': np.mean(dev).round(4),
-        'rmse': np.std(dev).round(4),
-        'mae': np.mean(dev0).round(4),
-        'max': np.max(dev0).round(4)
+        'mean deviation': (np.mean(dev)).round(4),
+        'rmse': (np.std(dev)).round(4),
+        'mae': (np.mean(dev0)).round(4),
+        'max': (np.max(dev0)).round(4)
     }
 
     if hyperopt:
@@ -790,6 +833,7 @@ def fit_driver(preprocessor,
     else:
         estimator = estimator.steps[-1][1]
         estimator.start_at(2).save('best_model', True)
+
     return results
 
 
@@ -817,7 +861,7 @@ def chain_driver(hyper, model, dest='chained_estimator'):
     old_model.save(dest, True)
 
 
-def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction'):
+def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', basis_key=''):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5
@@ -832,10 +876,12 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
     if not model == '':
         model = xc.NeuralXC(model)._pipeline
         basis = model.get_basis_instructions()
-        basis_key = basis_to_hash(basis)
+        if not basis_key:
+            basis_key = basis_to_hash(basis)
     else:
         basis_key = ''
 
+    print(basis_key)
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
     results = {}
     if not model == '':
@@ -852,9 +898,10 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
 
         targets = data[:, -1].real
         predictions = pipeline.predict(data)[0]
+        #         predictions = pipeline.predict(data,partial=True)
         if predict:
             np.save(dest, predictions)
-            return 0
+            return predictions
         dev = (predictions.flatten() - targets.flatten())
     else:
         if predict:
@@ -901,6 +948,7 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         plt.xlabel('$E_{ref}[eV]$')
         plt.ylabel('$E_{pred}[eV]$')
         plt.show()
+
     return results
 
 

@@ -167,6 +167,9 @@ if __name__ == '__main__':
         action='store_true',
         help='If model0 specified do full stack instead of stacking estimators (means also stack PCA etc.)')
     ad.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
+    ad.add_argument('--scale_targets', action='store_true', help='Adiabatically scale targets')
+    ad.add_argument('--scale_exp', metavar='scale_exp', type=int, default='',
+        help='Exponent for scaling function 1-((Tmax-t)/Tmax))**scale_exp')
     ad.add_argument(
         '--max_epochs',
         metavar='max_epochs',
