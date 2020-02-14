@@ -9,5 +9,5 @@
         "xc": "PBE",
         "basis": "ccpvdz"
     },
-    "n_workers": 2
+    "n_workers": 1
 }

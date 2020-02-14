@@ -195,22 +195,28 @@ def adiabatic_driver(xyz,
                      scale_exp=2):
 
     statistics_sc = {'mae': 1000}
+    xyz = os.path.abspath(xyz)
+    pre = json.loads(open(preprocessor, 'r').read())
+    engine_kwargs = pre.get('engine_kwargs', {})
     if sets:
         sets = os.path.abspath(sets)
 
-    pre = json.loads(open(preprocessor, 'r').read())
     if model0:
+        convert_tf(tf_path=model0, np_path='model0')
+        model0 = 'model0'
         model0 = os.path.abspath(model0)
+        engine_kwargs = {'nxc': model0}
+        engine_kwargs.update(pre.get('engine_kwargs', {}))
         ensemble = True
         if fullstack:
+            model0_orig = model0
             model0 = ''
         else:
-            model0 = model0
+            model0_orig = model0
     else:
         ensemble = False
         model0 = ''
 
-    xyz = os.path.abspath(xyz)
     if nozero:
         E0 = 0
     else:
@@ -248,7 +254,7 @@ def adiabatic_driver(xyz,
             os.chdir('../')
         else:
             print('====== Iteration {} ======'.format(iteration))
-            if ensemble:
+            if ensemble and not fullstack:
                 shcopytree(model0, 'it0/nxc')
             mkdir('it{}'.format(iteration))
             shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
@@ -263,7 +269,7 @@ def adiabatic_driver(xyz,
                 pre['preprocessor'].get('application', 'siesta'),
                 workdir='workdir',
                 nworkers=pre.get('n_workers', 1),
-                kwargs=pre.get('engine_kwargs', {}))
+                kwargs=engine_kwargs)
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
             add_data_driver(
                 hdf5='data.hdf5',
@@ -304,7 +310,6 @@ def adiabatic_driver(xyz,
                     preprocessor='pre.json', hyper='hyper.json', model=model0, ensemble=ensemble, sets='sets.inp', b=b)
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            convert_tf(tf_path='best_model', np_path='merged_new')
 
             os.chdir('../')
         hotstart += 1
@@ -319,11 +324,18 @@ def adiabatic_driver(xyz,
             # shcopy(hyper, 'it{}/hyper.json'.format(iteration))
             os.chdir('it{}'.format(iteration))
             open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+
+            if ensemble:
+                convert_tf('best_model', 'best_model_np')
+                ensemble_driver(dest='merged', models=[model0_orig, 'best_model_np'], estonly=not fullstack)
+            else:
+                shcopytree('best_model', 'merged')
+
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
             shutil.rmtree('workdir')
             mkdir('workdir')
-            engine_kwargs = {'nxc': '../../best_model'}
+            engine_kwargs = {'nxc': '../../merged'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
             shcopytree('best_model', 'model_it{}'.format(it_label))
 

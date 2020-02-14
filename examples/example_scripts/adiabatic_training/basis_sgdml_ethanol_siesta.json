@@ -28,5 +28,5 @@
             "MaxSCFIterations": 200
         }
     },
-    "n_workers": 3
+    "n_workers": 1
 }
