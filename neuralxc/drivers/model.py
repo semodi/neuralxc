@@ -731,12 +731,18 @@ def fit_driver(preprocessor,
                 new_param_grid = {key[len('ml__'):]: value for key,value in  grid_cv.param_grid.items()\
                     if 'ml__estimator' in key}
 
-                pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
-                estimator = GridSearchCV(
-                    Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
-                                                                 ('estimator', new_model.steps[-1][1].steps[-1][1])]),
-                    new_param_grid,
-                    cv=inp.get('cv', 2))
+                if new_model.steps[-1][1].steps[2:-1]:
+                    pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
+                    estimator = GridSearchCV(
+                        Pipeline(new_model.steps[-1][1].steps[:2] + [('file_pipe', FilePipeline('.tmp.pckl')),
+                                                                     ('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                        new_param_grid,
+                        cv=inp.get('cv', 2))
+                else:
+                    estimator = GridSearchCV(
+                        Pipeline(new_model.steps[-1][1].steps[:2] + [('estimator', new_model.steps[-1][1].steps[-1][1])]),
+                        new_param_grid,
+                        cv=inp.get('cv', 2))
 
                 new_model.steps[-1][1].steps = new_model.steps[-1][1].steps[:-1]
                 do_concat = True
