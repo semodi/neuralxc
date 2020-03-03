@@ -211,8 +211,8 @@ class NumpyNetworkEstimator(BaseEstimator):
         for sys_idx, X in enumerate(X_list):
             for spec in X:
                 feat = X[spec]
+                old_shape = feat.shape
                 if feat.ndim == 3:
-                    old_shape = feat.shape
                     feat = atomic_shape(feat)
 
                 if not self.trunc:

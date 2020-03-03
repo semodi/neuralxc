@@ -436,6 +436,7 @@ def workflow_driver(xyz,
         engine_kwargs = {'nxc': model0}
         engine_kwargs.update(pre.get('engine_kwargs', {}))
         ensemble = True
+        model0orig = model0
         if fullstack:
             model0 = ''
         else:
@@ -537,7 +538,7 @@ def workflow_driver(xyz,
             shcopytree('it{}/merged_new'.format(iteration - 1), 'it{}/merged'.format(iteration))
             os.chdir('it{}'.format(iteration))
             if ensemble:
-                ensemble_driver(dest='nxc', models=[model0, 'merged'], estonly=not fullstack)
+                ensemble_driver(dest='nxc', models=[model0orig, 'merged'], estonly=not fullstack)
             else:
                 shcopytree('merged', 'nxc')
 
@@ -657,7 +658,6 @@ def fit_driver(preprocessor,
     """ Fits a NXCPipeline to the provided data
     """
     inputfile = hyper
-
     if sets != '':
         hdf5 = parse_sets_input(sets)
     else:
@@ -799,7 +799,10 @@ def fit_driver(preprocessor,
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
         best_params_ = estimator.best_params_
         if do_concat:
-            os.remove('.tmp.pckl')
+            try:
+                os.remove('.tmp.pckl')
+            except FileNotFoundError:
+                pass
             new_model.steps[-1][1].steps.append(estimator.best_estimator_.steps[-1])
             new_model.steps[-1][1].start_at(2).save('best_model', True)
         else:
