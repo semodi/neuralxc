@@ -61,6 +61,12 @@ def shcopytree(src, dest):
     except FileExistsError:
         pass
 
+def shcopytreedel(src, dest):
+    try:
+        shutil.copytree(src, dest)
+    except FileExistsError:
+        shutil.rmtree(dest)
+        shutil.copytree(src, dest)
 
 def create_report(path='.'):
     paths = glob('*/stat*')
@@ -329,7 +335,7 @@ def adiabatic_driver(xyz,
                 convert_tf('best_model', 'best_model_np')
                 ensemble_driver(dest='merged', models=[model0_orig, 'best_model_np'], estonly=not fullstack)
             else:
-                shcopytree('best_model', 'merged')
+                shcopytreedel('best_model', 'merged')
 
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
@@ -337,7 +343,7 @@ def adiabatic_driver(xyz,
             mkdir('workdir')
             engine_kwargs = {'nxc': '../../merged'}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
-            shcopytree('best_model', 'model_it{}'.format(it_label))
+            shcopytreedel('best_model', 'model_it{}'.format(it_label))
 
             driver(
                 read(xyz, ':'),
