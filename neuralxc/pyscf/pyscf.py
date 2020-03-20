@@ -1,6 +1,11 @@
+import neuralxc
 from abc import ABC, abstractmethod
-from pyscf import gto
-from pyscf.scf import hf, RHF
+import pyscf
+from pyscf import gto, dft
+from pyscf.dft import RKS
+from pyscf.scf import hf, RHF, RKS
+from pyscf.scf.chkfile import load_scf
+from pyscf.lib.numpy_helper import NPArrayWithTag
 import numpy as np
 from scipy.special import sph_harm
 import scipy.linalg
@@ -14,10 +19,45 @@ from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
 from ..projector import DefaultProjector, BaseProjector
+import neuralxc
 
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
+
+def RKS(mol, nxc='', **kwargs):
+    mf = dft.RKS(mol, **kwargs)
+    if not nxc is '':
+        model = neuralxc.get_nxc_adapter('pyscf', nxc)
+        model.initialize(mol)
+        mf.get_veff = veff_mod(mf, model)
+    return mf
+
+def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc=''):
+    pos = atoms.positions
+    spec = atoms.get_chemical_symbols()
+    mol_input = [[s, p] for s, p in zip(spec, pos)]
+
+    mol = gto.M(atom=mol_input, basis=basis)
+    mf = RKS(mol, nxc=nxc)
+    mf.set(chkfile=path)
+    mf.xc = xc
+    mf.kernel()
+    return mf, mol
+
+def veff_mod(mf, model):
+    def get_veff(mol=None, dm=None, dm_last=0, vhf_last=0, hermi=1):
+        veff = pyscf.dft.rks.get_veff(mf, mol, dm, dm_last, vhf_last, hermi)
+        vnxc = NPArrayWithTag(veff.shape)
+        nxc = model.get_V(dm)
+        vnxc[:, :] = nxc[1][:, :]
+        vnxc.exc = nxc[0]
+        vnxc.ecoul = 0
+        veff[:, :] += vnxc[:, :]
+        veff.exc += vnxc.exc
+        return veff
+
+    return get_veff
 
 def get_eri3c(mol, auxmol, op):
     pmol = mol + auxmol
@@ -51,7 +91,7 @@ class PySCFProjector(BaseProjector):
 
     def initialize(self, mol, *args, **kwargs):
         self.spec_agnostic = self.basis.get('spec_agnostic', False)
-        self.op = self.basis.get('operator', 'rij').lower()
+        self.op = self.basis.get('operator', 'delta').lower()
         self.delta = self.basis.get('delta', False)
 
         if self.delta:

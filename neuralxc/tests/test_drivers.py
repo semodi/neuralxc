@@ -11,11 +11,6 @@ import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
 from neuralxc.drivers import *
 import shutil
-try:
-    import ase
-    ase_found = True
-except ModuleNotFoundError:
-    ase_found = False
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 

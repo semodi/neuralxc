@@ -37,7 +37,7 @@ conda install -y  -c conda-forge -c defaults  \
    pytest-cov \
 
 yes |  pip install codecov
-yes |  pip install pyscf
+#yes |  pip install pyscf
 yes |  pip install tabulate
 export NPY_DISTUTILS_APPEND_FLAGS=1
 pip install -e .

@@ -10,12 +10,13 @@ import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
 from neuralxc.drivers import *
+from neuralxc.engines import Engine
 import shutil
 try:
-    import ase
-    ase_found = True
+    import pyscf
+    pyscf_found = True
 except ModuleNotFoundError:
-    ase_found = False
+    pyscf_found = False
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,6 +32,7 @@ def shcopytree(src, dest):
         shutil.copytree(src, dest)
 
 
+@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_adiabatic():
     os.chdir(test_dir)
@@ -40,11 +42,14 @@ def test_adiabatic():
 
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
     adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2)
+    engine = Engine('pyscf', nxc='it1/nxc')
+    engine.compute(read('benzene_small.traj','0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
 
+@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_iterative():
     os.chdir(test_dir)
@@ -54,6 +59,9 @@ def test_iterative():
 
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
     workflow_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2, stop_early=False)
+
+    engine = Engine('pyscf', nxc='it1/nxc')
+    engine.compute(read('benzene_small.traj','0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')

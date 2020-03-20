@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
-from .pyscf import compute_KS
+try:
+    from ..pyscf.pyscf import compute_KS
+except ModuleNotFoundError:
+    compute_KS = None
 from ase.calculators.singlepoint import SinglePointCalculator
 from .siesta import CustomSiesta
 import os

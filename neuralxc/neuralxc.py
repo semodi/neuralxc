@@ -20,7 +20,6 @@ import time
 import traceback
 from periodictable import elements as element_dict
 from .timer import timer
-from .pyscf import BasisPadder
 
 agnostic_dict = {i: 'X' for i in np.arange(500)}
 

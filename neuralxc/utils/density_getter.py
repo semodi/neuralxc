@@ -4,10 +4,10 @@ import numpy as np
 import struct
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
-from ..pyscf.pyscf import get_dm
 import re
 try:
     from pyscf.scf.chkfile import load_scf
+    from ..pyscf.pyscf import get_dm
     pyscf_found = True
 except ModuleNotFoundError:
     pyscf_found = False

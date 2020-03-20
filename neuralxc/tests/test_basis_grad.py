@@ -14,12 +14,6 @@ import pickle
 import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
-try:
-    import ase
-    ase_found = True
-except ModuleNotFoundError:
-    ase_found = False
-
 from spher_grad import rlylm, grlylm
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
