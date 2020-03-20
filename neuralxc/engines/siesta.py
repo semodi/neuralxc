@@ -1,8 +1,9 @@
-from ase.calculators.siesta.siesta import Siesta
-from ase.calculators.calculator import Calculator, all_changes
-import shutil
 import os
+import shutil
+
+from ase.calculators.calculator import Calculator, all_changes
 from ase.calculators.siesta.base_siesta import *
+from ase.calculators.siesta.siesta import Siesta
 
 
 class CustomSiesta(Siesta):

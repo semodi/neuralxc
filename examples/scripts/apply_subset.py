@@ -1,8 +1,10 @@
-from ase.io import read, write
-import numpy as np
-from ase.units import kcal, mol
-from ase.calculators.singlepoint import SinglePointCalculator
 import sys
+
+import numpy as np
+from ase.calculators.singlepoint import SinglePointCalculator
+from ase.io import read, write
+from ase.units import kcal, mol
+
 kcalpmol = kcal / mol
 
 

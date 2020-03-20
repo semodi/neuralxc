@@ -1,42 +1,45 @@
-import json
+import copy
 import glob
-import h5py
-from ase.io import read
-from neuralxc.symmetrizer import symmetrizer_factory
-from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
-from neuralxc.ml.transformer import GroupedStandardScaler
-from neuralxc.ml import NetworkEstimator as NetworkWrapper
-from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
-from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
-from neuralxc.preprocessor import Preprocessor
-from neuralxc.datastructures.hdf5 import *
-from neuralxc.ml.utils import *
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.base import clone
-import pandas as pd
-from pprint import pprint
-from dask.distributed import Client, LocalCluster
-from sklearn.externals.joblib import parallel_backend
-import time
-import os
-import shutil
-from collections import namedtuple
 import hashlib
+import json
+import os
+import pickle
+import shutil
 import subprocess
+import sys
+import time
+from collections import namedtuple
+from glob import glob
+from pprint import pprint
+
+import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import tensorflow as tf
+from ase.io import read
+from dask.distributed import Client, LocalCluster
+from sklearn.base import clone
+from sklearn.externals.joblib import parallel_backend
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+
 import neuralxc as xc
-import sys
-import copy
-import pickle
+from neuralxc.datastructures.hdf5 import *
+from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
+from neuralxc.ml import NetworkEstimator as NetworkWrapper
+from neuralxc.ml import NXCPipeline
+from neuralxc.ml.ensemble import ChainedEstimator, StackedEstimator
+from neuralxc.ml.network import NumpyNetworkEstimator, load_pipeline
+from neuralxc.ml.transformer import (GroupedPCA, GroupedStandardScaler,
+                                     GroupedVarianceThreshold)
+from neuralxc.ml.utils import *
+from neuralxc.preprocessor import Preprocessor, driver
+from neuralxc.symmetrizer import symmetrizer_factory
+
 from .data import *
 from .other import *
-from neuralxc.preprocessor import driver
-from glob import glob
-import tensorflow as tf
+
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'

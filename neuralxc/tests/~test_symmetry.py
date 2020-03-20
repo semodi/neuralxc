@@ -2,18 +2,20 @@
 Unit and regression test for the neuralxc package.
 """
 
+import copy
+import os
+import pickle
+import sys
+from abc import ABC, abstractmethod
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
 # Import package, test suite, and other packages as needed
 import neuralxc as xc
-import pytest
-import sys
-import numpy as np
-import os
-from neuralxc.doc_inherit import doc_inherit
-from abc import ABC, abstractmethod
-import pickle
-import copy
-import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
+from neuralxc.doc_inherit import doc_inherit
 
 try:
     import ase

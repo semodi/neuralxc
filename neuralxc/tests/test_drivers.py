@@ -1,16 +1,18 @@
-import neuralxc as xc
-import pytest
-import sys
-import numpy as np
-import os
-from neuralxc.doc_inherit import doc_inherit
-from abc import ABC, abstractmethod
-import pickle
 import copy
-import matplotlib.pyplot as plt
-from neuralxc.constants import Bohr, Hartree
-from neuralxc.drivers import *
+import os
+import pickle
 import shutil
+import sys
+from abc import ABC, abstractmethod
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
+import neuralxc as xc
+from neuralxc.constants import Bohr, Hartree
+from neuralxc.doc_inherit import doc_inherit
+from neuralxc.drivers import *
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 

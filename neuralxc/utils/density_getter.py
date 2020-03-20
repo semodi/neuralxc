@@ -1,10 +1,13 @@
 """Utility functions for real-space grid properties
 """
-import numpy as np
+import re
 import struct
 from abc import ABC, abstractmethod
+
+import numpy as np
+
 from ..base import ABCRegistry
-import re
+
 try:
     from pyscf.scf.chkfile import load_scf
     from ..pyscf.pyscf import get_dm

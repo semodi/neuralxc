@@ -1,6 +1,8 @@
-import numpy as np
-from ..base import ABCRegistry
 from abc import ABC, abstractmethod
+
+import numpy as np
+
+from ..base import ABCRegistry
 
 
 class BaseActivation(ABC):

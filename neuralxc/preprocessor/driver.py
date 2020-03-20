@@ -1,14 +1,16 @@
+import argparse
+import itertools
+import json
+import os
+import sys
+
 import dask
 import dask.distributed
-from dask.distributed import Client, LocalCluster
-import sys
-import argparse
-import os
-from ase.io import read, write
-import json
-import itertools
-from ase import Atoms
 import numpy as np
+from ase import Atoms
+from ase.io import read, write
+from dask.distributed import Client, LocalCluster
+
 from ..engines import Engine
 
 

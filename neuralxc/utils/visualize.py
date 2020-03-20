@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_density_cut(rho, rmax=0, plane=2, height=0, *args, **kwargs):

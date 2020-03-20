@@ -1,13 +1,16 @@
+import os
 from abc import ABC, abstractmethod
+
+from ase.calculators.singlepoint import SinglePointCalculator
+from ase.units import Hartree
+
 from ..base import ABCRegistry
+from .siesta import CustomSiesta
+
 try:
     from ..pyscf.pyscf import compute_KS
 except ModuleNotFoundError:
     compute_KS = None
-from ase.calculators.singlepoint import SinglePointCalculator
-from .siesta import CustomSiesta
-import os
-from ase.units import Hartree
 
 
 class EngineRegistry(ABCRegistry):

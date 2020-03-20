@@ -1,15 +1,18 @@
-from abc import ABC, abstractmethod
-import numpy as np
-from scipy.special import sph_harm
-import scipy.linalg
-from sympy import N
-from functools import reduce
-import time
 import math
-from ..doc_inherit import doc_inherit
-from spher_grad import grlylm
-from ..base import ABCRegistry
+import time
+from abc import ABC, abstractmethod
+from functools import reduce
+
+import numpy as np
+import scipy.linalg
 from numba import jit
+from scipy.special import sph_harm
+from sympy import N
+
+from spher_grad import grlylm
+
+from ..base import ABCRegistry
+from ..doc_inherit import doc_inherit
 from ..timer import timer
 
 

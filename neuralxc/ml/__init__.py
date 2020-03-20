@@ -1,5 +1,2 @@
-from . import transformer
-from .network import NetworkEstimator
-from .network import NXCPipeline
-from . import utils
-from . import ensemble
+from .network import NetworkEstimator, NXCPipeline
+from . import ensemble, transformer, utils

@@ -1,6 +1,5 @@
 import numpy as np
-from sklearn.base import TransformerMixin
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class Formatter(TransformerMixin, BaseEstimator):

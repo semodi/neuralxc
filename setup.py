@@ -3,7 +3,8 @@ neuralxc
 Implementation of a machine learned density functional
 """
 #from setuptools import setup
-from numpy.distutils.core import setup, Extension
+from numpy.distutils.core import Extension, setup
+
 import versioneer
 
 spher_grad = Extension('spher_grad', [
