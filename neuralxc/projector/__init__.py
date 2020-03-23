@@ -1,4 +1,2 @@
+from .projector import DensityProjector, M_make_complex, BehlerProjector, NonOrthoProjector, DeltaProjector, DefaultProjector, BaseProjector
 from . import projector
-from .projector import (BaseProjector, BehlerProjector, DefaultProjector,
-                        DeltaProjector, DensityProjector, M_make_complex,
-                        NonOrthoProjector)

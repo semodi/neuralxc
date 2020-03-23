@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
-
-import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
-from sympy import N
-from sympy.physics.quantum.cg import CG
-
-from ..base import ABCRegistry
+from sklearn.base import TransformerMixin
+from sklearn.base import BaseEstimator
 from ..doc_inherit import doc_inherit
+from sympy.physics.quantum.cg import CG
+from sympy import N
+import numpy as np
 from ..formatter import expand
+from ..base import ABCRegistry
 
 
 class SymmetrizerRegistry(ABCRegistry):

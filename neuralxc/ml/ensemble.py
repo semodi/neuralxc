@@ -1,7 +1,6 @@
-import numpy as np
 from sklearn.base import BaseEstimator
-
 from neuralxc.ml.network import NumpyNetworkEstimator
+import numpy as np
 
 
 class EnsembleEstimator(BaseEstimator):

@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 import argparse
-
 from neuralxc.drivers import *
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Add data to hdf5 file')
@@ -142,7 +140,7 @@ if __name__ == '__main__':
         type=float,
         default='0.0005',
         help='Tolerance in energy defining whether iterative training converged (default: 0.0005 eV)')
-    ad.add_argument('--b0', metavar='b0', type=float, default='1', help='Initial value for weight decay (default: 1)')
+    ad.add_argument('--b0', metavar='b0', type=float, default='-1', help='Initial value for weight decay (default: -1, use value specified in hyper file)')
     ad.add_argument(
         '--b_decay',
         metavar='b_decay',

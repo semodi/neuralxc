@@ -1,18 +1,17 @@
-import hashlib
-import json
+from sklearn.base import TransformerMixin
+from sklearn.base import BaseEstimator
+from ..utils.density_getter import density_getter_factory
+from ..projector import DensityProjector, BehlerProjector, NonOrthoProjector
+from ..formatter import atomic_shape, system_shape
+from dask import delayed
+from ase.io import read
 import os
 from os.path import join as pjoin
-
-import numpy as np
-from ase.io import read
-from dask import delayed
-from dask.distributed import Client, LocalCluster
-from sklearn.base import BaseEstimator, TransformerMixin
-
 from ..constants import Bohr
-from ..formatter import atomic_shape, system_shape
-from ..projector import BehlerProjector, DensityProjector, NonOrthoProjector
-from ..utils.density_getter import density_getter_factory
+import numpy as np
+import hashlib
+import json
+from dask.distributed import Client, LocalCluster
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):

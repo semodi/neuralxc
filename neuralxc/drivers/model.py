@@ -1,43 +1,41 @@
-import copy
-import glob
-import hashlib
 import json
-import os
-import pickle
-import shutil
-import subprocess
-import sys
-import time
-from collections import namedtuple
-from pprint import pprint
-
+import glob
 import h5py
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from ase.io import read
-from dask.distributed import Client, LocalCluster
-from sklearn.base import clone
-from sklearn.externals.joblib import parallel_backend
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-
-import neuralxc as xc
-from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
+from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
+from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import ChainedEstimator, StackedEstimator
-from neuralxc.ml.network import NumpyNetworkEstimator, load_pipeline
-from neuralxc.ml.transformer import (GroupedPCA, GroupedStandardScaler,
-                                     GroupedVarianceThreshold)
+from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
+from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
+from neuralxc.preprocessor import Preprocessor
+from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
-from neuralxc.preprocessor import Preprocessor, driver
-from neuralxc.symmetrizer import symmetrizer_factory
-
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.base import clone
+import pandas as pd
+from pprint import pprint
+from dask.distributed import Client, LocalCluster
+from sklearn.externals.joblib import parallel_backend
+import time
+import os
+import shutil
+from collections import namedtuple
+import hashlib
+import subprocess
+import matplotlib.pyplot as plt
+import numpy as np
+import neuralxc as xc
+import sys
+import copy
+import pickle
 from .data import *
 from .other import *
-
+from neuralxc.preprocessor import driver
+from glob import glob
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -71,7 +69,7 @@ def shcopytreedel(src, dest):
         shutil.copytree(src, dest)
 
 def create_report(path='.'):
-    paths = glob.glob('*/stat*')
+    paths = glob('*/stat*')
 
     stats = []
     for p in paths:
@@ -190,7 +188,7 @@ def adiabatic_driver(xyz,
                      hyper2='',
                      maxit=5,
                      tol=0.0005,
-                     b0=1,
+                     b0=-1,
                      b_decay=0.1,
                      hotstart=0,
                      sets='',
@@ -294,19 +292,18 @@ def adiabatic_driver(xyz,
                     'system/ref'])
 
             open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
+            if hyperopt:
+                if scale_targets:
+                    raise Exception('Hyperpar optimization and scale_targets currently not supported')
+                statistics_fit = fit_driver(
                 preprocessor='pre.json',
                 hyper='hyper.json',
                 model=model0,
                 ensemble=ensemble,
                 sets='sets.inp',
-                b=b,
-                hyperopt=hyperopt,
-                target_scale = \
-                        (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
-            if hyperopt:
-                if scale_targets:
-                    raise Exception('Hyperpar optimization and scale_targets currently not supported')
+                b=-1,
+                hyperopt=hyperopt)
+
                 shcopy('hyper.json', 'hyper_old.json')
                 best_pars = json.load(open('best_params.json', 'r'))
                 if max_epochs > 0:
@@ -316,6 +313,16 @@ def adiabatic_driver(xyz,
 
                 statistics_fit = fit_driver(
                     preprocessor='pre.json', hyper='hyper.json', model=model0, ensemble=ensemble, sets='sets.inp', b=b)
+            else:
+                statistics_fit = fit_driver(
+                preprocessor='pre.json',
+                hyper='hyper.json',
+                model=model0,
+                ensemble=ensemble,
+                sets='sets.inp',
+                b=b,
+                target_scale = \
+                        (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
 
             open('statistics_fit', 'w').write(json.dumps(statistics_fit))
 

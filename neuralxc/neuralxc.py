@@ -6,21 +6,20 @@ Handles the primary interface that can be accessed by the electronic structure c
 and all other relevant classes
 """
 
+import numpy as np
+from .ml.network import load_pipeline
+from .ml.network import NetworkEstimator
+from .projector import DensityProjector, DeltaProjector
+from .symmetrizer import symmetrizer_factory
+from .utils.visualize import plot_density_cut
+from .constants import Rydberg, Bohr, Hartree
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 import os
 import time
 import traceback
-from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
-
-import numpy as np
 from periodictable import elements as element_dict
-
-from .constants import Bohr, Hartree, Rydberg
-from .ml.network import NetworkEstimator, load_pipeline
-from .projector import DeltaProjector, DensityProjector
-from .symmetrizer import symmetrizer_factory
 from .timer import timer
-from .utils.visualize import plot_density_cut
 
 agnostic_dict = {i: 'X' for i in np.arange(500)}
 

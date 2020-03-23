@@ -1,12 +1,11 @@
 import argparse
-import glob
 import os
 import re
+import glob
 import shutil
 import subprocess as sp
-from contextlib import contextmanager
 from tempfile import TemporaryDirectory
-
+from contextlib import contextmanager
 # YAML imports
 try:
     import yaml  # PyYAML

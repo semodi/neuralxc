@@ -1,6 +1,5 @@
-import sys
-
 from ase.io import read, write
+import sys
 
 all_sys = []
 

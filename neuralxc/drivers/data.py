@@ -1,42 +1,39 @@
-import copy
-import glob
-import hashlib
 import json
-import os
-import pickle
-import shutil
-import subprocess
-import sys
-import time
-from collections import namedtuple
-from pprint import pprint
-from types import SimpleNamespace as SN
-
+import glob
 import h5py
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from ase.io import read
-from dask.distributed import Client, LocalCluster
-from sklearn.base import clone
-from sklearn.externals.joblib import parallel_backend
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-
-import neuralxc as xc
-from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
+from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
+from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import ChainedEstimator, StackedEstimator
-from neuralxc.ml.network import NumpyNetworkEstimator, load_pipeline
-from neuralxc.ml.transformer import (GroupedPCA, GroupedStandardScaler,
-                                     GroupedVarianceThreshold)
-from neuralxc.ml.utils import *
+from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
+from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
 from neuralxc.preprocessor import Preprocessor
-from neuralxc.symmetrizer import symmetrizer_factory
-
-# from .other import *
+from neuralxc.datastructures.hdf5 import *
+from neuralxc.ml.utils import *
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.base import clone
+import pandas as pd
+from pprint import pprint
+from dask.distributed import Client, LocalCluster
+from sklearn.externals.joblib import parallel_backend
+import time
+import os
+import shutil
+from collections import namedtuple
+import hashlib
+import subprocess
+import matplotlib.pyplot as plt
+import numpy as np
+import neuralxc as xc
+import sys
+import copy
+import pickle
+from types import SimpleNamespace as SN
+from .other import *
 
 bi_slice = slice
 os.environ['KMP_AFFINITY'] = 'none'

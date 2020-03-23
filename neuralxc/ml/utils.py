@@ -1,25 +1,23 @@
-import h5py
+from ..formatter import expand, atomic_shape, system_shape
 import numpy as np
-from sklearn.base import BaseEstimator
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GridSearchCV
-from sklearn.neighbors import NearestNeighbors
-from sklearn.pipeline import Pipeline
-
-from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
+from sklearn.base import BaseEstimator
+from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
+from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
 from neuralxc.ml.network import load_pipeline
-from neuralxc.ml.transformer import (GroupedPCA, GroupedStandardScaler,
-                                     GroupedVarianceThreshold)
-from neuralxc.ml.utils import *
 from neuralxc.preprocessor import Preprocessor
-from neuralxc.symmetrizer import symmetrizer_factory
-
-from ..formatter import atomic_shape, expand, system_shape
+from neuralxc.datastructures.hdf5 import *
+from neuralxc.ml.utils import *
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.neighbors import NearestNeighbors
+from sklearn.linear_model import LinearRegression
+import h5py
 
 
 def opt_E0(file, baselines, references):
@@ -38,7 +36,7 @@ def opt_E0(file, baselines, references):
         for sidx, spec in enumerate(allspecies):
             X[sysidx, sidx] = sys.count(spec)
         y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
-    lr = LinearRegression(fit_intercept=False)
+    lr = LinearRegression(fit_intercept=True)
     lr.fit(X, y)
     E0 = {}
     for spec, coeff in zip(allspecies, lr.coef_):

@@ -1,15 +1,17 @@
-import os
-import shutil
-
-from ase.calculators.calculator import Calculator, all_changes
-from ase.calculators.siesta.base_siesta import *
 from ase.calculators.siesta.siesta import Siesta
+from ase.calculators.calculator import Calculator, all_changes
+import shutil
+import os
+from ase.calculators.siesta.base_siesta import *
 
 
 class CustomSiesta(Siesta):
     def __init__(self, fdf_path=None, **kwargs):
         self.fdf_path = fdf_path
         self.nxc = kwargs.pop('nxc', '')
+        self.skip_calculated = kwargs.pop('skip_calculated', True)
+        if not self.skip_calculated:
+            print('Siesta Caculator is not re-uisng results')
         kwargs.pop('mbe','')
         if 'label' in kwargs:
             kwargs['label'] = kwargs['label'].lower()
@@ -196,7 +198,7 @@ class CustomSiesta(Siesta):
 
     def calculate(self, atoms=None, properties=['energy'], system_changes=all_changes):
 
-        if '0_NORMAL_EXIT' in os.listdir('.'):
+        if '0_NORMAL_EXIT' in os.listdir('.') and self.skip_calculated:
             Calculator.calculate(self, atoms, properties, system_changes)
             self.write_input(self.atoms, properties, system_changes)
             # if self.command is None:

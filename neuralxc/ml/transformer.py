@@ -5,15 +5,14 @@ A typical dataset looks like this:
 [{'spec1': features,'spec2' : features}, {'spec1': features, 'spec3': features}]
 where the outer list runs over independent systems.
 """
-from abc import ABC, abstractmethod
-
-import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.decomposition import PCA
+from sklearn.base import TransformerMixin
+from sklearn.base import BaseEstimator
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-
 from ..formatter import atomic_shape, system_shape
+from abc import ABC, abstractmethod
+import numpy as np
 
 
 class GroupedTransformer(ABC):

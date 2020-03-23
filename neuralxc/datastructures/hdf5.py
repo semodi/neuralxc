@@ -1,9 +1,7 @@
+from ase.io import read, write
 import hashlib
 import json
-
 import numpy as np
-from ase.io import read, write
-
 import neuralxc.ml.utils
 
 
