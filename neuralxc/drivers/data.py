@@ -36,7 +36,7 @@ from neuralxc.ml.utils import *
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.symmetrizer import symmetrizer_factory
 
-from .other import *
+# from .other import *
 
 bi_slice = slice
 os.environ['KMP_AFFINITY'] = 'none'

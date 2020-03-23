@@ -9,7 +9,6 @@ import subprocess
 import sys
 import time
 from collections import namedtuple
-from glob import glob
 from pprint import pprint
 
 import h5py
@@ -72,7 +71,7 @@ def shcopytreedel(src, dest):
         shutil.copytree(src, dest)
 
 def create_report(path='.'):
-    paths = glob('*/stat*')
+    paths = glob.glob('*/stat*')
 
     stats = []
     for p in paths:

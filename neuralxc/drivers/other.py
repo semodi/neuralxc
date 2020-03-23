@@ -25,6 +25,7 @@ from sklearn.pipeline import Pipeline
 
 import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
+from neuralxc.drivers.data import add_data_driver
 from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
