@@ -18,5 +18,6 @@ SCF.DM.Tolerance 0.0002
 SCF.H.Converge F
 SCF.EDM.Converge F
 SCF.FreeE.Converge T
+neuralxc.threads 2
 
 

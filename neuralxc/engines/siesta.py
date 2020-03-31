@@ -12,7 +12,7 @@ class CustomSiesta(Siesta):
         self.skip_calculated = kwargs.pop('skip_calculated', True)
         if not self.skip_calculated:
             print('Siesta Caculator is not re-uisng results')
-        kwargs.pop('mbe','')
+        kwargs.pop('mbe', '')
         if 'label' in kwargs:
             kwargs['label'] = kwargs['label'].lower()
         super().__init__(**kwargs)

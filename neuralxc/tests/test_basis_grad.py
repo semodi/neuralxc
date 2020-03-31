@@ -29,7 +29,7 @@ def test_drad(r_o, n):
 
     basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}}
 
-    projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
+    projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_set)
 
     basis = {'n': n, 'l': 3, 'r_o': r_o}
     r = np.linspace(0, r_o, 100)
@@ -69,7 +69,7 @@ def test_dspher():
 
     basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}}
 
-    projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
+    projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_set)
 
     coords = np.random.rand(10, 3)
     lmax = 10

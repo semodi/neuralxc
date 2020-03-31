@@ -28,7 +28,6 @@ def prints_error(method):
     """ Decorator:forpy only prints stdout, no error messages,
     therefore print each error message to stdout instead
     """
-
     def wrapper_print_error(*args, **kwargs):
         try:
             return method(*args, **kwargs)
@@ -38,12 +37,6 @@ def prints_error(method):
             raise (e)
 
     return wrapper_print_error
-
-
-def verify_type(obj):
-    print('Type of object is:')
-    print(obj)
-    print(hasattr(obj, 'get_V'))
 
 
 @prints_error
@@ -94,12 +87,11 @@ class NXCAdapter(ABC):
 
 class PySCFNXC(NXCAdapter):
     def initialize(self, mol):
-        # elements = np.array([str(element_dict[e]) for e in elements])
         self.initialized = True
-        self._adaptee.initialize(mol, None, None, None)
+        self._adaptee.initialize(mol=mol)
 
     def get_V(self, dm):
-        E, V = self._adaptee.get_V(dm)
+        E, V = self._adaptee.get_V(rho=dm)
         E /= Hartree
         V /= Hartree
         return E, V
@@ -115,7 +107,7 @@ class SiestaNXC(NXCAdapter):
         self.element_filter = np.array([(e in model_elements) for e in elements])
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
-        self._adaptee.initialize(unitcell, grid, positions, elements)
+        self._adaptee.initialize(unitcell=unitcell, grid=grid, positions=positions, species=elements)
         use_drho = False
         if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
             use_drho = True
@@ -163,9 +155,6 @@ class SiestaNXC(NXCAdapter):
         -----
         Arrays should be provided in Fortran order
         """
-        elements = np.array([str(element_dict[e]) for e in elements])
-        unitcell = unitcell.T
-        positions = positions.T
         rho_reshaped = rho.reshape(*grid[::-1]).T
         if not self.initialized:
             raise Exception('Must call initialize before calling get_V')
@@ -174,13 +163,10 @@ class SiestaNXC(NXCAdapter):
         if calc_forces:
             self.force_correction = Vnxc[1][:-3].T / Rydberg
             self.stress_correction = Vnxc[1][-3:].T / Rydberg
-            #            if not np.allclose(self.stress_correction, self.stress_correction.T):
-            #                raise Exception('Stress correction not symmetric')
             Vnxc = Vnxc[0]
 
         Enxc = Enxc / Rydberg
         Vnxc = Vnxc.real.T.reshape(-1, 1) / Rydberg
-        # print('Not correcting V!')
         V[:, :] = Vnxc + V
         print('NeuralXC: Enxc = {} eV'.format(Enxc * Rydberg))
         return Enxc
@@ -225,7 +211,7 @@ class NeuralXC():
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error
-    def initialize(self, unitcell, grid, positions, species):
+    def initialize(self, **kwargs):
         """Parameters
         ------------------
         unitcell, array float
@@ -238,22 +224,19 @@ class NeuralXC():
         	atomic species (chem. symbols)
         """
 
-        self.unitcell = unitcell
-        self.grid = grid
-        self.positions = positions
-        self.species = species
-        self.projector = DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
+        self.projector_kwargs = kwargs
+        self.projector = DensityProjector(basis_instructions=self._pipeline.get_basis_instructions(), **kwargs)
 
     def _get_v_thread(self, dEdC, rho, positions, species, calc_forces=False):
         # print(positions, species)
-        V = self.projector.get_V(dEdC, positions, species, calc_forces, rho)
+        V = self.projector.get_V(dEdC, positions=positions, species=species, calc_forces=calc_forces, rho=rho)
         return V
 
     def _get_e_thread(self, rho, positions, species):
         # print(positions, species)
         positions = positions.reshape(-1, 3)
         species = [species]
-        C = self.projector.get_basis_rep(rho, positions, species)
+        C = self.projector.get_basis_rep(rho, positions=positions, species=species)
         D = self.symmetrizer.get_symmetrized(C)
         E = self._pipeline.predict(D)[0]
         dEdD = self._pipeline.get_gradient(D)
@@ -288,13 +271,12 @@ class NeuralXC():
         E = 0
         if calc_forces:
             timer.start('get_V_forces')
-            V = [0, np.zeros([len(self.positions) + 3, 3])]
         else:
             timer.start('get_V')
-            V = 0
+
         if self.max_workers == 1:
             timer.start('project')
-            C = self.projector.get_basis_rep(rho, self.positions, self.species)
+            C = self.projector.get_basis_rep(rho, **self.projector_kwargs)
             timer.stop('project')
             timer.start('ml_pipeline')
             D = self.symmetrizer.get_symmetrized(C)
@@ -302,13 +284,13 @@ class NeuralXC():
             dEdC = self.symmetrizer.get_gradient(self._pipeline.get_gradient(D))
             timer.stop('ml_pipeline')
             timer.start('build_V')
-            V = self.projector.get_V(dEdC, self.positions, self.species, calc_forces, rho)
+            V = self.projector.get_V(dEdC, calc_forces=calc_forces, rho=rho, **self.projector_kwargs)
             timer.stop('build_V')
         else:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_rep = {
                     executor.submit(self._get_e_thread, rho, position, spec): spec
-                    for position, spec in zip(self.positions, self.species)
+                    for position, spec in zip(self.projector_kwargs['positions'], self.projector_kwargs['species'])
                 }
 
                 dEdC = []
@@ -318,11 +300,13 @@ class NeuralXC():
                     dEdC.append(results[1])
 
                 if not calc_forces:
+                    V = 0
                     dEdC = np.array(dEdC)
                     future_to_rep = {
-                        executor.submit(self.projector.get_V, dedc, position.reshape(-1, 3), [spec], calc_forces, rho):
+                        executor.submit(self._get_v_thread, dedc, rho, position.reshape(-1, 3), [spec], calc_forces):
                         spec
-                        for dedc, position, spec in zip(dEdC, self.positions, self.species)
+                        for dedc, position, spec in zip(dEdC, self.projector_kwargs['positions'],
+                                                        self.projector_kwargs['species'])
                     }
                     for i, future in enumerate(future_to_rep):
                         results = future.result()
@@ -337,7 +321,7 @@ class NeuralXC():
                     for spec in dEdC_dict:
                         dEdC_dict[spec] = np.concatenate(dEdC_dict[spec], axis=1)
 
-                    V = self.projector.get_V(dEdC_dict, self.positions, self.species, calc_forces, rho)
+                    V = self.projector.get_V(dEdC_dict, calc_forces=calc_forces, rho=rho, **self.projector_kwargs)
 
         if calc_forces:
             timer.create_report('NXC_TIMING')

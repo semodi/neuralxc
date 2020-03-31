@@ -176,14 +176,13 @@ class GroupedPCA(GroupedTransformer, PCA):
         super().__init__(**self.get_kwargs())
 
     def get_kwargs(self):
-        return dict(
-            n_components=self.n_components,
-            copy=self.copy,
-            whiten=self.whiten,
-            svd_solver=self.svd_solver,
-            tol=self.tol,
-            iterated_power=self.iterated_power,
-            random_state=self.random_state)
+        return dict(n_components=self.n_components,
+                    copy=self.copy,
+                    whiten=self.whiten,
+                    svd_solver=self.svd_solver,
+                    tol=self.tol,
+                    iterated_power=self.iterated_power,
+                    random_state=self.random_state)
 
     def fit(self, *args, **kwargs):
         if self.n_components == 1:

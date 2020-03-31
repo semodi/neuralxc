@@ -92,11 +92,13 @@ def test_density_projector(projector_type):
 
     basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}, 'projector_type': projector_type}
 
-    density_projector = xc.projector.DensityProjector(unitcell, grid, basis_set)
+    density_projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_set)
+
     positions = np.array([[0.0, 0.0, 0.0], [-0.75846035, -0.59257417, 0.0], [0.75846035, -0.59257417, 0.0]
                           ]) / xc.constants.Bohr
 
-    basis_rep = density_projector.get_basis_rep(rho, positions, ['O', 'H', 'H'])
+    basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
+
     if projector_type == 'ortho':
         if save_test_density_projector:
             with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'wb') as file:
@@ -195,12 +197,11 @@ def test_formatter():
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize(
-    ['transformer', 'filepath'],
-    [[xc.ml.transformer.GroupedPCA(n_components=2),
-      os.path.join(test_dir, 'pca1.pckl')],
-     [xc.ml.transformer.GroupedVarianceThreshold(0.005),
-      os.path.join(test_dir, 'var09.pckl')]])
+@pytest.mark.parametrize(['transformer', 'filepath'],
+                         [[xc.ml.transformer.GroupedPCA(n_components=2),
+                           os.path.join(test_dir, 'pca1.pckl')],
+                          [xc.ml.transformer.GroupedVarianceThreshold(0.005),
+                           os.path.join(test_dir, 'var09.pckl')]])
 def test_grouped_transformers(transformer, filepath):
     with open(os.path.join(test_dir, 'transformer_in.pckl'), 'rb') as file:
         C = pickle.load(file)
@@ -241,7 +242,7 @@ def test_neuralxc_benzene():
 
     positions = benzene_traj.get_positions() / Bohr
     species = benzene_traj.get_chemical_symbols()
-    benzene_nxc.initialize(unitcell, grid, positions, species)
+    benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
     V, forces = benzene_nxc.get_V(rho, calc_forces=True)[1]
     V = V / Hartree
     forces = forces / Hartree * Bohr
@@ -260,20 +261,22 @@ def test_force_correction(use_delta):
     if use_delta:
         drho, _, _ = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'dbenzene'))
-        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
         benzene_nxc.projector = xc.projector.DeltaProjector(benzene_nxc.projector)
         benzene_nxc.projector.set_constant_density(drho, positions, species)
 
     else:
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
-        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
 
     def get_V_shifted(self, rho, unitcell, grid, positions, positions_shifted, species, calc_forces=False):
         """ only defined to calculate basis set contribution to forces with numerical derivatives.
         For finite difference, the descriptors should be calculated using the original positions,
         whereas V will then be built with displaced atoms
         """
-        projector = xc.projector.DensityProjector(unitcell, grid, self._pipeline.get_basis_instructions())
+        projector = xc.projector.DensityProjector(unitcell=unitcell,
+                                                  grid=grid,
+                                                  basis_instructions=self._pipeline.get_basis_instructions())
 
         if use_delta:
             projector = xc.projector.DeltaProjector(projector)
@@ -284,13 +287,13 @@ def test_force_correction(use_delta):
 
         symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_dict)
 
-        C = projector.get_basis_rep(rho, positions, species)
+        C = projector.get_basis_rep(rho, positions=positions, species=species)
 
         D = symmetrizer.get_symmetrized(C)
         dEdC = symmetrizer.get_gradient(self._pipeline.get_gradient(D))
         E = self._pipeline.predict(D)[0]
 
-        return E, projector.get_V(dEdC, positions_shifted, species, calc_forces, rho)
+        return E, projector.get_V(dEdC, positions=positions_shifted, species=species, calc_forces=calc_forces, rho=rho)
 
     V, forces = benzene_nxc.get_V(rho, calc_forces=True)[1]
     forces = forces[:-3]  # no stress
@@ -335,13 +338,13 @@ def test_parallel(use_delta):
         drho, _, _ = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.DRHO'))
         rho_const = (rho - drho)
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'dbenzene'))
-        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
         benzene_nxc.projector = xc.projector.DeltaProjector(benzene_nxc.projector)
         benzene_nxc.projector.set_constant_density(rho_const, positions, species)
 
     else:
         benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
-        benzene_nxc.initialize(unitcell, grid, positions, species)
+        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
 
     V_serial = benzene_nxc.get_V(rho, calc_forces=False)[1]
     benzene_nxc.max_workers = 4

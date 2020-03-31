@@ -58,11 +58,10 @@ def mbe_driver(atoms, app, workdir, kwargs, nworkers):
 
     for n in range(1, n_mol):
         new_atoms = [
-            Atoms(
-                building_block * n,
-                positions=a.get_positions().reshape(-1, n_block, 3)[np.array(comb)].reshape(-1, 3),
-                pbc=a.get_pbc(),
-                cell=a.get_cell()) for a in atoms for comb in itertools.combinations(range(n_mol), n)
+            Atoms(building_block * n,
+                  positions=a.get_positions().reshape(-1, n_block, 3)[np.array(comb)].reshape(-1, 3),
+                  pbc=a.get_pbc(),
+                  cell=a.get_cell()) for a in atoms for comb in itertools.combinations(range(n_mol), n)
         ]
         try:
             os.mkdir(mbe_root + '/mbe_{}'.format(n))

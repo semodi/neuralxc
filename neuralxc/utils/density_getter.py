@@ -35,9 +35,14 @@ class PySCFDensityGetter(BaseDensityGetter):
     def __init__(self, binary=None):
         pass
 
-    def get_density(self, file_path):
+    def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
-        return get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
+        res = get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
+
+        if return_dict:
+            return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
+        else:
+            return res
 
 
 class SiestaDensityGetter(BaseDensityGetter):
@@ -47,11 +52,16 @@ class SiestaDensityGetter(BaseDensityGetter):
     def __init__(self, binary):
         self._binary = binary
 
-    def get_density(self, file_path):
+    def get_density(self, file_path, return_dict=False):
         if self._binary:
-            return SiestaDensityGetter.get_density_bin(file_path)
+            res = SiestaDensityGetter.get_density_bin(file_path)
         else:
-            return SiestaDensityGetter.get_density(file_path)
+            res = SiestaDensityGetter.get_density(file_path)
+
+        if return_dict:
+            return {'rho': res[0], 'unitcell': res[1], 'grid': res[2]}
+        else:
+            return res
 
     @staticmethod
     def get_density_bin(file_path):

@@ -76,8 +76,9 @@ class BaseProjector(metaclass=ProjectorRegistry):
         pass
 
 
-def DensityProjector(unitcell=None, grid=None, basis_instructions=None):
+def DensityProjector(**kwargs):
 
+    basis_instructions = kwargs['basis_instructions']
     application = basis_instructions.get('application', 'siesta')
     projector_type = basis_instructions.get('projector_type', 'ortho')
     if application == 'pyscf':
@@ -87,7 +88,7 @@ def DensityProjector(unitcell=None, grid=None, basis_instructions=None):
     if not projector_type in registry:
         raise Exception('Projector: {} not registered'.format(projector_type))
 
-    return registry[projector_type](unitcell, grid, basis_instructions)
+    return registry[projector_type](**kwargs)
 
 
 class DefaultProjector(BaseProjector):
@@ -95,7 +96,7 @@ class DefaultProjector(BaseProjector):
     _registry_name = 'default'
 
     #TODO: Make some functions private
-    def __init__(self, unitcell=None, grid=None, basis_instructions=None):
+    def __init__(self, unitcell, grid, basis_instructions, **kwargs):
         """
         Parameters
         ------------------
@@ -129,7 +130,7 @@ class DefaultProjector(BaseProjector):
         self.W = W
         self.all_angs = {}
 
-    def get_basis_rep(self, rho, positions, species):
+    def get_basis_rep(self, rho, positions, species, **kwargs):
         """Calculates the basis representation for a given real space density
 
         Parameters
@@ -184,7 +185,7 @@ class DefaultProjector(BaseProjector):
 
         return basis_rep
 
-    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None):
+    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None, **kwargs):
         """Calculates the basis representation for a given real space density
 
         Parameters
@@ -222,8 +223,12 @@ class DefaultProjector(BaseProjector):
             if calc_forces:
                 if not isinstance(rho, np.ndarray):
                     raise ValueError('Must provide rho as np.ndarray')
-                force_corrections[i] = self.get_force_correction(
-                    rho, coeffs, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
+                force_corrections[i] = self.get_force_correction(rho,
+                                                                 coeffs,
+                                                                 box,
+                                                                 basis,
+                                                                 self.W[spec],
+                                                                 angs=self.all_angs.get(idx, None))
 
         stress_correction = np.einsum('ij,ik-> jk', force_corrections, positions)
 
@@ -256,8 +261,8 @@ class DefaultProjector(BaseProjector):
         # assert False
         # return sph_harm(m, l, phi, theta)
 
-        angulars =  self.angulars_real(l, theta, phi)
-        return angulars[m+l]
+        angulars = self.angulars_real(l, theta, phi)
+        return angulars[m + l]
 
     @staticmethod
     def angulars_real(l, theta, phi):
@@ -910,7 +915,7 @@ class DeltaProjector():
         self.positions = positions
         self.species = species
 
-    def get_basis_rep(self, rho, positions, species):
+    def get_basis_rep(self, rho, positions, species, **kwargs):
         basis_rep = self.projector.get_basis_rep(rho, positions, species)
         if positions.shape != self.positions.shape:
             index = np.where(np.all(self.positions[species[0] == np.array(self.species)] == positions[0], axis=-1))
@@ -920,7 +925,7 @@ class DeltaProjector():
                 basis_rep[spec] -= self.constant_basis_rep[spec]
         return basis_rep
 
-    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None):
+    def get_V(self, dEdC, positions, species, calc_forces=False, rho=None, **kwargs):
 
         if isinstance(rho, np.ndarray):
             rho = rho - self.constant_rho

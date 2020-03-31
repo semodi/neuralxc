@@ -26,6 +26,9 @@ l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
 def RKS(mol, nxc='', **kwargs):
+    """ Wrapper for the pyscf RKS (restricted Kohn-Sham) class
+    that uses a NeuralXC potential
+    """
     mf = dft.RKS(mol, **kwargs)
     if not nxc is '':
         model = neuralxc.get_nxc_adapter('pyscf', nxc)
@@ -33,7 +36,11 @@ def RKS(mol, nxc='', **kwargs):
         mf.get_veff = veff_mod(mf, model)
     return mf
 
+
 def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc=''):
+    """ Given an ase atoms object, run a pyscf RKS calculation on it and
+    return the results
+    """
     pos = atoms.positions
     spec = atoms.get_chemical_symbols()
     mol_input = [[s, p] for s, p in zip(spec, pos)]
@@ -45,7 +52,11 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc=''):
     mf.kernel()
     return mf, mol
 
+
 def veff_mod(mf, model):
+    """ Wrapper to get the modified get_veff() that uses a NeuralXC
+    potential
+    """
     def get_veff(mol=None, dm=None, dm_last=0, vhf_last=0, hermi=1):
         veff = pyscf.dft.rks.get_veff(mf, mol, dm, dm_last, vhf_last, hermi)
         vnxc = NPArrayWithTag(veff.shape)
@@ -59,7 +70,11 @@ def veff_mod(mf, model):
 
     return get_veff
 
+
 def get_eri3c(mol, auxmol, op):
+    """ Returns three center-one electron intergrals need for basis
+    set projection
+    """
     pmol = mol + auxmol
     nao = mol.nao_nr()
     naux = auxmol.nao_nr()
@@ -74,10 +89,13 @@ def get_eri3c(mol, auxmol, op):
 
 
 def get_dm(mo_coeff, mo_occ):
+    """ Get density matrix"""
     return np.einsum('ij,j,jk -> ik', mo_coeff, mo_occ, mo_coeff.T)
 
 
 def get_coeff(dm, eri3c):
+    """ Given a density matrix, return coefficients from basis set projection
+    """
     return np.einsum('ijk, ij -> k', eri3c, dm)
 
 
@@ -85,11 +103,11 @@ class PySCFProjector(BaseProjector):
 
     _registry_name = 'pyscf'
 
-    def __init__(self, mol, coeff, basis_instructions, *args, **kwargs):
+    def __init__(self, mol, basis_instructions, **kwargs):
         self.basis = basis_instructions
         self.initialize(mol)
 
-    def initialize(self, mol, *args, **kwargs):
+    def initialize(self, mol, **kwargs):
         self.spec_agnostic = self.basis.get('spec_agnostic', False)
         self.op = self.basis.get('operator', 'delta').lower()
         self.delta = self.basis.get('delta', False)
@@ -112,7 +130,7 @@ class PySCFProjector(BaseProjector):
         self.mol = mol
         self.auxmol = auxmol
 
-    def get_basis_rep(self, dm, mol=None, auxmol=None):
+    def get_basis_rep(self, dm, **kwargs):
         # if not mol is None and mol.atom != self.mol.atom:
         #     self.initialize(mol)
         if self.delta:
@@ -127,7 +145,7 @@ class PySCFProjector(BaseProjector):
 
         return coeff
 
-    def get_V(self, dEdC, positions=None, species=None, calc_forces=False, rho=None):
+    def get_V(self, dEdC, **kwargs):
         if self.spec_agnostic:
             running_idx = 0
             for sym in self.spec_partition:
@@ -182,8 +200,8 @@ class BasisPadder():
                     for l in range(max_l[sym] + 1):
                         if any(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels]):
                             indexing_left[sym][-1] += [True] * (2 * l + 1)
-                            sidx = np.where(
-                                ['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels])[0][0]
+                            sidx = np.where(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab
+                                             for lab in labels])[0][0]
                             indexing_right[sym][-1] += np.arange(sidx, sidx + (2 * l + 1)).astype(int).tolist()
                         else:
                             indexing_left[sym][-1] += [False] * (2 * l + 1)
@@ -231,8 +249,8 @@ class BasisPadder():
             sym = self.mol.atom_pure_symbol(aidx)
             coeff_in = coeff[sym]
             if coeff_in.ndim == 3: coeff_in = coeff_in[0]
-            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]])
-                                           - slice[-2]] = coeff_in[cnt[sym], self.indexing_l[sym][cnt[sym]]]
+            coeff_out[slice[-2]:slice[-1]][np.array(self.indexing_r[sym][cnt[sym]]) -
+                                           slice[-2]] = coeff_in[cnt[sym], self.indexing_l[sym][cnt[sym]]]
             cnt[sym] += 1
 
         return coeff_out

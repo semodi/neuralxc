@@ -86,12 +86,11 @@ def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
     except FileExistsError:
         pass
 
-    driver(
-        read(xyz, ':'),
-        pre['preprocessor'].get('application', 'siesta'),
-        workdir=workdir,
-        nworkers=pre.get('n_workers', 1),
-        kwargs=pre.get('engine_kwargs', {}))
+    driver(read(xyz, ':'),
+           pre['preprocessor'].get('application', 'siesta'),
+           workdir=workdir,
+           nworkers=pre.get('n_workers', 1),
+           kwargs=pre.get('engine_kwargs', {}))
     shutil.move(workdir + '/results.traj', './results.traj')
     if workdir == '.tmp/':
         shutil.rmtree(workdir)

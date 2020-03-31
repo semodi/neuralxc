@@ -121,10 +121,12 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             basis_instructions.get('application', 'siesta'),
             binary = basis_instructions.get('binary', True))
 
-        rho, unitcell, grid = density_getter.get_density(path)
-        projector = DensityProjector(unitcell, grid, basis_instructions)
-        basis_rep = projector.get_basis_rep(rho, pos, species)
-        del rho
+        density_dict = density_getter.get_density(path, return_dict=True)
+        density_dict.update({'positions': pos, 'species': species})
+        projector = DensityProjector(**density_dict, basis_instructions=basis_instructions)
+        rho = density_dict.pop('rho')
+        basis_rep = projector.get_basis_rep(rho, **density_dict)
+        del density_dict
         results = []
 
         scnt = {spec: 0 for spec in species}

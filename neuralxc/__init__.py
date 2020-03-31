@@ -6,12 +6,12 @@ Implementation of a machine learned density functional
 # Add imports here
 import warnings
 warnings.filterwarnings("ignore")
-PYSCF_FOUND=True
+PYSCF_FOUND = True
 try:
     import pyscf
 except ModuleNotFoundError:
-    PYSCF_FOUND=False
-from .neuralxc import NeuralXC, SiestaNXC, get_nxc_adapter, verify_type, get_V
+    PYSCF_FOUND = False
+from .neuralxc import NeuralXC, SiestaNXC, get_nxc_adapter, get_V
 from . import projector
 from . import utils
 from . import constants

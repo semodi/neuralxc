@@ -8,8 +8,10 @@ if __name__ == '__main__':
 
     #================ Plot Basis Set ================
     basis = subparser.add_parser('basis', description='Plot radial basis functions')
-    basis.add_argument(
-        'basis', action='store', type=str, help='Path to .json file \
+    basis.add_argument('basis',
+                       action='store',
+                       type=str,
+                       help='Path to .json file \
         containing the basis to plot')
     basis.set_defaults(func=plot_basis)
 
@@ -24,18 +26,20 @@ if __name__ == '__main__':
     adddat.add_argument('hdf5', action='store', type=str, help='Path to hdf5 file')
     adddat.add_argument('system', action='store', type=str, help='System')
     adddat.add_argument('method', action='store', type=str, help='Method')
-    adddat.add_argument(
-        'add', action='store', type=str, nargs='*', help='Which quantities to add (energy, forces, density)')
+    adddat.add_argument('add',
+                        action='store',
+                        type=str,
+                        nargs='*',
+                        help='Which quantities to add (energy, forces, density)')
     adddat.add_argument('--traj', metavar='traj', type=str, default='', help='Path to .xyz/.traj file')
     adddat.add_argument('--density', metavar='density', type=str, default='', help='Path to basis representation file')
     adddat.add_argument('--override', action=('store_true'), help='If exists, override? (Default: False)')
     adddat.add_argument('--slice', metavar='slice', type=str, default=':', help='Only add slice of dataset')
-    adddat.add_argument(
-        '--zero',
-        metavar='zero',
-        type=int,
-        default=None,
-        help='Shift energies by this value, if not set, use minimum of dataset.')
+    adddat.add_argument('--zero',
+                        metavar='zero',
+                        type=int,
+                        default=None,
+                        help='Shift energies by this value, if not set, use minimum of dataset.')
     adddat.set_defaults(func=add_data_driver)
 
     def inspectdat_driver(args):
@@ -52,8 +56,11 @@ if __name__ == '__main__':
     splitdat.add_argument('group', action='store', type=str, help='Which group to apply slicing to')
     splitdat.add_argument('label', action='store', type=str, help='New label for slice')
     splitdat.add_argument('--slice', metavar='slice', default=':', type=str, help='Slice in numpy notation')
-    splitdat.add_argument(
-        '--comp', metavar='comp', default='', type=str, help='Store complementary slice under this group')
+    splitdat.add_argument('--comp',
+                          metavar='comp',
+                          default='',
+                          type=str,
+                          help='Store complementary slice under this group')
     splitdat.set_defaults(func=split_data_driver)
 
     #================ Delete data ================
@@ -67,8 +74,11 @@ if __name__ == '__main__':
         'sample', description='Sample the data for a given basis set using KMeans cluster in feature-space')
     sampledat.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     sampledat.add_argument('size', action='store', type=int, help='Sample size')
-    sampledat.add_argument(
-        '--dest', action='store', type=str, default='sample.npy', help='Save to (default: sample.npy)')
+    sampledat.add_argument('--dest',
+                           action='store',
+                           type=str,
+                           default='sample.npy',
+                           help='Save to (default: sample.npy)')
     sampledat.add_argument('--hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data')
     sampledat.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
     sampledat.set_defaults(func=sample_driver)
@@ -93,26 +103,33 @@ if __name__ == '__main__':
     fit = subparser.add_parser('fit', description='Fit a NeuralXC model')
     fit.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     fit.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
-    fit.add_argument(
-        '--hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    fit.add_argument('--hdf5',
+                     metavar='hdf5',
+                     type=str,
+                     nargs=3,
+                     help='Path to hdf5 file, baseline data, reference data')
     fit.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
-    fit.add_argument(
-        '--sample', metavar='sample', type=str, default='', help='Only use a subsample of data contained in hdf5 file')
+    fit.add_argument('--sample',
+                     metavar='sample',
+                     type=str,
+                     default='',
+                     help='Only use a subsample of data contained in hdf5 file')
     fit.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
-    fit.add_argument(
-        '--model', metavar='model', type=str, default='', help='Continue training model found at this location')
-    fit.add_argument(
-        '--ensemble',
-        action='store_true',
-        help='Derive pipeline from --model and only fit final estimator, to be able to build\
+    fit.add_argument('--model',
+                     metavar='model',
+                     type=str,
+                     default='',
+                     help='Continue training model found at this location')
+    fit.add_argument('--ensemble',
+                     action='store_true',
+                     help='Derive pipeline from --model and only fit final estimator, to be able to build\
     an ensemble of estimators later on')
     fit.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
-    fit.add_argument(
-        '--b',
-        metavar='b',
-        type=float,
-        default=-1,
-        help='Weight decay parameter (supercedes the one specified in config file)')
+    fit.add_argument('--b',
+                     metavar='b',
+                     type=float,
+                     default=-1,
+                     help='Weight decay parameter (supercedes the one specified in config file)')
     fit.set_defaults(func=fit_driver)
 
     # =============  Adiabatic  ====================
@@ -120,62 +137,66 @@ if __name__ == '__main__':
     ad.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     ad.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
-    ad.add_argument(
-        '--data',
-        metavar='data',
-        type=str,
-        default='',
-        help='Start from this dataset instead of computing iteration 0')
-    ad.add_argument(
-        '--hyper2',
-        metavar='hyper2',
-        type=str,
-        default='',
-        help='Path to .json configuration file setting hyperparameters used for iteration > 0')
-    ad.add_argument(
-        '--maxit', metavar='maxit', type=int, default='5', help='Maximum number of iterations (default: 5)')
-    ad.add_argument(
-        '--tol',
-        metavar='tol',
-        type=float,
-        default='0.0005',
-        help='Tolerance in energy defining whether iterative training converged (default: 0.0005 eV)')
-    ad.add_argument('--b0', metavar='b0', type=float, default='-1', help='Initial value for weight decay (default: -1, use value specified in hyper file)')
-    ad.add_argument(
-        '--b_decay',
-        metavar='b_decay',
-        type=float,
-        default='0.1',
-        help='Decay for regularization parameter b (applied after every iteration) (default: 0.1)')
-    ad.add_argument(
-        '--hotstart',
-        metavar='hotstart',
-        type=int,
-        default='0',
-        help='Continue workflow at this iteration ( -1: only do testing )')
+    ad.add_argument('--data',
+                    metavar='data',
+                    type=str,
+                    default='',
+                    help='Start from this dataset instead of computing iteration 0')
+    ad.add_argument('--hyper2',
+                    metavar='hyper2',
+                    type=str,
+                    default='',
+                    help='Path to .json configuration file setting hyperparameters used for iteration > 0')
+    ad.add_argument('--maxit',
+                    metavar='maxit',
+                    type=int,
+                    default='5',
+                    help='Maximum number of iterations (default: 5)')
+    ad.add_argument('--tol',
+                    metavar='tol',
+                    type=float,
+                    default='0.0005',
+                    help='Tolerance in energy defining whether iterative training converged (default: 0.0005 eV)')
+    ad.add_argument('--b0',
+                    metavar='b0',
+                    type=float,
+                    default='-1',
+                    help='Initial value for weight decay (default: -1, use value specified in hyper file)')
+    ad.add_argument('--b_decay',
+                    metavar='b_decay',
+                    type=float,
+                    default='0.1',
+                    help='Decay for regularization parameter b (applied after every iteration) (default: 0.1)')
+    ad.add_argument('--hotstart',
+                    metavar='hotstart',
+                    type=int,
+                    default='0',
+                    help='Continue workflow at this iteration ( -1: only do testing )')
     ad.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
-    ad.add_argument(
-        '--nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
-    ad.add_argument(
-        '--model0',
-        metavar='model0',
-        type=str,
-        default='',
-        help='Build new model on top of model0 as a stacked estimator')
+    ad.add_argument('--nozero',
+                    action='store_true',
+                    help='Do not automatically set energy origins for every dataset by using min')
+    ad.add_argument('--model0',
+                    metavar='model0',
+                    type=str,
+                    default='',
+                    help='Build new model on top of model0 as a stacked estimator')
     ad.add_argument(
         '--fullstack',
         action='store_true',
         help='If model0 specified do full stack instead of stacking estimators (means also stack PCA etc.)')
     ad.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
     ad.add_argument('--scale_targets', action='store_true', help='Adiabatically scale targets')
-    ad.add_argument('--scale_exp', metavar='scale_exp', type=int, default='2',
-        help='Exponent for scaling function 1-((Tmax-t)/Tmax))**scale_exp')
-    ad.add_argument(
-        '--max_epochs',
-        metavar='max_epochs',
-        type=int,
-        default=0,
-        help='Maximum number of epochs in adiabatic training')
+    ad.add_argument('--scale_exp',
+                    metavar='scale_exp',
+                    type=int,
+                    default='2',
+                    help='Exponent for scaling function 1-((Tmax-t)/Tmax))**scale_exp')
+    ad.add_argument('--max_epochs',
+                    metavar='max_epochs',
+                    type=int,
+                    default=0,
+                    help='Maximum number of epochs in adiabatic training')
     ad.set_defaults(func=adiabatic_driver)
 
     # ============= Workflow ====================
@@ -183,50 +204,50 @@ if __name__ == '__main__':
     wf.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     wf.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     wf.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
-    wf.add_argument(
-        '--data',
-        metavar='data',
-        type=str,
-        default='',
-        help='Start from this dataset instead of computing iteration 0')
-    wf.add_argument(
-        '--hyper2',
-        metavar='hyper2',
-        type=str,
-        default='',
-        help='Path to .json configuration file setting hyperparameters used for iteration > 0')
+    wf.add_argument('--data',
+                    metavar='data',
+                    type=str,
+                    default='',
+                    help='Start from this dataset instead of computing iteration 0')
+    wf.add_argument('--hyper2',
+                    metavar='hyper2',
+                    type=str,
+                    default='',
+                    help='Path to .json configuration file setting hyperparameters used for iteration > 0')
     wf.add_argument('--maxit', metavar='maxit', type=int, default='5', help='Maximum number of iterations (default:5)')
-    wf.add_argument(
-        '--tol',
-        metavar='maxit',
-        type=float,
-        default='0.0005',
-        help='Tolerance in energy defining whether iterative training converged (default .0005 eV)')
-    wf.add_argument(
-        '--hotstart',
-        metavar='hotstart',
-        type=int,
-        default='0',
-        help='Continue workflow at this iteration ( -1: only do testing )')
+    wf.add_argument('--tol',
+                    metavar='maxit',
+                    type=float,
+                    default='0.0005',
+                    help='Tolerance in energy defining whether iterative training converged (default .0005 eV)')
+    wf.add_argument('--hotstart',
+                    metavar='hotstart',
+                    type=int,
+                    default='0',
+                    help='Continue workflow at this iteration ( -1: only do testing )')
     wf.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
-    wf.add_argument(
-        '--nozero', action='store_true', help='Do not automatically set energy origins for every dataset by using min')
-    wf.add_argument(
-        '--model0',
-        metavar='model0',
-        type=str,
-        default='',
-        help='Build new model on top of model0 as a stacked estimator')
-    wf.add_argument(
-        '--fullstack', action='store_true', help='If model0 specified do full stack instead of stacking estimators')
+    wf.add_argument('--nozero',
+                    action='store_true',
+                    help='Do not automatically set energy origins for every dataset by using min')
+    wf.add_argument('--model0',
+                    metavar='model0',
+                    type=str,
+                    default='',
+                    help='Build new model on top of model0 as a stacked estimator')
+    wf.add_argument('--fullstack',
+                    action='store_true',
+                    help='If model0 specified do full stack instead of stacking estimators')
     wf.set_defaults(func=workflow_driver)
 
     # =============== Evaluate =====================
 
     eval = subparser.add_parser('eval', description='Evaluate a NeuralXC model')
     eval.add_argument('--model', metavar='model', default='', help='Path to NeuralXC model')
-    eval.add_argument(
-        '--hdf5', metavar='hdf5', type=str, nargs=3, help='Path to hdf5 file, baseline data, reference data')
+    eval.add_argument('--hdf5',
+                      metavar='hdf5',
+                      type=str,
+                      nargs=3,
+                      help='Path to hdf5 file, baseline data, reference data')
     eval.add_argument('--plot', action='store_true', help='Create scatterplot?')
     eval.add_argument('--savefig', action='store', type=str, default='', help='Save scatterplot?')
     eval.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
@@ -237,8 +258,11 @@ if __name__ == '__main__':
 
     pred = subparser.add_parser('predict', description='Predict energies with NeuralXC model')
     pred.add_argument('--model', metavar='model', help='Path to NeuralXC model')
-    pred.add_argument(
-        '--hdf5', metavar='hdf5', type=str, nargs=2, help='Path to hdf5 file, baseline data, reference data')
+    pred.add_argument('--hdf5',
+                      metavar='hdf5',
+                      type=str,
+                      nargs=2,
+                      help='Path to hdf5 file, baseline data, reference data')
     pred.add_argument('--dest', metavar='dest', type=str, default='prediction', help='Destination where to store data')
     pred.set_defaults(predict=True)
     pred.set_defaults(func=eval_driver)
@@ -246,8 +270,11 @@ if __name__ == '__main__':
     # ============= Stack ================
 
     ens = subparser.add_parser('stack', description='Stack mutltiple NeuralXC models')
-    ens.add_argument(
-        '--operation', metavar='operation', type=str, default='sum', help='Operation to combine estimator outputs')
+    ens.add_argument('--operation',
+                     metavar='operation',
+                     type=str,
+                     default='sum',
+                     help='Operation to combine estimator outputs')
     ens.add_argument('--dest', metavar='dest', type=str, default='stacked_ensemble', help='Model destination')
     ens.add_argument('--estonly', action=('store_true'), help='Only stack the final estimators')
     ens.add_argument('models', action='store', type=str, nargs='+', help='Paths to models to combine')
@@ -280,25 +307,26 @@ if __name__ == '__main__':
     # =======================================================
     pre = subparser.add_parser('pre', description='Preprocess electron density')
     pre.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
-    pre.add_argument(
-        '--dest',
-        metavar='dest',
-        type=str,
-        default='.tmp/',
-        help='Destination where to store data,\
+    pre.add_argument('--dest',
+                     metavar='dest',
+                     type=str,
+                     default='.tmp/',
+                     help='Destination where to store data,\
                                                                         can be either a directory or an .hdf5 file (with groups) (default: .tmp/)'
-    )
+                     )
     pre.add_argument('--xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
     pre.set_defaults(func=pre_driver)
 
     df = subparser.add_parser('default', description='Fetch default configuration files')
-    df.add_argument(
-        'kind',
-        action='store',
-        help='Preprocessor (pre) or hyperparameter (hyper) config file',
-        choices=['pre', 'hyper'])
-    df.add_argument(
-        '--hint', metavar='hint', type=str, default='', help='Partially complete config file to fill with defaults')
+    df.add_argument('kind',
+                    action='store',
+                    help='Preprocessor (pre) or hyperparameter (hyper) config file',
+                    choices=['pre', 'hyper'])
+    df.add_argument('--hint',
+                    metavar='hint',
+                    type=str,
+                    default='',
+                    help='Partially complete config file to fill with defaults')
     df.add_argument('--out', metavar='out', type=str, default='', help='Store to (default pre.json/hyper.json)')
     df.set_defaults(func=fetch_default_driver)
 

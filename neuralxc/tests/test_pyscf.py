@@ -44,7 +44,7 @@ def test_adiabatic():
     adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2)
     os.chdir(test_dir + '/driver_data_tmp')
     engine = Engine('pyscf', nxc='it0/best_model')
-    engine.compute(read('benzene_small.traj','0'))
+    engine.compute(read('benzene_small.traj', '0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
@@ -62,7 +62,7 @@ def test_iterative():
     workflow_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2, stop_early=False)
 
     engine = Engine('pyscf', nxc='it1/nxc')
-    engine.compute(read('benzene_small.traj','0'))
+    engine.compute(read('benzene_small.traj', '0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
