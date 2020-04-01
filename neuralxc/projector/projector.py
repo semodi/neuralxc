@@ -11,7 +11,7 @@ from spher_grad import grlylm
 from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
-
+import neuralxc.config as config
 
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
@@ -158,8 +158,8 @@ class DefaultProjector(BaseProjector):
             projection, angs = self.project(rho, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
 
             basis_rep[spec].append(projection)
-
-            self.all_angs[idx] = angs
+            if config.UseMemory:
+                self.all_angs[idx] = angs
 
         for spec in basis_rep:
             basis_rep[spec] = np.concatenate(basis_rep[spec], axis=0)
@@ -530,8 +530,6 @@ class DefaultProjector(BaseProjector):
                 angs.append([])
                 ang_l = self.angulars_real(l, Theta, Phi)
                 for m in range(-l, l + 1):
-                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    # angs[l].append(self.angulars(l, m, Theta, Phi))
                     angs[l].append(ang_l[l + m])
 
         #Build radial part of b.f.

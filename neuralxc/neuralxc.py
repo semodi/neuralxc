@@ -20,6 +20,7 @@ import time
 import traceback
 from periodictable import elements as element_dict
 from .timer import timer
+import neuralxc.config as config
 
 agnostic_dict = {i: 'X' for i in np.arange(500)}
 
@@ -205,7 +206,7 @@ class NeuralXC():
         symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
-        self.max_workers = 1
+        self.max_workers = config.DefaultNThreads
         if symmetrize_dict['basis'].get('spec_agnostic', False):
             element_dict = agnostic_dict
         print('NeuralXC: Pipeline successfully loaded')
@@ -223,7 +224,7 @@ class NeuralXC():
         species, list string
         	atomic species (chem. symbols)
         """
-
+        timer.start('MD step')
         self.projector_kwargs = kwargs
         self.projector = DensityProjector(basis_instructions=self._pipeline.get_basis_instructions(), **kwargs)
 
@@ -324,7 +325,11 @@ class NeuralXC():
                     V = self.projector.get_V(dEdC_dict, calc_forces=calc_forces, rho=rho, **self.projector_kwargs)
 
         if calc_forces:
+            timer.stop('get_V_forces')
+            timer.stop('MD step')
+            timer.stop('master')
             timer.create_report('NXC_TIMING')
+            timer.start('master')
         else:
             timer.stop('get_V')
         return E, V
