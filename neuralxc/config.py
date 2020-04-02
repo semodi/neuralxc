@@ -3,3 +3,4 @@
 UseMemory=True
 UseTimer=True
 DefaultNThreads=1
+OptLevel=0

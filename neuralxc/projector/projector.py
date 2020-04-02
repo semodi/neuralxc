@@ -296,7 +296,7 @@ class DefaultProjector(BaseProjector):
         for i, m in enumerate(range(-l, l + 1)):
             sh_list[i] = sph_harm(m, l, phi, theta)
 
-        ang = np.einsum('ij,j...-> i...', M, sh_list, optimize=True)
+        ang = np.einsum('ij,j...-> i...', M, sh_list)
         return ang.real
 
     def get_force_correction(self, rho, coeffs, box, basis, W=None, angs=None):
@@ -465,22 +465,23 @@ class DefaultProjector(BaseProjector):
         rads = self.radials(R, basis, W)
 
         timer.stop('build:basis_functions:radial', False)
-        v = np.zeros_like(Xm, dtype=np.float64)
-        idx = 0
-
-        timer.stop('build:basis_functions', False)
         timer.start('build:build', False)
-        for n in range(n_rad):
-            for l in range(n_l):
-                for m in range(2 * l + 1):
-                    v += coeffs[idx] * angs[l][m] * rads[n]
-                    idx += 1
+        if  config.OptLevel > 1:
+            v = np.zeros_like(Xm, dtype=np.float64)
+            idx = 0
 
-        # coeffs_rs = coeffs.reshape(n_rad,n_l**2)
-        # angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
-        # rads = np.array(rads)
-        #
-        # v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads, optimize=False)
+            timer.stop('build:basis_functions', False)
+            for n in range(n_rad):
+                for l in range(n_l):
+                    for m in range(2 * l + 1):
+                        v += coeffs[idx] * angs[l][m] * rads[n]
+                        idx += 1
+        else:
+            coeffs_rs = coeffs.reshape(n_rad,n_l**2)
+            angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
+            rads = np.array(rads)
+
+            v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads)
         timer.stop('build:build', False)
         return v
 
@@ -551,7 +552,7 @@ class DefaultProjector(BaseProjector):
         angs_padded = np.array(angs_padded)
 
         rads = np.array(rads) * self.V_cell
-        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho, optimize=True)
+        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho, optimize=config.OptLevel>0)
         coeff = []
 
         #remove zero padding from m
