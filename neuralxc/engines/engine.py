@@ -65,11 +65,12 @@ class SiestaEngine(BaseEngine):
         kwargs['basis_set'] = kwargs.pop('basis', 'DZP')
         kwargs['fdf_arguments'] = kwargs.get('fdf_arguments', {'MaxSCFIterations': 200})
         kwargs['pseudo_qualifier'] = kwargs.get('pseudo_qualifier', '')
+        exec_prepend = kwargs.pop('exec_prepend', '')
 
         # Environment variables for ase
         os.environ['SIESTA_PP_PATH'] = kwargs.pop('pseudoloc', '.')
         if not 'SIESTA_COMMAND' in os.environ:
-            os.environ['SIESTA_COMMAND'] = 'siesta < ./%s > ./%s'
+            os.environ['SIESTA_COMMAND'] = exec_prepend + ' siesta < ./%s > ./%s'
 
         self.calc = CustomSiesta(fdf_path, **kwargs)
 
