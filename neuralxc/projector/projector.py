@@ -12,7 +12,7 @@ from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
 import neuralxc.config as config
-
+from ..utils import geom
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
 
@@ -285,19 +285,23 @@ class DefaultProjector(BaseProjector):
         float or np.ndarray
             Value of angular function at provided point(s)
         """
-        if l > 0:
-            M = M_make_complex(l + 1)[-(2 * l + 1):, -(2 * l + 1):]
-            M = np.linalg.inv(M)
-        else:
-            M = np.eye(1)
-
-        shape = (2 * l + 1, ) + phi.shape
-        sh_list = np.zeros(shape, dtype=np.complex)
-        for i, m in enumerate(range(-l, l + 1)):
-            sh_list[i] = sph_harm(m, l, phi, theta)
-
-        ang = np.einsum('ij,j...-> i...', M, sh_list)
-        return ang.real
+        # if l > 0:
+        #     M = M_make_complex(l + 1)[-(2 * l + 1):, -(2 * l + 1):]
+        #     M = np.linalg.inv(M)
+        # else:
+        #     M = np.eye(1)
+        #
+        # shape = (2 * l + 1, ) + phi.shape
+        # sh_list = np.zeros(shape, dtype=np.complex)
+        # for i, m in enumerate(range(-l, l + 1)):
+        #     sh_list[i] = sph_harm(m, l, phi, theta)
+        #
+        # ang = np.einsum('ij,j...-> i...', M, sh_list)
+        # return ang.real
+        res = []
+        for m in range(-l,l+1):
+            res.append(geom.SH(l,m,theta,phi))
+        return np.stack(res)
 
     def get_force_correction(self, rho, coeffs, box, basis, W=None, angs=None):
         """ Calculate the contribution to the forces that arises from the
