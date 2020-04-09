@@ -83,8 +83,9 @@ def test_siesta_density_getter():
 
 
 @pytest.mark.fast
+@pytest.mark.project
 @pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf']])
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch']])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -99,7 +100,7 @@ def test_density_projector(projector_type):
 
     basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
 
-    if projector_type == 'ortho':
+    if projector_type in ['ortho','ortho_torch']:
         if save_test_density_projector:
             with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'wb') as file:
                 pickle.dump(basis_rep, file)

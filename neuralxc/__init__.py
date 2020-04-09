@@ -8,6 +8,10 @@ import warnings
 warnings.filterwarnings("ignore")
 PYSCF_FOUND = True
 try:
+    import torch
+except ModuleNotFoundError:
+    TORCH_FOUND = False
+try:
     import pyscf
 except ModuleNotFoundError:
     PYSCF_FOUND = False
