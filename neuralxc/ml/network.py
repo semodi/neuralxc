@@ -23,6 +23,10 @@ import shutil
 from .activation import get_activation
 import copy
 import tensorflow as tf
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
 # import tensorflow
 Dataset = namedtuple("Dataset", "data species")
 
@@ -278,6 +282,20 @@ class NumpyNetworkEstimator(BaseEstimator):
         else:
             return self.activation.f(x.dot(W[-1]) + B[-1])
 
+    def get_energy_torch(self, x, W, B):
+
+        if not hasattr(self, 'trunc'): self.trunc = False
+        x = torch.from_numpy(x)
+        W = [torch.from_numpy(w).double() for w in W]
+        B = [torch.from_numpy(b).double() for b in B]
+        for w, b in zip(W[:-1], B[:-1]):
+            x = self.activation.f(torch.matmul(x,w) + b)
+
+        if not self.trunc:
+            return (torch.matmul(x, W[-1]) + B[-1]).detach().numpy()
+        else:
+            return self.activation.f(torch.matmul(x, W[-1]) + B[-1]).detach().numpy()
+
     def gradient(self, x, W, B):
         # For backwards compatibility
         if not hasattr(self, 'trunc'):
@@ -304,6 +322,11 @@ class NumpyNetworkEstimator(BaseEstimator):
 
             # Output will be (n_samples, n_layerout, n_features)
             return gradient.swapaxes(0, 1).swapaxes(1, 2)
+
+    def to_torch(self):
+        self.get_energy_numpy = self.get_energy
+        self.get_energy = self.get_energy_torch
+        self.is_torch = True
 
     def _make_serializable(self, path):
         return None

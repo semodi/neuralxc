@@ -27,7 +27,7 @@ test_dir = os.path.dirname(os.path.abspath(__file__))
 @pytest.mark.fast
 @pytest.mark.symmetrizer_gradient
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base', 'casimir_torch']])
 def test_symmetrizer_gradient(symmetrizer_type):
     """ Synthetic test to see if symmetrizer gradient respects chain rule of
         differentiation

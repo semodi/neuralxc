@@ -20,28 +20,37 @@ class Sigmoid(BaseActivation):
 
     _registry_name = 'sigmoid'
 
-    def __init__(self):
-        pass
+    def __init__(self, lib = np):
+        self.lib = lib
 
     def f(self, x):
-        return 1 / (1 + np.exp(-x))
+        if not hasattr(self, 'lib'):
+            self.lib = np
+
+        return 1 / (1 + self.lib.exp(-x))
 
     def df(self, x):
-        return np.exp(-x) / (1 + np.exp(-x))**2
+        if not hasattr(self, 'lib'):
+            self.lib = np
+        return self.lib.exp(-x) / (1 + self.lib.exp(-x))**2
 
 
 class Tanh(BaseActivation):
 
     _registry_name = 'tanh'
 
-    def __init__(self):
-        pass
+    def __init__(self, lib = np):
+        self.lib = lib
 
     def f(self, x):
-        return np.tanh(x)
+        if not hasattr(self, 'lib'):
+            self.lib = np
+        return self.lib.tanh(x)
 
     def df(self, x):
-        return (1 - np.tanh(x)**2)
+        if not hasattr(self, 'lib'):
+            self.lib = np
+        return (1 - self.lib.tanh(x)**2)
 
 
 def get_activation(activation):
