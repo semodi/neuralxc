@@ -259,7 +259,6 @@ def test_species_grouper():
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.realspace
-@pytest.mark.mark
 def test_neuralxc_benzene():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))

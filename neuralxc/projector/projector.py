@@ -119,7 +119,9 @@ class DefaultProjector(BaseProjector):
         U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
         for i in range(3):
             U[i, :] = U[i, :] / grid[i]
+
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+        print('a', a)
 
         self.unitcell = unitcell
         self.grid = grid

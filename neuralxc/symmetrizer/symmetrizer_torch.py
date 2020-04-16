@@ -10,17 +10,35 @@ from ..base import ABCRegistry
 from .symmetrizer import BaseSymmetrizer
 import torch
 
+def convert_torch_wrapper(func):
+
+    def wrapped_func(X, *args, **kwargs):
+        X = torch.from_numpy(X)
+        Y = func(X, *args, **kwargs)
+        return Y.detach().numpy()
+
+    return wrapped_func
+
 class CasimirSymmetrizerTorch(torch.nn.Module, BaseSymmetrizer):
 
     _registry_name = 'casimir_torch'
 
     def __init__(self, *args, **kwargs):
 
-        torch.nn.Module.__init__(self)
         BaseSymmetrizer.__init__(self, *args, **kwargs)
+        torch.nn.Module.__init__(self)
+
+    def forward(self, C):
+        self._symmetrize_function = self._symmetrize_function_bare
+        return BaseSymmetrizer.get_symmetrized(self, C)
+
+    def get_symmetrized(self, C):
+        self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function_bare)
+        return BaseSymmetrizer.get_symmetrized(self, C)
+
 
     @staticmethod
-    def _symmetrize_function(c, n_l, n, *args):
+    def _symmetrize_function_bare(c, n_l, n, *args):
         """ Returns the casimir invariants of the tensors stored in c
 
         Parameters:
@@ -41,8 +59,6 @@ class CasimirSymmetrizerTorch(torch.nn.Module, BaseSymmetrizer):
         np.ndarray
             Casimir invariants
         """
-
-        c = torch.from_numpy(c)
         c_shape = c.size()
 
         c = c.view(-1, c_shape[-1])
@@ -55,7 +71,9 @@ class CasimirSymmetrizerTorch(torch.nn.Module, BaseSymmetrizer):
                 idx += 2 * l + 1
         casimirs = torch.stack(casimirs).T
 
-        return casimirs.view(*c_shape[:-1], -1).detach().numpy()
+        return casimirs.view(*c_shape[:-1], -1)
+
+    _symmetrize_function = _symmetrize_function_bare
 
     @staticmethod
     def _gradient_function(dEdd, c, n_l, n):

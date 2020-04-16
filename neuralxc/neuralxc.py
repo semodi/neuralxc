@@ -206,9 +206,9 @@ class NeuralXC():
         symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
         symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
         self.symmetrizer = symmetrizer_factory(symmetrize_dict)
-        self.max_workers = config.DefaultNThreads
         if symmetrize_dict['basis'].get('spec_agnostic', False):
             element_dict = agnostic_dict
+        self.max_workers = config.DefaultNThreads
         print('NeuralXC: Pipeline successfully loaded')
 
     @prints_error
@@ -225,6 +225,11 @@ class NeuralXC():
         	atomic species (chem. symbols)
         """
         timer.start('MD step')
+        symmetrize_dict = {'basis': self._pipeline.get_basis_instructions()}
+        symmetrize_dict.update(self._pipeline.get_symmetrize_instructions())
+        self.symmetrizer = symmetrizer_factory(symmetrize_dict)
+        if symmetrize_dict['basis'].get('spec_agnostic', False):
+            element_dict = agnostic_dict
         self.projector_kwargs = kwargs
         self.projector = DensityProjector(basis_instructions=self._pipeline.get_basis_instructions(), **kwargs)
 
