@@ -157,8 +157,9 @@ class GroupedTransformer(ABC):
     def to_torch(self):
         TorchModule.__init__(self)
         self.is_torch = True
-        for spec in self._spec_dict:
-            self._spec_dict[spec].is_torch = True
+        if hasattr(self,'_spec_dict'):
+            for spec in self._spec_dict:
+                self._spec_dict[spec].is_torch = True
 
 class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModule):
     def __init__(self, threshold=0.0):

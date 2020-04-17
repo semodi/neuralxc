@@ -21,7 +21,8 @@ import traceback
 from periodictable import elements as element_dict
 from .timer import timer
 import neuralxc.config as config
-
+from glob import glob
+import torch
 agnostic_dict = {i: 'X' for i in np.arange(500)}
 
 
@@ -66,7 +67,10 @@ class NXCAdapter(ABC):
     def __init__(self, path, options={}):
         # from mpi4py import MPI
         path = ''.join(path.split())
-        self._adaptee = NeuralXC(path)
+        if path[-len('.jit'):] == '.jit' :
+            self._adaptee = NeuralXCJIT(path)
+        else:
+            self._adaptee = NeuralXC(path)
         self.initialized = False
 
         # This complicated structure is necessary because of forpy, which
@@ -104,20 +108,27 @@ class SiestaNXC(NXCAdapter):
         elements = np.array([str(element_dict[e]) for e in elements])
         unitcell = unitcell.T
         positions = positions.T
-        model_elements = [key for key in self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
-        self.element_filter = np.array([(e in model_elements) for e in elements])
+        if hasattr(self._adaptee,'_pipeline'):
+            model_elements = [key for key in self._adaptee._pipeline.get_basis_instructions() if len(key) == 1]
+            self.element_filter = np.array([(e in model_elements) for e in elements])
+        else:
+            self.element_filter = np.array([True]*len(positions))
         positions = positions[self.element_filter]
         elements = elements[self.element_filter]
         self._adaptee.initialize(unitcell=unitcell, grid=grid, positions=positions, species=elements)
         use_drho = False
-        if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
-            use_drho = True
-            print('NeuralXC: Using DRHO')
-            rho_reshaped = rho.reshape(*grid[::-1]).T
-            self._adaptee.projector = DeltaProjector(self._adaptee.projector)
-            self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
+        if hasattr(self._adaptee, '_pipeline'):
+            if self._adaptee._pipeline.get_basis_instructions().get('extension', 'RHOXC') == 'DRHO':
+                use_drho = True
+                print('NeuralXC: Using DRHO')
+                rho_reshaped = rho.reshape(*grid[::-1]).T
+                self._adaptee.projector = DeltaProjector(self._adaptee.projector)
+                self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
+            else:
+                print('NeuralXC: Using RHOXC')
         else:
             print('NeuralXC: Using RHOXC')
+
         self.initialized = True
 
         return use_drho
@@ -338,3 +349,81 @@ class NeuralXC():
         else:
             timer.stop('get_V')
         return E, V
+
+
+class NeuralXCJIT:
+
+
+    def __init__(self, path):
+        model_paths = glob(path + '/*')
+        self.basis_models = {}
+        self.projector_models = {}
+        # print(model_paths)
+        print('NeuralXC: Instantiate NeuralXC, using jit model')
+        print('NeuralXC: Loading model from ' + path)
+
+        for mp in model_paths:
+            if 'basis' in mp:
+                self.basis_models[mp.split('_')[-1]] =\
+                 torch.jit.load(mp)
+            if 'projector' in mp:
+                self.projector_models[mp.split('_')[-1]] =\
+                 torch.jit.load(mp)
+        self.energy_model  =\
+                 torch.jit.load(os.path.join(path, 'xc'))
+        print('NeuralXC: Model successfully loaded')
+
+    @prints_error
+    def initialize(self, **kwargs):
+        """Parameters
+        ------------------
+        unitcell, array float
+        	Unitcell in bohr
+        grid, array float
+        	Grid points per unitcell
+        positions, array float
+        	atomic positions
+        species, list string
+        	atomic species (chem. symbols)
+        """
+        self.projector_kwargs = kwargs
+        self.unitcell = torch.from_numpy(kwargs['unitcell']).double()
+        self.grid = torch.from_numpy(kwargs['grid']).double()
+        self.positions = torch.from_numpy(kwargs['positions']).double()
+        self.a = torch.norm(self.unitcell, dim=1).double() / self.grid
+        U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
+        self.V_cell = torch.det(U)
+        self.species = kwargs['species']
+        with torch.jit.optimized_execution(should_optimize=True):
+            self.compute_basis(False)
+
+    @prints_error
+    def compute_basis(self, positions_grad=False):
+        self.positions.requires_grad = positions_grad
+        self.radials = []
+        self.angulars = []
+        for pos, spec in zip(self.positions, self.species):
+            rad, ang = self.basis_models[spec](pos, self.unitcell, self.grid, self.a)
+            self.radials.append(rad)
+            self.angulars.append(ang)
+
+    @prints_error
+    def get_V(self, rho, calc_forces=False):
+
+        with torch.jit.optimized_execution(should_optimize=True):
+            if calc_forces:
+                self.compute_basis(True)
+            self.descriptors = {spec:[] for spec in self.species}
+            rho = torch.from_numpy(rho).double()
+            rho.requires_grad = True
+            for pos, spec, rad, ang in zip(self.positions, self.species,
+                                                self.radials, self.angulars):
+                self.descriptors[spec].append(self.projector_models[spec](rho, pos,
+                                                self.unitcell, self.grid, self.a, rad, ang))
+
+            E = self.energy_model(*[torch.stack(self.descriptors[spec]) for spec in self.descriptors])
+            E.backward()
+            V = (rho.grad/self.V_cell).detach().numpy()
+            if calc_forces:
+                V = [V, np.concatenate([-self.positions.grad.detach().numpy(),np.zeros([3,3])])]
+            return E.detach().numpy()[0], V

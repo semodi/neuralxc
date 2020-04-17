@@ -167,6 +167,90 @@ def load_pipeline(path):
         pipeline.steps[-1][-1].load_network(os.path.join(path, 'network'))
     return pipeline
 
+def compile_model(model, outpath, override = False):
+
+    model._pipeline.to_torch()
+    model._pipeline.basis_instructions['projector_type'] = \
+        model._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
+    model._pipeline.symmetrize_instructions['symmetrizer_type'] = \
+        model._pipeline.symmetrize_instructions.get('symmetrizer_type','casimir') + '_torch'
+
+
+    unitcell_c = np.eye(3)*5.0
+    grid_c = np.array([10,10,10])
+    a_c = np.linalg.norm(unitcell_c, axis=1) / grid_c
+    pos_c = np.array([[0, 0, 0]])
+    rho_c = np.ones(shape=(10,10,10))
+    species = []
+    for spec in model._pipeline.basis_instructions:
+        if len(spec) < 3:
+            species.append(spec)
+
+    model.initialize(unitcell=unitcell_c, grid=grid_c, positions=pos_c, species=species)
+
+    unitcell_c = torch.from_numpy(unitcell_c).double()
+    grid_c = torch.from_numpy(grid_c).double()
+    a_c = torch.from_numpy(a_c).double()
+    pos_c = torch.from_numpy(pos_c).double()
+    rho_c = torch.from_numpy(rho_c).double()
+
+    class E_predictor(torch.nn.Module):
+        def __init__(self, species):
+            torch.nn.Module.__init__(self)
+            self.species = species
+
+        def forward(self, *args):
+             C = {spec : c for spec,c in zip(self.species, args)}
+             x = model.symmetrizer(C)
+             for steps in model._pipeline.steps[:]:
+                 x = steps[1].forward(x)
+             return x
+
+    class ModuleBasis(torch.nn.Module):
+        def __init__(self):
+            torch.nn.Module.__init__(self)
+            self.projector = model.projector
+
+        def forward(self, positions, unitcell, grid, a):
+             return self.projector.forward_basis(positions, unitcell, grid, a)
+
+    class ModuleProject(torch.nn.Module):
+        def __init__(self):
+            torch.nn.Module.__init__(self)
+            self.projector = model.projector
+
+        def forward(self, rho, positions, unitcell, grid, a, radials, angulars):
+             return self.projector.forward_fast(rho, positions, unitcell, grid, a, radials, angulars)
+
+
+    basismod = ModuleBasis()
+    projector = ModuleProject()
+    basis_models = {}
+    projector_models = {}
+    C = []
+    with torch.jit.optimized_execution(should_optimize=True):
+        for spec in species:
+            basismod.projector.set_species(spec)
+            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, a_c), optimize=True, check_trace = True)
+            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, a_c)
+            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars), optimize=True, check_trace = True)
+            C.append(projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars).unsqueeze(0))
+        epred = E_predictor(species)
+        e_model = torch.jit.trace(epred, tuple(C), optimize=True, check_trace = False)
+
+    try:
+        os.mkdir(outpath)
+    except FileExistsError:
+        if override:
+            shutil.rmtree(outpath)
+            os.mkdir(outpath)
+        else:
+            raise Exception('Model exists, set override = True to save at this location')
+
+    for spec in species:
+        torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
+        torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
+    torch.jit.save(e_model, outpath + '/xc')
 
 class NumpyNetworkEstimator(torch.nn.Module, BaseEstimator):
 

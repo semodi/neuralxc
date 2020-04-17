@@ -37,7 +37,6 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         """
         torch.nn.Module.__init__(self)
         self.basis = basis_instructions
-
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
         for species in basis_instructions:
