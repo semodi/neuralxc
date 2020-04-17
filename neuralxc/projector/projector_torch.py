@@ -19,6 +19,7 @@ import periodictable
 import torch
 
 
+
 class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
 
     _registry_name = 'default_torch'
@@ -49,6 +50,10 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         self.a = torch.from_numpy(a).double()
         self.W = {w:torch.from_numpy(W[w]) for w in W}
 
+        for species in basis_instructions:
+            if len(species) < 3:
+                W[species] = self.get_W(basis_instructions[species])
+
     def get_basis_rep(self, rho, positions, species, **kwargs):
         """Calculates the basis representation for a given real space density
 
@@ -72,21 +77,39 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         C = self.forward(rho, positions, species, self.unitcell, self.grid, self.a)
         return {spec: C[spec].detach().numpy() for spec in C}
 
+    def set_species(self, species):
+        self.species = species
+
+    def set_cell_parameters(self, unitcell, grid, a):
+
+        U = torch.einsum('ij,i->ij', unitcell, 1/grid)
+        self.grid = grid
+        self.V_cell = torch.det(U)
+        self.U = torch.transpose(U,0,1)
+        self.U_inv = torch.inverse(U)
+        self.a = a
+
+
+    def forward_basis(self, positions, unitcell, grid, a):
+
+        self.set_cell_parameters(unitcell, grid, a)
+        basis = self.basis[self.species]
+        box = self.box_around(positions, basis['r_o'])
+        return self.get_basis_on_mesh(box, basis, self.W[self.species])
+
+
+    def forward_fast(self, rho, positions, unitcell, grid, a, radials, angulars):
+
+        self.set_cell_parameters(unitcell, grid, a)
+        basis = self.basis[self.species]
+        Xm, Ym, Zm = self.mesh_around(positions, basis['r_o'])
+        return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, int(basis['l']))
+
+
 
     def forward(self, rho, positions, species, unitcell, grid, a):
 
-        U = torch.einsum('ij,i->ij', unitcell, (grid[:3])**(-1))
-        # a = torch.sqrt(torch.einsum('ij->i',unitcell**2)) / grid
-        # a = torch.diag(U)
-        # a = torch.from_numpy(np.array([0.20996965, 0.20996965, 0.20996965]))
-        self.grid = grid
-        self.V_cell = torch.det(U)
-        # self.V_cell = 1
-        self.U = torch.transpose(U,0,1)
-        # self.U = U.T
-        self.U_inv = torch.inverse(U)
-        self.a = a
-        self.all_angs = {}
+        self.set_cell_parameters(unitcell, grid, a)
         basis_rep = {}
         species = [str(element_dict[int(s.detach().numpy())]) for s in species]
 
@@ -94,11 +117,9 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
             if not spec in basis_rep:
                 basis_rep[spec] = []
 
-            idx = '{}{}{}{}'.format(spec, pos[0], pos[1], pos[2])
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
-            projection, angs = self.project(rho, box, basis, self.W[spec],
-                angs=self.all_angs.get(idx, None))
+            projection = self.project(rho, box, basis, self.W[spec])
 
             basis_rep[spec].append(projection)
 
@@ -133,6 +154,48 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
             res.append(geom.SH(l,m,theta,phi))
         return torch.stack(res)
 
+    def project_onto(self, rho, rads, angs, n_l):
+
+        #zero_pad_angs (so that it can be converted to numpy array):
+        # n_rad = rads.shape[0]
+        # n_l = angs.shape[0]
+        rads = rads * self.V_cell
+        coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs, rads, rho)
+
+        indexing = torch.ones(coeff_array.size()[1:])
+        indexing = (torch.tril(indexing, diagonal = n_l) * torch.flip(torch.tril(indexing, diagonal = n_l), (1,))).bool()
+        coeff = coeff_array[:, indexing]
+
+        return coeff.view(-1)
+
+    def get_basis_on_mesh(self, box, basis, W):
+
+        n_rad = basis['n']
+        n_l = basis['l']
+        r_o = basis['r_o']
+        R, Theta, Phi = box['radial']
+        Xm, Ym, Zm = box['mesh']
+
+        #Build angular part of basis functions
+        angs = []
+        for l in range(n_l):
+            angs.append([])
+            ang_l = self.angulars_real(l, Theta, Phi)
+            for m in range(-l, l + 1):
+                angs[l].append(ang_l[l + m])
+
+        zeropad = torch.zeros_like(R)
+        angs_padded = []
+        for l in range(n_l):
+            angs_padded.append(torch.stack([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l)))
+
+        angs_padded = torch.stack(angs_padded)
+
+        rads = self.radials(R, basis, W)
+
+        return rads, angs_padded
+
+
     def project(self, rho, box, basis, W=None, return_dict=False, angs=None):
         '''
         Project the real space density rho onto a set of basis functions
@@ -165,8 +228,6 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         R, Theta, Phi = box['radial']
         Xm, Ym, Zm = box['mesh']
 
-        # Automatically detect whether entire charge density or only surrounding
-        # box was provided
         #Build angular part of basis functions
         angs = []
         for l in range(n_l):
@@ -174,9 +235,6 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
             ang_l = self.angulars_real(l, Theta, Phi)
             for m in range(-l, l + 1):
                 angs[l].append(ang_l[l + m])
-        #Build radial part of b.f.
-        # if not isinstance(W, np.ndarray):
-            # W = self.get_W(basis)  # Matrix to orthogonalize radial basis
 
         rads = self.radials(R, basis, W)
 
@@ -201,7 +259,21 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
                     if abs(m - n_l) <= l:
                         coeff.append(coeff_array[n, l, m])
 
-        return torch.stack(coeff).view(1, -1), angs
+        return torch.stack(coeff).view(1, -1)
+
+    def mesh_around(self, pos, radius):
+        pos = pos.view(-1)
+        #Create box with max. distance = radius
+        rmax = torch.ceil(radius / self.a)
+        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
+
+        #Find mesh pos.
+        cm = torch.round(self.U_inv.mv(pos))
+        Xm = torch.fmod((Xm + cm[0]), self.grid[0])
+        Ym = torch.fmod((Ym + cm[1]), self.grid[1])
+        Zm = torch.fmod((Zm + cm[2]), self.grid[2])
+
+        return Xm.long(), Ym.long(), Zm.long()
 
     def box_around(self, pos, radius):
         '''
