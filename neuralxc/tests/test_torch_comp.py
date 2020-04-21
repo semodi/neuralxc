@@ -34,14 +34,14 @@ save_siesta_density_getter = False
 save_test_symmetrizer = False
 save_grouped_transformer = False
 
-@pytest.mark.torchmbp
-def test_compile_mbpolmodel():
+# @pytest.mark.torchmbp
+# def test_compile_mbpolmodel():
+#
+#     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/MB-pol/model')
+#     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp.nxc.jit')
 
-    model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/MB-pol/model')
-    xc.ml.network.compile_model(model, 'mbp.nxc.jit')
-    
 @pytest.mark.torch
-def test_benzene():
+def test_benzene_compiled():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
     xc.ml.network.compile_model(benzene_nxc, 'benzene.nxc.jit',
@@ -78,6 +78,46 @@ def test_benzene():
     assert np.allclose(V_np[0], V_comp[0])
     assert np.allclose(V_np[1], V_comp[1])
     assert np.allclose(forces_np, forces_comp)
+
+# @pytest.mark.torch
+# def test_benzene_torch():
+#
+#     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+#
+#     benzene_nxc._pipeline.to_torch()
+#     benzene_nxc._pipeline.basis_instructions['projector_type'] = \
+#         benzene_nxc._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
+#     benzene_nxc._pipeline.symmetrize_instructions['symmetrizer_type'] = \
+#         benzene_nxc._pipeline.symmetrize_instructions.get('symmetrizer_type','casimir') + '_torch'
+#     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+#     density_getter = xc.utils.SiestaDensityGetter(binary=True)
+#     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
+#
+#     a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+#     positions = benzene_traj.get_positions() / Bohr
+#     species = benzene_traj.get_chemical_symbols()
+#     start = time()
+#     benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+#     V_comp = benzene_nxc.get_V(rho, calc_forces=True)
+#     forces_comp = V_comp[1][1][:-3]
+#     V_comp = V_comp[0], V_comp[1][0]
+#     end = time()
+#
+#     time_torch = end - start
+#
+#     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+#     start = time()
+#     benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+#     V_np = benzene_nxc.get_V(rho, calc_forces=True)
+#     forces_np = V_np[1][1][:-3]
+#     V_np = V_np[0], V_np[1][0]
+#     end = time()
+#     time_classical = end - start
+#     print('Torch', time_torch)
+#     print('Classical', time_classical)
+#     assert np.allclose(V_np[0], V_comp[0])
+#     assert np.allclose(V_np[1], V_comp[1])
+#     assert np.allclose(forces_np, forces_comp)
 # @pytest.mark.torch_energy
 # def test_neuralxc_benzene_torch_energy():
 #

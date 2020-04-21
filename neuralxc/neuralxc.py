@@ -358,19 +358,21 @@ class NeuralXCJIT:
         model_paths = glob(path + '/*')
         self.basis_models = {}
         self.projector_models = {}
+        self.energy_models = {}
         # print(model_paths)
         print('NeuralXC: Instantiate NeuralXC, using jit model')
         print('NeuralXC: Loading model from ' + path)
 
         for mp in model_paths:
-            if 'basis' in mp:
+            if 'basis' in os.path.basename(mp):
                 self.basis_models[mp.split('_')[-1]] =\
                  torch.jit.load(mp)
-            if 'projector' in mp:
+            if 'projector' in  os.path.basename(mp):
                 self.projector_models[mp.split('_')[-1]] =\
                  torch.jit.load(mp)
-        self.energy_model  =\
-                 torch.jit.load(os.path.join(path, 'xc'))
+            if 'xc' in os.path.basename(mp):
+                self.energy_models[mp.split('_')[-1]] =\
+                 torch.jit.load(mp)
         print('NeuralXC: Model successfully loaded')
 
     @prints_error
@@ -386,6 +388,7 @@ class NeuralXCJIT:
         species, list string
         	atomic species (chem. symbols)
         """
+        timer.start('MD step')
         self.projector_kwargs = kwargs
         self.unitcell = torch.from_numpy(kwargs['unitcell']).double()
         self.grid = torch.from_numpy(kwargs['grid']).double()
@@ -402,28 +405,46 @@ class NeuralXCJIT:
         self.positions.requires_grad = positions_grad
         self.radials = []
         self.angulars = []
+        timer.start('build_basis')
         for pos, spec in zip(self.positions, self.species):
             rad, ang = self.basis_models[spec](pos, self.unitcell, self.grid, self.a)
             self.radials.append(rad)
             self.angulars.append(ang)
+        timer.stop('build_basis')
 
     @prints_error
     def get_V(self, rho, calc_forces=False):
 
         with torch.jit.optimized_execution(should_optimize=True):
             if calc_forces:
+                timer.start('get_V_forces')
                 self.compute_basis(True)
+            else:
+                timer.start('get_V')
             self.descriptors = {spec:[] for spec in self.species}
             rho = torch.from_numpy(rho).double()
             rho.requires_grad = True
+            e_list = []
             for pos, spec, rad, ang in zip(self.positions, self.species,
                                                 self.radials, self.angulars):
-                self.descriptors[spec].append(self.projector_models[spec](rho, pos,
-                                                self.unitcell, self.grid, self.a, rad, ang))
+                e_list.append(self.energy_models[spec](
+                    self.projector_models[spec](rho, pos,
+                                                self.unitcell,
+                                                self.grid,
+                                                self.a, rad, ang).unsqueeze(0)
+                                                )
+                                            )
 
-            E = self.energy_model(*[torch.stack(self.descriptors[spec]) for spec in self.descriptors])
-            E.backward()
+                e_list[-1].backward()
+            E = torch.sum(torch.cat(e_list))
             V = (rho.grad/self.V_cell).detach().numpy()
             if calc_forces:
                 V = [V, np.concatenate([-self.positions.grad.detach().numpy(),np.zeros([3,3])])]
-            return E.detach().numpy()[0], V
+                timer.stop('MD step')
+                timer.stop('master')
+                timer.stop('get_V_forces')
+                timer.create_report('NXC_TIMING_JIT')
+                timer.start('master')
+            else:
+                timer.stop('get_V')
+            return E.detach().numpy(), V
