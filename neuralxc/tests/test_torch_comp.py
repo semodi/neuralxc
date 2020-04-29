@@ -41,6 +41,80 @@ save_grouped_transformer = False
 #     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp.nxc.jit')
 
 @pytest.mark.torch
+def test_mybox():
+
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
+    grid_np = np.array(grid)
+    positions = benzene_traj.get_positions() / Bohr
+    # Break symmetries
+    positions[:,0] += 0.02
+    positions[:,1] += 0.01
+    positions[:,2] += 0.12
+    species = benzene_traj.get_chemical_symbols()
+    a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+    benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+    C = benzene_nxc.projector.get_basis_rep(rho, positions, species)
+    C = {spec: C[spec].tolist() for spec in C}
+    # my_box[0,1] = grid[0]/2
+    basis = benzene_nxc._pipeline.get_basis_instructions()
+
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    xc.ml.network.compile_model(benzene_nxc, 'benzene.nxc.jit',
+        override=True)
+    benzene_nxc = xc.neuralxc.NeuralXCJIT('benzene.nxc.jit')
+    basis_models = benzene_nxc.basis_models
+    projector_models = benzene_nxc.projector_models
+
+    unitcell = torch.from_numpy(unitcell).double()
+    grid = torch.from_numpy(grid).double()
+    positions = torch.from_numpy(positions).double()
+    a = torch.from_numpy(a).double()
+
+    def is_in_box(pos, rc, my_box_d, grid_d, a): #Not necessary but can be used
+                                                 #(might promise some speedup)
+        return True
+        grid = grid_d * a[0]
+        my_box = my_box_d * a[0]
+        posm = pos - rc
+        posp = pos + rc
+        posm = torch.fmod(torch.ceil(torch.abs(posm)/grid)*grid + posm,grid)
+        posp = torch.fmod(torch.ceil(torch.abs(posp)/grid)*grid + posp,grid)
+        return all([(posm[i] >= my_box[i,0] and posm[i] < my_box[i,1]) or\
+                    (posp[i] >= my_box[i,0] and posp[i] < my_box[i,1]) for i in range(3)])
+
+    for pos, spec in zip(positions, species):
+        c_jit = 0
+        box_lim = [0,int(grid_np[0]/2)+5,grid_np[0]]
+        for ibox in range(2):
+            for jbox in range(2):
+                for kbox in range(2):
+                    my_box = np.zeros([3,2])
+                    my_box[:,1] = grid
+                    my_box[0,0] = box_lim[ibox]
+                    my_box[0,1] = box_lim[ibox+1]
+                    my_box[1,0] = box_lim[jbox]
+                    my_box[1,1] = box_lim[jbox+1]
+                    my_box[2,0] = box_lim[kbox]
+                    my_box[2,1] = box_lim[kbox+1]
+                    my_box = my_box.astype(int)
+                    rho_jit = torch.from_numpy(rho[my_box[0,0]:my_box[0,1],my_box[1,0]:my_box[1,1],my_box[2,0]:my_box[2,1]]).double()
+                    my_box = torch.from_numpy(my_box).double()
+                    if is_in_box(pos, basis[spec]['r_o'], my_box, grid, a):
+                        rad, ang = basis_models[spec](pos, unitcell, grid, a, my_box)
+                        rsize = rad.size()
+                        if not rsize[-1]*rsize[-2]*rsize[-3]: continue
+                        c_jit += projector_models[spec](rho_jit,
+                            pos, unitcell, grid, a, rad, ang, my_box).detach().numpy()
+        c_np = C[spec].pop(0)
+        assert np.allclose(c_jit, c_np)
+
+    # assert False
+
+
+@pytest.mark.benzene_compiled
 def test_benzene_compiled():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))

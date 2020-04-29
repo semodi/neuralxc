@@ -189,17 +189,17 @@ def compile_model(model, outpath, override = False):
             torch.nn.Module.__init__(self)
             self.projector = projector
 
-        def forward(self, positions, unitcell, grid, a):
-             return self.projector.forward_basis(positions, unitcell, grid, a)
+        def forward(self, positions, unitcell, grid, a, my_box):
+             return self.projector.forward_basis(positions, unitcell, grid, a, my_box)
 
     class ModuleProject(torch.nn.Module):
         def __init__(self, projector):
             torch.nn.Module.__init__(self)
             self.projector = projector
 
-        def forward(self, rho, positions, unitcell, grid, a, radials, angulars):
-             return self.projector.forward_fast(rho, positions, unitcell, grid, a, radials, angulars)
-             
+        def forward(self, rho, positions, unitcell, grid, a, radials, angulars, my_box):
+             return self.projector.forward_fast(rho, positions, unitcell, grid, a, radials, angulars, my_box)
+
     model._pipeline.to_torch()
     model._pipeline.basis_instructions['projector_type'] = \
         model._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
@@ -208,10 +208,18 @@ def compile_model(model, outpath, override = False):
 
 
     unitcell_c = np.eye(3)*5.0
-    grid_c = np.array([10,10,10])
+    # unitcell_c[0,0] = 3
+    grid_c = np.array([9,9,9])
+    my_box = np.array([[0,9]]*3)
     a_c = np.linalg.norm(unitcell_c, axis=1) / grid_c
     pos_c = np.array([[0, 0, 0]])
-    rho_c = np.ones(shape=(10,10,10))
+    # rho_c = np.ones(shape=(my_box[0,1] - my_box[0,0],
+    #                        my_box[1,1] - my_box[1,0],
+    #                        my_box[2,1] - my_box[2,0]))
+
+    rho_c = np.ones(shape=grid_c)
+
+
     species = []
     for spec in model._pipeline.basis_instructions:
         if len(spec) < 3:
@@ -224,7 +232,7 @@ def compile_model(model, outpath, override = False):
     a_c = torch.from_numpy(a_c).double()
     pos_c = torch.from_numpy(pos_c).double()
     rho_c = torch.from_numpy(rho_c).double()
-
+    my_box = torch.from_numpy(my_box).double()
     basismod = ModuleBasis(model.projector)
     projector = ModuleProject(model.projector)
 
@@ -234,10 +242,10 @@ def compile_model(model, outpath, override = False):
     with torch.jit.optimized_execution(should_optimize=True):
         for spec in species:
             basismod.projector.set_species(spec)
-            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, a_c), optimize=True, check_trace = True)
-            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, a_c)
-            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars), optimize=True, check_trace = True)
-            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars).unsqueeze(0)
+            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, a_c, my_box), optimize=True, check_trace = True)
+            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, a_c, my_box)
+            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars, my_box), optimize=True, check_trace = True)
+            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars, my_box).unsqueeze(0)
             epred = E_predictor(spec, model)
             e_models[spec] = torch.jit.trace(epred, C, optimize=True, check_trace = False)
 

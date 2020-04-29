@@ -89,19 +89,19 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         self.a = a
 
 
-    def forward_basis(self, positions, unitcell, grid, a):
+    def forward_basis(self, positions, unitcell, grid, a, my_box):
 
         self.set_cell_parameters(unitcell, grid, a)
         basis = self.basis[self.species]
-        box = self.box_around(positions, basis['r_o'])
+        box = self.box_around(positions, basis['r_o'], my_box)
         return self.get_basis_on_mesh(box, basis, self.W[self.species])
 
 
-    def forward_fast(self, rho, positions, unitcell, grid, a, radials, angulars):
+    def forward_fast(self, rho, positions, unitcell, grid, a, radials, angulars, my_box):
 
         self.set_cell_parameters(unitcell, grid, a)
         basis = self.basis[self.species]
-        Xm, Ym, Zm = self.mesh_around(positions, basis['r_o'])
+        Xm, Ym, Zm = self.mesh_around(positions, basis['r_o'], my_box)
         return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, int(basis['l']))
 
 
@@ -260,21 +260,23 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
 
         return torch.stack(coeff).view(1, -1)
 
-    def mesh_around(self, pos, radius):
+    def mesh_around(self, pos, radius, my_box):
         pos = pos.view(-1)
         #Create box with max. distance = radius
         rmax = torch.ceil(radius / self.a)
-        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
-
-        #Find mesh pos.
         cm = torch.round(self.U_inv.mv(pos))
+        # my_box -= my_box[:,0].unsqueeze(1)
+        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, my_box = my_box,cm =cm, scaled=False, rmax=rmax, indexing='ij')
+        #Find mesh pos.
+        cm = shift(cm, self.grid)
+        cm -= my_box[:,0]
         Xm = torch.fmod((Xm + cm[0]), self.grid[0])
         Ym = torch.fmod((Ym + cm[1]), self.grid[1])
         Zm = torch.fmod((Zm + cm[2]), self.grid[2])
 
         return Xm.long(), Ym.long(), Zm.long()
 
-    def box_around(self, pos, radius):
+    def box_around(self, pos, radius, my_box):
         '''
         Return dictionary containing box around an atom at position pos with
         given radius. Dictionary contains box in mesh, euclidean and spherical
@@ -290,22 +292,28 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
                 euclidean and spherical coordinates
         '''
         pos = pos.view(-1)
-        #Create box with max. distance = radius
-        rmax = torch.ceil(radius / self.a)
-        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
-        X, Y, Z = self.mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
-
 
         #Find mesh pos.
         cm = torch.round(self.U_inv.mv(pos))
         dr = pos - self.U.mv(cm)
+        #Create box with max. distance = radius
+        rmax = torch.ceil(radius / self.a)
+
+        # my_box = my_box - cm.view(3,1)
+
+        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=False, rmax=rmax, indexing='ij')
+        X, Y, Z = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=True, rmax=rmax, indexing='ij')
+
+
         Xs = X - dr[0]
         Ys = Y - dr[1]
         Zs = Z - dr[2]
 
+        #TODO: this could probably be done in 1d and moved to mesh_3d
         Xm = torch.fmod((Xm + cm[0]), self.grid[0])
         Ym = torch.fmod((Ym + cm[1]), self.grid[1])
         Zm = torch.fmod((Zm + cm[2]), self.grid[2])
+
 
         R = torch.sqrt(Xs**2 + Ys**2 + Zs**2)
 
@@ -314,8 +322,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         Theta[R < 1e-15] = 0
         return {'mesh': [Xm, Ym, Zm], 'real': [Xs, Ys, Zs], 'radial': [R, Theta, Phi]}
 
-    @staticmethod
-    def mesh_3d(U, a, rmax, scaled=False, indexing='xy'):
+    def mesh_3d(self, U, a, rmax, my_box, cm, scaled=False, indexing='xy'):
         """
         Returns a 3d mesh taking into account periodic boundary conditions
 
@@ -336,10 +343,31 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
             defines mesh.
         """
 
-        # resolve the periodic boundary conditions
-        x_pbc = torch.cat([torch.arange(0, rmax[0] + 1), torch.arange(-rmax[0], 0)])
-        y_pbc = torch.cat([torch.arange(0, rmax[1] + 1), torch.arange(-rmax[1], 0)])
-        z_pbc = torch.cat([torch.arange(0, rmax[2] + 1), torch.arange(-rmax[2], 0)])
+
+        x_pbc = torch.arange(-rmax[0], rmax[0] + 1, dtype=torch.float64)
+        y_pbc = torch.arange(-rmax[1], rmax[1] + 1, dtype=torch.float64)
+        z_pbc = torch.arange(-rmax[2], rmax[2] + 1, dtype=torch.float64)
+
+
+        x_pbc_shifted = x_pbc + cm[0]
+        y_pbc_shifted = y_pbc + cm[1]
+        z_pbc_shifted = z_pbc + cm[2]
+
+        # Shift all to positive, then resolve periodic boundary conditions to compare to myBox
+        x_pbc_shifted = shift(x_pbc_shifted, self.grid[0])
+        y_pbc_shifted = shift(y_pbc_shifted, self.grid[1])
+        z_pbc_shifted = shift(z_pbc_shifted, self.grid[2])
+
+        if not scaled:
+            x_pbc = shift(x_pbc, self.grid[0])
+            y_pbc = shift(y_pbc, self.grid[1])
+            z_pbc = shift(z_pbc, self.grid[2])
+
+        x_pbc = x_pbc[(x_pbc_shifted >= my_box[0,0]) & (x_pbc_shifted < my_box[0,1])]
+        y_pbc = y_pbc[(y_pbc_shifted >= my_box[1,0]) & (y_pbc_shifted < my_box[1,1])]
+        z_pbc = z_pbc[(z_pbc_shifted >= my_box[2,0]) & (z_pbc_shifted < my_box[2,1])]
+        # print(x_pbc)
+        #
 
         Xm, Ym, Zm = torch.meshgrid([x_pbc, y_pbc, z_pbc])
 
@@ -459,3 +487,8 @@ class OrthoProjectorTorch(DefaultProjectorTorch, OrthoProjector):
             for j in range(i + 1, nmax):
                 S_matrix[j, i] = S_matrix[i, j]
         return S_matrix
+
+
+def shift(c, g):
+    c = torch.fmod(c + torch.ceil(torch.abs(torch.min(c)/g))*g, g)
+    return c
