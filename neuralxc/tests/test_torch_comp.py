@@ -40,7 +40,6 @@ save_grouped_transformer = False
 #     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/MB-pol/model')
 #     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp.nxc.jit')
 
-@pytest.mark.torch
 def test_mybox():
 
     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
@@ -112,7 +111,62 @@ def test_mybox():
         assert np.allclose(c_jit, c_np)
 
     # assert False
+@pytest.mark.torch
+def test_stress():
 
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    xc.ml.network.compile_model(benzene_nxc, 'benzene.nxc.jit',
+        override=True)
+    benzene_nxc = xc.neuralxc.NeuralXCJIT('benzene.nxc.jit')
+
+    benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+
+
+    rho, unitcell_true, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
+    positions = benzene_traj.get_positions() / Bohr
+    species = benzene_traj.get_chemical_symbols()
+    positions_scaled = positions.dot(np.linalg.inv(unitcell_true))
+    assert np.allclose(positions, positions_scaled.dot(unitcell_true))
+
+    unitcell = np.array(unitcell_true)
+    positions = positions_scaled
+    benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+    V_comp = benzene_nxc.get_V(rho, calc_forces=True)
+    stress = V_comp[1][1][-3:]
+    forces = V_comp[1][1][:-3]
+    stress_virial = positions.T.dot(forces)
+    stress_virial  = ((stress_virial + stress_virial.T)*.5).round(4)
+    stress_diag = []
+    for ij in range(3):
+        dx = 0.0001
+        energies = []
+        for ix in [-1, 1]:
+            unitcell = np.array(unitcell_true)
+            unitcell[ij,ij] *= (1 + dx*ix)
+            benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+            V_comp = benzene_nxc.get_V(rho, calc_forces=True)
+            forces_comp = V_comp[1][1][:-3]
+            V_comp = V_comp[0], V_comp[1][0]
+            energies.append(V_comp[0])
+
+        V_ucell = np.linalg.det(unitcell_true)
+        stress_xx = (energies[1] - energies[0])/dx*.5/V_ucell
+        stress_diag.append(stress_xx)
+
+    print('Finite diff ' , stress_diag)
+    print('Exact ' ,np.diag(stress))
+    # print(np.array(stress_diag)/np.diag(stress))
+    assert False
+
+    # benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    # benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+    # V_np = benzene_nxc.get_V(rho, calc_forces=True)
+    # forces_np = V_np[1][1][:-3]
+    # V_np = V_np[0], V_np[1][0]
+    # assert np.allclose(V_np[0], V_comp[0])
+    # assert np.allclose(V_np[1], V_comp[1])
+    # assert np.allclose(forces_np, forces_comp)
 
 @pytest.mark.benzene_compiled
 def test_benzene_compiled():
@@ -129,9 +183,10 @@ def test_benzene_compiled():
     with torch.jit.optimized_execution(should_optimize=True):
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
         positions = benzene_traj.get_positions() / Bohr
+        positions_scaled = positions.dot(np.linalg.inv(unitcell))
         species = benzene_traj.get_chemical_symbols()
         start = time()
-        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions_scaled, species=species)
         V_comp = benzene_nxc.get_V(rho, calc_forces=True)
         forces_comp = V_comp[1][1][:-3]
         V_comp = V_comp[0], V_comp[1][0]
@@ -147,8 +202,8 @@ def test_benzene_compiled():
     V_np = V_np[0], V_np[1][0]
     end = time()
     time_classical = end - start
-    print('Torch', time_torch)
-    print('Classical', time_classical)
+    # print('Torch', time_torch)
+    # print('Classical', time_classical)
     assert np.allclose(V_np[0], V_comp[0])
     assert np.allclose(V_np[1], V_comp[1])
     assert np.allclose(forces_np, forces_comp)

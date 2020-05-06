@@ -79,8 +79,9 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
     def set_species(self, species):
         self.species = species
 
-    def set_cell_parameters(self, unitcell, grid, a):
+    def set_cell_parameters(self, unitcell, grid):
 
+        a = torch.norm(unitcell, dim=1).double() / grid
         U = torch.einsum('ij,i->ij', unitcell, 1/grid)
         self.grid = grid
         self.V_cell = torch.det(U)
@@ -89,17 +90,15 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         self.a = a
 
 
-    def forward_basis(self, positions, unitcell, grid, a, my_box):
-
-        self.set_cell_parameters(unitcell, grid, a)
+    def forward_basis(self, positions, unitcell, grid, my_box):
+        self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
         box = self.box_around(positions, basis['r_o'], my_box)
         return self.get_basis_on_mesh(box, basis, self.W[self.species])
 
 
-    def forward_fast(self, rho, positions, unitcell, grid, a, radials, angulars, my_box):
-
-        self.set_cell_parameters(unitcell, grid, a)
+    def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, my_box):
+        self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
         Xm, Ym, Zm = self.mesh_around(positions, basis['r_o'], my_box)
         return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, int(basis['l']))
@@ -344,10 +343,17 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         """
 
 
-        x_pbc = torch.arange(-rmax[0], rmax[0] + 1, dtype=torch.float64)
-        y_pbc = torch.arange(-rmax[1], rmax[1] + 1, dtype=torch.float64)
-        z_pbc = torch.arange(-rmax[2], rmax[2] + 1, dtype=torch.float64)
+        # x_pbc = torch.arange(-rmax[0], rmax[0] + 1, dtype=torch.float64)
+        # y_pbc = torch.arange(-rmax[1], rmax[1] + 1, dtype=torch.float64)
+        # z_pbc = torch.arange(-rmax[2], rmax[2] + 1, dtype=torch.float64)
 
+        # Does the same as above but does not complain if unitcell.requires_gradient
+        x_pbc = torch.arange(-1000, 1000, dtype=torch.float64)
+        x_pbc = x_pbc[(x_pbc >= -rmax[0]) & (x_pbc <= rmax[0])]
+        y_pbc = torch.arange(-1000, 1000, dtype=torch.float64)
+        y_pbc = y_pbc[(y_pbc >= -rmax[1]) & (y_pbc <= rmax[1])]
+        z_pbc = torch.arange(-1000, 1000, dtype=torch.float64)
+        z_pbc = z_pbc[(z_pbc >= -rmax[2]) & (z_pbc <= rmax[2])]
 
         x_pbc_shifted = x_pbc + cm[0]
         y_pbc_shifted = y_pbc + cm[1]

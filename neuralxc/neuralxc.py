@@ -391,29 +391,45 @@ class NeuralXCJIT:
         timer.start('MD step')
         self.projector_kwargs = kwargs
         self.unitcell = torch.from_numpy(kwargs['unitcell']).double()
+        self.unitcell_inv = torch.inverse(self.unitcell).detach().numpy()
+        self.epsilon = torch.zeros([3,3]).double()
+        self.epsilon.requires_grad = True
+        self.unitcell_we = torch.mm((torch.eye(3) + self.epsilon), self.unitcell)
         self.grid = torch.from_numpy(kwargs['grid']).double()
         self.positions = torch.from_numpy(kwargs['positions']).double()
-        self.a = torch.norm(self.unitcell, dim=1).double() / self.grid
+        # self.positions = torch.mm(self.positions_scaled,self.unitcell)
         U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
         self.V_cell = torch.det(U)
+        self.V_ucell = torch.det(self.unitcell).detach().numpy()
         self.species = kwargs['species']
+        self.my_box = torch.zeros([3,2])
+        self.my_box[:,1] = self.grid
         with torch.jit.optimized_execution(should_optimize=True):
             self.compute_basis(False)
 
     @prints_error
     def compute_basis(self, positions_grad=False):
         self.positions.requires_grad = positions_grad
+        if positions_grad:
+            unitcell = self.unitcell_we
+        else:
+            unitcell = self.unitcell
         self.radials = []
         self.angulars = []
         timer.start('build_basis')
         for pos, spec in zip(self.positions, self.species):
-            rad, ang = self.basis_models[spec](pos, self.unitcell, self.grid, self.a)
+            rad, ang = self.basis_models[spec](pos, unitcell, self.grid, self.my_box)
             self.radials.append(rad)
             self.angulars.append(ang)
         timer.stop('build_basis')
 
     @prints_error
     def get_V(self, rho, calc_forces=False):
+
+        if calc_forces:
+            unitcell = self.unitcell_we
+        else:
+            unitcell = self.unitcell
 
         with torch.jit.optimized_execution(should_optimize=True):
             if calc_forces:
@@ -429,17 +445,20 @@ class NeuralXCJIT:
                                                 self.radials, self.angulars):
                 e_list.append(self.energy_models[spec](
                     self.projector_models[spec](rho, pos,
-                                                self.unitcell,
+                                                unitcell,
                                                 self.grid,
-                                                self.a, rad, ang).unsqueeze(0)
+                                                rad, ang, self.my_box).unsqueeze(0)
                                                 )
                                             )
 
-                e_list[-1].backward()
+                # e_list[-1].backward()
             E = torch.sum(torch.cat(e_list))
+            E.backward()
             V = (rho.grad/self.V_cell).detach().numpy()
             if calc_forces:
-                V = [V, np.concatenate([-self.positions.grad.detach().numpy(),np.zeros([3,3])])]
+                V = [V, np.concatenate([-self.positions.grad.detach().numpy().dot(self.unitcell_inv),
+                    self.epsilon.grad.detach().numpy()/self.V_ucell])]
+
                 timer.stop('MD step')
                 timer.stop('master')
                 timer.stop('get_V_forces')

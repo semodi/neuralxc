@@ -189,16 +189,18 @@ def compile_model(model, outpath, override = False):
             torch.nn.Module.__init__(self)
             self.projector = projector
 
-        def forward(self, positions, unitcell, grid, a, my_box):
-             return self.projector.forward_basis(positions, unitcell, grid, a, my_box)
+        def forward(self, positions, unitcell, grid, my_box):
+             positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             return self.projector.forward_basis(positions, unitcell, grid, my_box)
 
     class ModuleProject(torch.nn.Module):
         def __init__(self, projector):
             torch.nn.Module.__init__(self)
             self.projector = projector
 
-        def forward(self, rho, positions, unitcell, grid, a, radials, angulars, my_box):
-             return self.projector.forward_fast(rho, positions, unitcell, grid, a, radials, angulars, my_box)
+        def forward(self, rho, positions, unitcell, grid, radials, angulars, my_box):
+             positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             return self.projector.forward_fast(rho, positions, unitcell, grid, radials, angulars, my_box)
 
     model._pipeline.to_torch()
     model._pipeline.basis_instructions['projector_type'] = \
@@ -242,10 +244,10 @@ def compile_model(model, outpath, override = False):
     with torch.jit.optimized_execution(should_optimize=True):
         for spec in species:
             basismod.projector.set_species(spec)
-            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, a_c, my_box), optimize=True, check_trace = True)
-            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, a_c, my_box)
-            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars, my_box), optimize=True, check_trace = True)
-            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, a_c, radials, angulars, my_box).unsqueeze(0)
+            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, my_box), optimize=True, check_trace = True)
+            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, my_box)
+            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box), optimize=True, check_trace = True)
+            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box).unsqueeze(0)
             epred = E_predictor(spec, model)
             e_models[spec] = torch.jit.trace(epred, C, optimize=True, check_trace = False)
 
