@@ -84,7 +84,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         a = torch.norm(unitcell, dim=1).double() / grid
         U = torch.einsum('ij,i->ij', unitcell, 1/grid)
         self.grid = grid
-        self.V_cell = torch.det(U)
+        self.V_cell = torch.abs(torch.det(U))
         self.U = torch.transpose(U,0,1)
         self.U_inv = torch.inverse(U)
         self.a = a

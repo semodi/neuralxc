@@ -400,8 +400,8 @@ class NeuralXCJIT:
         self.positions_we = torch.mm(torch.eye(3) + self.epsilon, self.positions.T).T
         # self.positions = torch.mm(self.positions_scaled,self.unitcell)
         U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
-        self.V_cell = torch.det(U)
-        self.V_ucell = torch.det(self.unitcell).detach().numpy()
+        self.V_cell = torch.abs(torch.det(U))
+        self.V_ucell = torch.abs(torch.det(self.unitcell)).detach().numpy()
         self.species = kwargs['species']
         self.my_box = torch.zeros([3,2])
         self.my_box[:,1] = self.grid
