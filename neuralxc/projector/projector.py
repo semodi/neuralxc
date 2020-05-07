@@ -122,7 +122,7 @@ class DefaultProjector(BaseProjector):
 
         self.unitcell = unitcell
         self.grid = grid
-        self.V_cell = np.linalg.det(U)
+        self.V_cell = np.abs(np.linalg.det(U))
         self.U = U.T
         self.U_inv = np.linalg.inv(U)
         self.a = a
