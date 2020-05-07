@@ -397,6 +397,7 @@ class NeuralXCJIT:
         self.unitcell_we = torch.mm((torch.eye(3) + self.epsilon), self.unitcell)
         self.grid = torch.from_numpy(kwargs['grid']).double()
         self.positions = torch.from_numpy(kwargs['positions']).double()
+        self.positions_we = torch.mm(torch.eye(3) + self.epsilon, self.positions.T).T
         # self.positions = torch.mm(self.positions_scaled,self.unitcell)
         U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
         self.V_cell = torch.det(U)
@@ -410,14 +411,18 @@ class NeuralXCJIT:
     @prints_error
     def compute_basis(self, positions_grad=False):
         self.positions.requires_grad = positions_grad
+        self.positions_we = torch.mm(torch.eye(3) + self.epsilon, self.positions.T).T
         if positions_grad:
             unitcell = self.unitcell_we
+            positions = self.positions_we
         else:
             unitcell = self.unitcell
+            positions = self.positions
+
         self.radials = []
         self.angulars = []
         timer.start('build_basis')
-        for pos, spec in zip(self.positions, self.species):
+        for pos, spec in zip(positions, self.species):
             rad, ang = self.basis_models[spec](pos, unitcell, self.grid, self.my_box)
             self.radials.append(rad)
             self.angulars.append(ang)
@@ -428,8 +433,10 @@ class NeuralXCJIT:
 
         if calc_forces:
             unitcell = self.unitcell_we
+            positions = self.positions_we
         else:
             unitcell = self.unitcell
+            positions = self.positions
 
         with torch.jit.optimized_execution(should_optimize=True):
             if calc_forces:
@@ -441,7 +448,7 @@ class NeuralXCJIT:
             rho = torch.from_numpy(rho).double()
             rho.requires_grad = True
             e_list = []
-            for pos, spec, rad, ang in zip(self.positions, self.species,
+            for pos, spec, rad, ang in zip(positions, self.species,
                                                 self.radials, self.angulars):
                 e_list.append(self.energy_models[spec](
                     self.projector_models[spec](rho, pos,
@@ -456,7 +463,7 @@ class NeuralXCJIT:
             E.backward()
             V = (rho.grad/self.V_cell).detach().numpy()
             if calc_forces:
-                V = [V, np.concatenate([-self.positions.grad.detach().numpy().dot(self.unitcell_inv),
+                V = [V, np.concatenate([-self.positions.grad.detach().numpy(),
                     self.epsilon.grad.detach().numpy()/self.V_ucell])]
 
                 timer.stop('MD step')

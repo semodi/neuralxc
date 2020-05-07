@@ -190,7 +190,7 @@ def compile_model(model, outpath, override = False):
             self.projector = projector
 
         def forward(self, positions, unitcell, grid, my_box):
-             positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             # positions = torch.einsum('...i,ij->...j',positions, unitcell)
              return self.projector.forward_basis(positions, unitcell, grid, my_box)
 
     class ModuleProject(torch.nn.Module):
@@ -199,7 +199,7 @@ def compile_model(model, outpath, override = False):
             self.projector = projector
 
         def forward(self, rho, positions, unitcell, grid, radials, angulars, my_box):
-             positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             # positions = torch.einsum('...i,ij->...j',positions, unitcell)
              return self.projector.forward_fast(rho, positions, unitcell, grid, radials, angulars, my_box)
 
     model._pipeline.to_torch()

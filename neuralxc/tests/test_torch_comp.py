@@ -126,17 +126,13 @@ def test_stress():
     rho, unitcell_true, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
     positions = benzene_traj.get_positions() / Bohr
     species = benzene_traj.get_chemical_symbols()
-    positions_scaled = positions.dot(np.linalg.inv(unitcell_true))
-    assert np.allclose(positions, positions_scaled.dot(unitcell_true))
 
     unitcell = np.array(unitcell_true)
-    positions = positions_scaled
     benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
     V_comp = benzene_nxc.get_V(rho, calc_forces=True)
     stress = V_comp[1][1][-3:]
     forces = V_comp[1][1][:-3]
-    stress_virial = positions.T.dot(forces)
-    stress_virial  = ((stress_virial + stress_virial.T)*.5).round(4)
+
     stress_diag = []
     for ij in range(3):
         dx = 0.0001
@@ -144,11 +140,13 @@ def test_stress():
         for ix in [-1, 1]:
             unitcell = np.array(unitcell_true)
             unitcell[ij,ij] *= (1 + dx*ix)
+            positions[:,ij] *= (1 + dx*ix)
             benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
             V_comp = benzene_nxc.get_V(rho, calc_forces=True)
             forces_comp = V_comp[1][1][:-3]
             V_comp = V_comp[0], V_comp[1][0]
             energies.append(V_comp[0])
+            positions[:,ij] /= (1 + dx*ix)
 
         V_ucell = np.linalg.det(unitcell_true)
         stress_xx = (energies[1] - energies[0])/dx*.5/V_ucell
