@@ -115,7 +115,7 @@ class DefaultProjector(BaseProjector):
                 W[species] = self.get_W(basis_instructions[species])
 
         # Determine unitcell constants
-        U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
+        U = np.array(unitcell)  # Matrix to go from mesh to real space
         for i in range(3):
             U[i, :] = U[i, :] / grid[i]
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
@@ -124,7 +124,7 @@ class DefaultProjector(BaseProjector):
         self.grid = grid
         self.V_cell = np.abs(np.linalg.det(U))
         self.U = U.T
-        self.U_inv = np.linalg.inv(U)
+        self.U_inv = np.linalg.inv(self.U)
         self.a = a
         self.W = W
         self.all_angs = {}
