@@ -127,7 +127,7 @@ class DefaultProjector(BaseProjector):
         self.grid = grid
         self.V_cell = np.abs(np.linalg.det(U))
         self.U = U.T
-        self.U_inv = np.linalg.inv(U)
+        self.U_inv = np.linalg.inv(self.U)
         self.a = a
         self.W = W
         self.all_angs = {}

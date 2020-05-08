@@ -86,7 +86,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         self.grid = grid
         self.V_cell = torch.abs(torch.det(U))
         self.U = torch.transpose(U,0,1)
-        self.U_inv = torch.inverse(U)
+        self.U_inv = torch.inverse(self.U)
         self.a = a
 
 
