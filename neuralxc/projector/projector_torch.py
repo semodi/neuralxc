@@ -262,7 +262,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
     def mesh_around(self, pos, radius, my_box):
         pos = pos.view(-1)
         #Create box with max. distance = radius
-        rmax = torch.ceil(radius / self.a)
+        rmax = torch.ceil(radius / self.a) + 2
         cm = torch.round(self.U_inv.mv(pos))
         # my_box -= my_box[:,0].unsqueeze(1)
         Xm, Ym, Zm = self.mesh_3d(self.U, self.a, my_box = my_box,cm =cm, scaled=False, rmax=rmax, indexing='ij')
@@ -296,7 +296,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         cm = torch.round(self.U_inv.mv(pos))
         dr = pos - self.U.mv(cm)
         #Create box with max. distance = radius
-        rmax = torch.ceil(radius / self.a)
+        rmax = torch.ceil(radius / self.a) + 2
 
         # my_box = my_box - cm.view(3,1)
 
