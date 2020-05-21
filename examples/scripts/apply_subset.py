@@ -26,11 +26,12 @@ def get_structures_energies(path, unit=1):
 if __name__ == '__main__':
 
     if len(sys.argv) == 5:
-        unit = float(len(sys.argv[4]))
+        unit = float(sys.argv[4])
     else:
         unit = kcalpmol
-
-    atoms = get_structures_energies(sys.argv[1], unit=kcalpmol)
+    
+    print("using unit" , unit)
+    atoms = get_structures_energies(sys.argv[1], unit=unit)
     if not sys.argv[2] == 'all':
         subset = np.genfromtxt(sys.argv[2]).astype(int)
     else:
