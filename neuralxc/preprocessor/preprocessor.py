@@ -30,10 +30,14 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         basis_rep = self.get_basis_rep()
         self.data = basis_rep
         self.computed_basis = self.basis_instructions
+        spec_agn = self.basis_instructions.get('spec_agnostic', False)
 
         unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis=0)
-        self.species_string = ''.join([s for s in unique_systems])
+        if spec_agn:
+            self.species_string = unique_systems[0][0]*max([len(s) for s in unique_systems])
+        else:
+            self.species_string = ''.join([s for s in unique_systems])
         # === Padding ===
 
         #Find padded width of data
@@ -42,12 +46,19 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             width[''.join(self.get_chemical_symbols(atoms))] = len(dat)
         #Sanity check
         assert len(unique_systems) == len(width)
-        paddedwidth = sum([width[key] for key in width])
+        if spec_agn:
+            paddedwidth = max([width[key] for key in width])
+        else:
+            paddedwidth = sum([width[key] for key in width])
+
         paddedoffset = {}
         cnt = 0
         for key in width:
-            paddedoffset[key] = cnt
-            cnt += width[key]
+            if spec_agn:
+                paddedoffset[key] = 0
+            else:
+                paddedoffset[key] = cnt
+                cnt += width[key]
 
         padded_data = np.zeros([len(self.data), paddedwidth], dtype='complex')
 
