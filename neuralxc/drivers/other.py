@@ -62,8 +62,13 @@ def get_real_basis(atoms, basis):
     from pyscf import gto
     from ..pyscf import BasisPadder
     real_basis = {}
+    is_file = os.path.isfile(basis)
+    if is_file:
+        parsed_basis = gto.basis.parse(open(basis,'r').read())
     for a in atoms:
         symbols = a.get_chemical_symbols()
+        if is_file:
+            basis ={s: parsed_basis for s in symbols}
         atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
         auxmol = gto.M(atom=atom, basis=basis)
         bp = BasisPadder(auxmol)
