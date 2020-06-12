@@ -315,6 +315,7 @@ if __name__ == '__main__':
                                                                         can be either a directory or an .hdf5 file (with groups) (default: .tmp/)'
                      )
     pre.add_argument('--xyz', metavar='xyz', type=str, default='', help='Path to xyz file')
+    pre.add_argument('--srcdir', metavar='srcdir', type=str, default='.', help='Source directory containing densities')
     pre.set_defaults(func=pre_driver)
 
     df = subparser.add_parser('default', description='Fetch default configuration files')
