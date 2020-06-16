@@ -195,7 +195,6 @@ class BasisPadder():
 
         indexing_left = {sym: [] for sym in max_n}
         indexing_right = {sym: [] for sym in max_n}
-
         labels = mol.ao_labels()
         for sym in max_n:
             for idx in sym_idx[sym]:
@@ -216,7 +215,7 @@ class BasisPadder():
         self.max_n = max_n
         self.indexing_l = indexing_left
         self.indexing_r = indexing_right
-        
+
     def get_basis_json(self):
 
         basis = {}

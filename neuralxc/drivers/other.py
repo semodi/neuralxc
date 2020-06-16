@@ -58,15 +58,17 @@ def plot_basis(basis):
         plt.show()
 
 
-def get_real_basis(atoms, basis):
+def get_real_basis(atoms, basis, spec_agnostic=False):
     from pyscf import gto
     from ..pyscf import BasisPadder
     real_basis = {}
     is_file = os.path.isfile(basis)
+    if spec_agnostic: atoms = atoms[0:1]
     if is_file:
         parsed_basis = gto.basis.parse(open(basis,'r').read())
     for a in atoms:
         symbols = a.get_chemical_symbols()
+        if spec_agnostic: symbols += ['X']
         if is_file:
             basis ={s: parsed_basis for s in symbols}
         atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
@@ -195,7 +197,8 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
         print('BI', basis_instr)
 
         if basis_instr.get('application', 'siesta') == 'pyscf':
-            real_basis = get_real_basis(atoms, basis_instr['basis'])
+            real_basis = get_real_basis(atoms, basis_instr['basis'],
+                spec_agnostic = basis_instr.get('spec_agnostic', False))
             for key in real_basis:
                 basis_instr[key] = real_basis[key]
             pre.update({'preprocessor': basis_instr})
