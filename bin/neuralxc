@@ -33,7 +33,7 @@ if __name__ == '__main__':
     adddat.add_argument(
         '--zero',
         metavar='zero',
-        type=int,
+        type=float,
         default=None,
         help='Shift energies by this value, if not set, use minimum of dataset.')
     adddat.set_defaults(func=add_data_driver)

@@ -52,12 +52,11 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
         [None]*(3-len(slice.split(':')))
 
     ijk = bi_slice(i, j, k)
-
     def obs(which, zero):
         if which == 'energy':
             if traj:
                 add_species(file, system, traj)
-                if zero:
+                if zero is not None:
                     energies = np.array([a.get_potential_energy()\
                      for a in read(traj,':')])[ijk]
                 else:
