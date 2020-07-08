@@ -1,7 +1,7 @@
 from sklearn.base import BaseEstimator
 from neuralxc.ml.network import NumpyNetworkEstimator
 import numpy as np
-
+import torch
 
 class EnsembleEstimator(BaseEstimator):
     def __init__(self, estimators, operation='sum'):
@@ -18,6 +18,7 @@ class EnsembleEstimator(BaseEstimator):
             self.operation = operation
         self.path = None
         self.models_loaded = False
+
 
     def load_network(self, path):
         for idx, estimator in enumerate(self.estimators):
@@ -70,6 +71,10 @@ class EnsembleEstimator(BaseEstimator):
 
         return -np.mean(scores)
 
+    def to_torch(self):
+        self.operation = getattr(torch, self.operation.__name__)
+        for estimator in self.estimators:
+            estimator.to_torch()
 
 class ChainedEstimator(EnsembleEstimator):
     allows_threading = False
@@ -175,6 +180,29 @@ class StackedEstimator(EnsembleEstimator):
 
             return self.operation(np.array(predictions), axis=0)
 
+    def forward(self, X, *args, **kwargs):
+
+        if kwargs.get('partial', False):
+
+            predictions = {}
+
+            for estimator in self.estimators:
+                pred = estimator.forward(X, *args, **kwargs)[0]
+                assert isinstance(pred, dict)
+                for species in pred:
+                    if not species in predictions:
+                        predictions[species] = []
+                    predictions[species].append(pred[species])
+
+            for species in predictions:
+                predictions[species] = self.operation(torch.stack(predictions[species]), axis=0)
+            return [predictions]
+        else:
+            predictions = []
+            for estimator in self.estimators:
+                predictions.append(estimator.forward(X, *args, **kwargs))
+
+            return self.operation(torch.stack(predictions), axis=0)
     def get_gradient(self, X, *args, **kwargs):
         gradients = {}
 

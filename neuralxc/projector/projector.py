@@ -119,7 +119,9 @@ class DefaultProjector(BaseProjector):
         U = np.array(unitcell)  # Matrix to go from mesh to real space
         for i in range(3):
             U[i, :] = U[i, :] / grid[i]
+
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+        print('a', a)
 
         self.unitcell = unitcell
         self.grid = grid
@@ -616,6 +618,45 @@ class DefaultProjector(BaseProjector):
 
         return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
 
+    @staticmethod
+    def mesh_3d(U, a, rmax, scaled=False, indexing='xy'):
+        """
+        Returns a 3d mesh taking into account periodic boundary conditions
+
+        Parameters
+        ----------
+
+        rmax: list, int
+            upper cutoff in every euclidean direction.
+        scaled: boolean
+            scale the meshes with unitcell size?
+        indexing: 'xy' or 'ij'
+            indexing scheme used by np.meshgrid.
+
+        Returns
+        -------
+
+        X, Y, Z: tuple of np.ndarray
+            defines mesh.
+        """
+
+        # resolve the periodic boundary conditions
+        x_pbc = list(range(0, rmax[0] + 1)) + list(range(-rmax[0], 0))
+        y_pbc = list(range(0, rmax[1] + 1)) + list(range(-rmax[1], 0))
+        z_pbc = list(range(0, rmax[2] + 1)) + list(range(-rmax[2], 0))
+
+        Xm, Ym, Zm = np.meshgrid(x_pbc, y_pbc, z_pbc, indexing=indexing)
+
+        Rm = np.concatenate([Xm.reshape(*Xm.shape, 1), Ym.reshape(*Xm.shape, 1), Zm.reshape(*Xm.shape, 1)], axis=3)
+
+        if scaled:
+            R = np.einsum('ij,klmj -> iklm', U, Rm)
+            X = R[0, :, :, :]
+            Y = R[1, :, :, :]
+            Z = R[2, :, :, :]
+            return X, Y, Z
+        else:
+            return Xm, Ym, Zm
 
 class OrthoProjector(DefaultProjector):
 
@@ -940,47 +981,6 @@ class DeltaProjector():
             return getattr(self, attr)
         else:
             return getattr(self.projector, attr)
-
-
-def mesh_3d(U, a, rmax, scaled=False, indexing='xy'):
-    """
-    Returns a 3d mesh taking into account periodic boundary conditions
-
-    Parameters
-    ----------
-
-    rmax: list, int
-        upper cutoff in every euclidean direction.
-    scaled: boolean
-        scale the meshes with unitcell size?
-    indexing: 'xy' or 'ij'
-        indexing scheme used by np.meshgrid.
-
-    Returns
-    -------
-
-    X, Y, Z: tuple of np.ndarray
-        defines mesh.
-    """
-
-    # resolve the periodic boundary conditions
-    x_pbc = list(range(0, rmax[0] + 1)) + list(range(-rmax[0], 0))
-    y_pbc = list(range(0, rmax[1] + 1)) + list(range(-rmax[1], 0))
-    z_pbc = list(range(0, rmax[2] + 1)) + list(range(-rmax[2], 0))
-
-    Xm, Ym, Zm = np.meshgrid(x_pbc, y_pbc, z_pbc, indexing=indexing)
-
-    Rm = np.concatenate([Xm.reshape(*Xm.shape, 1), Ym.reshape(*Xm.shape, 1), Zm.reshape(*Xm.shape, 1)], axis=3)
-
-    if scaled:
-        R = np.einsum('ij,klmj -> iklm', U, Rm)
-        X = R[0, :, :, :]
-        Y = R[1, :, :, :]
-        Z = R[2, :, :, :]
-        return X, Y, Z
-    else:
-        return Xm, Ym, Zm
-
 
 def M_make_complex(n_l):
     """Get a matrix to convert real into complex tensors

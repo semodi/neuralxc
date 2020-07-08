@@ -1,2 +1,6 @@
-from .projector import DensityProjector, M_make_complex, BehlerProjector, NonOrthoProjector, DeltaProjector, DefaultProjector, BaseProjector
+from .projector import DensityProjector,BehlerProjector, NonOrthoProjector, DeltaProjector, DefaultProjector, BaseProjector, M_make_complex
 from . import projector
+try:
+    from . import projector_torch
+except ModuleNotFoundError:
+    pass

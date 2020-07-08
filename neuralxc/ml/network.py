@@ -23,10 +23,23 @@ import shutil
 from .activation import get_activation
 import copy
 import tensorflow as tf
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
 # import tensorflow
 Dataset = namedtuple("Dataset", "data species")
 
+def convert_torch_wrapper(func):
 
+    def wrapped_func(X, *args, **kwargs):
+        X = torch.from_numpy(X)
+        Y = func(X, *args, **kwargs)
+        return Y.detach().numpy()
+
+    return wrapped_func
+
+# class NXCPipeline(Pipeline,torch.nn.Module):
 class NXCPipeline(Pipeline):
     def __init__(self, steps, basis_instructions, symmetrize_instructions):
         """ Class that extends the scikit-learn Pipeline by adding get_gradient
@@ -45,6 +58,7 @@ class NXCPipeline(Pipeline):
             Instructions for symmetrizer.
             Example {symmetrizer_type: 'casimir'}
         """
+        # torch.nn.Module.__init__(self)
         self.basis_instructions = basis_instructions
         self.symmetrize_instructions = symmetrize_instructions
         super().__init__(steps)
@@ -136,6 +150,14 @@ class NXCPipeline(Pipeline):
             pickle.dump(self, open(os.path.join(path, 'pipeline.pckl'), 'wb'))
             self.steps[-1][-1]._restore_after_pickling(ns_chunk)
 
+    def to_torch(self):
+        for step_idx, _ in  enumerate(self.steps):
+            self.steps[step_idx][1].to_torch()
+
+    def forward(self, X):
+        for steps in self.steps:
+            X = steps[1].forward(X)
+        return X
 
 def load_pipeline(path):
     """ Load a NXCPipeline from the directory specified in path
@@ -146,12 +168,110 @@ def load_pipeline(path):
     return pipeline
 
 
-class NumpyNetworkEstimator(BaseEstimator):
+
+def compile_model(model, outpath, override = False):
+
+    class E_predictor(torch.nn.Module):
+        def __init__(self, species, model):
+            torch.nn.Module.__init__(self)
+            self.species = species
+            self.model = model
+
+        def forward(self, *args):
+             C = {spec : c for spec,c in zip(self.species, args)}
+             x = self.model.symmetrizer(C)
+             for steps in self.model._pipeline.steps[:]:
+                 x = steps[1].forward(x)
+             return x
+
+    class ModuleBasis(torch.nn.Module):
+        def __init__(self, projector):
+            torch.nn.Module.__init__(self)
+            self.projector = projector
+
+        def forward(self, positions, unitcell, grid, my_box):
+             # positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             return self.projector.forward_basis(positions, unitcell, grid, my_box)
+
+    class ModuleProject(torch.nn.Module):
+        def __init__(self, projector):
+            torch.nn.Module.__init__(self)
+            self.projector = projector
+
+        def forward(self, rho, positions, unitcell, grid, radials, angulars, my_box):
+             # positions = torch.einsum('...i,ij->...j',positions, unitcell)
+             return self.projector.forward_fast(rho, positions, unitcell, grid, radials, angulars, my_box)
+
+    model._pipeline.to_torch()
+    model._pipeline.basis_instructions['projector_type'] = \
+        model._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
+    model._pipeline.symmetrize_instructions['symmetrizer_type'] = \
+        model._pipeline.symmetrize_instructions.get('symmetrizer_type','casimir') + '_torch'
+
+
+    unitcell_c = np.eye(3)*5.0
+    # unitcell_c[0,0] = 3
+    grid_c = np.array([9,9,9])
+    my_box = np.array([[0,9]]*3)
+    a_c = np.linalg.norm(unitcell_c, axis=1) / grid_c
+    pos_c = np.array([[0, 0, 0]])
+    # rho_c = np.ones(shape=(my_box[0,1] - my_box[0,0],
+    #                        my_box[1,1] - my_box[1,0],
+    #                        my_box[2,1] - my_box[2,0]))
+
+    rho_c = np.ones(shape=grid_c)
+
+
+    species = []
+    for spec in model._pipeline.basis_instructions:
+        if len(spec) < 3:
+            species.append(spec)
+
+    model.initialize(unitcell=unitcell_c, grid=grid_c, positions=pos_c, species=species)
+
+    unitcell_c = torch.from_numpy(unitcell_c).double()
+    grid_c = torch.from_numpy(grid_c).double()
+    a_c = torch.from_numpy(a_c).double()
+    pos_c = torch.from_numpy(pos_c).double()
+    rho_c = torch.from_numpy(rho_c).double()
+    my_box = torch.from_numpy(my_box).double()
+    basismod = ModuleBasis(model.projector)
+    projector = ModuleProject(model.projector)
+
+    basis_models = {}
+    projector_models = {}
+    e_models = {}
+    with torch.jit.optimized_execution(should_optimize=True):
+        for spec in species:
+            basismod.projector.set_species(spec)
+            basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, my_box), optimize=True, check_trace = True)
+            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, my_box)
+            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box), optimize=True, check_trace = True)
+            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box).unsqueeze(0)
+            epred = E_predictor(spec, model)
+            e_models[spec] = torch.jit.trace(epred, C, optimize=True, check_trace = False)
+
+    try:
+        os.mkdir(outpath)
+    except FileExistsError:
+        if override:
+            shutil.rmtree(outpath)
+            os.mkdir(outpath)
+        else:
+            raise Exception('Model exists, set override = True to save at this location')
+
+    for spec in species:
+        torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
+        torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
+        torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
+
+class NumpyNetworkEstimator(torch.nn.Module, BaseEstimator):
 
     allows_threading = True
 
     def __init__(self, W, B, activation, trunc=False):
 
+        torch.nn.Module.__init__(self)
         self.W = W
         self.B = B
         if isinstance(activation, str):
@@ -225,6 +345,12 @@ class NumpyNetworkEstimator(BaseEstimator):
         return predictions
 
     def predict(self, X, *args, **kwargs):
+        lib = np
+        if hasattr(self, 'is_torch'):
+            if self.is_torch and kwargs.get('wrap_torch', True):
+                self.get_energy = convert_torch_wrapper(self.get_energy)
+            else:
+                lib = torch
         made_list = False
         if isinstance(X, tuple):
             X = X[0]
@@ -246,7 +372,7 @@ class NumpyNetworkEstimator(BaseEstimator):
 
             for spec in X:
                 feat = X[spec]
-                n_sys = len(feat)
+                n_sys = feat.shape[0]
                 if feat.ndim == 3:
                     old_shape = feat.shape
                     feat = feat.reshape(-1, feat.shape[-1])
@@ -258,7 +384,7 @@ class NumpyNetworkEstimator(BaseEstimator):
                     prediction[spec] = self.get_energy(feat, self.W[spec], self.B[spec]).reshape(*old_shape[:-1], -1)
 
                 else:
-                    prediction += np.sum(self.get_energy(feat, self.W[spec], self.B[spec]).reshape(n_sys, -1), axis=-1)
+                    prediction += lib.sum(self.get_energy(feat, self.W[spec], self.B[spec]).reshape(n_sys, -1), -1)
 
             predictions.append(prediction)
 
@@ -278,11 +404,32 @@ class NumpyNetworkEstimator(BaseEstimator):
         else:
             return self.activation.f(x.dot(W[-1]) + B[-1])
 
+    def forward(self, X):
+        if self.is_torch:
+            return self.predict(X, wrap_torch = False)
+        else:
+            raise Exception("Must call to_torch before using it as PyTorch Module")
+
+    def get_energy_torch(self, x, W, B):
+
+        if not hasattr(self, 'trunc'): self.trunc = False
+        for w, b in zip(W[:-1], B[:-1]):
+            x = self.activation.f(torch.matmul(x,w) + b)
+
+        if not self.trunc:
+            return (torch.matmul(x, W[-1]) + B[-1])
+        else:
+            return self.activation.f(torch.matmul(x, W[-1]) + B[-1])
+
     def gradient(self, x, W, B):
         # For backwards compatibility
         if not hasattr(self, 'trunc'):
             self.trunc = False
-
+        if hasattr(self, 'is_torch'):
+            if self.is_torch:
+                W = [w.detach().numpy() for w in W]
+                B = [b.detach().numpy() for b in B]
+                self.activation.lib = np
         # del z_1/ del x_i
         gradient = np.array([np.eye(len(W[0]))] * len(x)).swapaxes(0, 1)
 
@@ -304,6 +451,15 @@ class NumpyNetworkEstimator(BaseEstimator):
 
             # Output will be (n_samples, n_layerout, n_features)
             return gradient.swapaxes(0, 1).swapaxes(1, 2)
+
+    def to_torch(self):
+        torch.nn.Module.__init__(self)
+        self.W = {spec: [torch.from_numpy(w).double() for w in self.W[spec]] for spec in self.W}
+        self.B = {spec: [torch.from_numpy(b).double() for b in self.B[spec]] for spec in self.B}
+        self.get_energy_numpy = self.get_energy
+        self.get_energy = self.get_energy_torch
+        self.activation.lib = torch
+        self.is_torch = True
 
     def _make_serializable(self, path):
         return None

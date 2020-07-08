@@ -19,6 +19,11 @@ try:
     ase_found = True
 except ModuleNotFoundError:
     ase_found = False
+try:
+    import torch
+    torch_found =True
+except ModuleNotFoundError:
+    torch_found = False
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -83,8 +88,9 @@ def test_siesta_density_getter():
 
 
 @pytest.mark.fast
+@pytest.mark.project
 @pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf']])
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch']])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -99,7 +105,7 @@ def test_density_projector(projector_type):
 
     basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
 
-    if projector_type == 'ortho':
+    if projector_type in ['ortho','ortho_torch']:
         if save_test_density_projector:
             with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'wb') as file:
                 pickle.dump(basis_rep, file)
@@ -122,8 +128,17 @@ def test_symmetrizer(symmetrizer_type):
     symmetrize_instructions = {'basis': basis_set, 'symmetrizer_type': symmetrizer_type}
 
     symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
-
+    C = {c: C[c].real for c in C}
     D = symmetrizer.get_symmetrized(C)
+
+    if '_torch' == symmetrizer_type[-len('_torch'):]:
+        symmetrize_instructions = {'basis': basis_set, 'symmetrizer_type': symmetrizer_type[:-len('_torch')]}
+
+        symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
+        D_notorch = symmetrizer.get_symmetrized(C)
+
+        for spec in D:
+            assert np.allclose(D_notorch[spec], D[spec])
 
     if save_test_symmetrizer:
         with open(os.path.join(test_dir, 'h2o_sym_{}.pckl'.format(symmetrizer_type)), 'wb') as file:
@@ -138,7 +153,7 @@ def test_symmetrizer(symmetrizer_type):
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
 def test_symmetrizer_rot_invariance(symmetrizer_type):
     C_list = []
     for i in range(3):
@@ -161,7 +176,7 @@ def test_symmetrizer_rot_invariance(symmetrizer_type):
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
 def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     with open(os.path.join(test_dir, 'rotated_synthetic.pckl'), 'rb') as file:
         C_list = pickle.load(file)
@@ -200,21 +215,32 @@ def test_formatter():
 @pytest.mark.parametrize(['transformer', 'filepath'],
                          [[xc.ml.transformer.GroupedPCA(n_components=2),
                            os.path.join(test_dir, 'pca1.pckl')],
+                          [xc.ml.transformer.GroupedStandardScaler(),
+                           os.path.join(test_dir, 'scaler.pckl')],
                           [xc.ml.transformer.GroupedVarianceThreshold(0.005),
                            os.path.join(test_dir, 'var09.pckl')]])
 def test_grouped_transformers(transformer, filepath):
-    with open(os.path.join(test_dir, 'transformer_in.pckl'), 'rb') as file:
-        C = pickle.load(file)
 
-    transformed = transformer.fit_transform(C)
-    if save_grouped_transformer:
-        with open(filepath, 'wb') as file:
-            pickle.dump(transformed, file)
-    else:
-        with open(filepath, 'rb') as file:
-            ref = pickle.load(file)
+    for use_torch in [False,True] if torch_found else [False]:
+        with open(os.path.join(test_dir, 'transformer_in.pckl'), 'rb') as file:
+            C = pickle.load(file)
+
+        transformer.fit(C)
+        transformed_no_torch = transformer.transform(C)
+        if use_torch:
+            transformer.to_torch()
+        transformed = transformer.transform(C)
+
         for spec in transformed:
-            assert np.allclose(transformed[spec], ref[spec])
+            assert np.allclose(transformed[spec], transformed_no_torch[spec])
+        if save_grouped_transformer:
+            with open(filepath, 'wb') as file:
+                pickle.dump(transformed, file)
+        else:
+            with open(filepath, 'rb') as file:
+                ref = pickle.load(file)
+            for spec in transformed:
+                assert np.allclose(transformed[spec], ref[spec])
 
 
 def test_species_grouper():
@@ -246,7 +272,14 @@ def test_neuralxc_benzene():
     V, forces = benzene_nxc.get_V(rho, calc_forces=True)[1]
     V = V / Hartree
     forces = forces / Hartree * Bohr
-
+    if torch_found:
+        benzene_nxc._pipeline.steps[-1][1].to_torch()
+        assert benzene_nxc._pipeline.steps[-1][1].is_torch
+        V_torch, forces_torch = benzene_nxc.get_V(rho, calc_forces=True)[1]
+        V_torch = V_torch / Hartree
+        forces_torch = forces_torch / Hartree * Bohr
+        assert np.allclose(V_torch, V)
+        assert np.allclose(forces_torch, forces)
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.force

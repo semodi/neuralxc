@@ -13,7 +13,22 @@ from sklearn.preprocessing import StandardScaler
 from ..formatter import atomic_shape, system_shape
 from abc import ABC, abstractmethod
 import numpy as np
+try:
+    import torch
+    TorchModule = torch.nn.Module
+except ModuleNotFoundError:
+    class TorchModule:
+         def __init__(self):
+             pass
 
+def convert_torch_wrapper(func):
+
+    def wrapped_func(X, *args, **kwargs):
+        X = torch.from_numpy(X)
+        Y = func(X, *args, **kwargs)
+        return Y.detach().numpy()
+
+    return wrapped_func
 
 class GroupedTransformer(ABC):
     """ Abstract base class, grouped transformer extend the functionality
@@ -26,9 +41,16 @@ class GroupedTransformer(ABC):
     def __init__(self, *args, **kwargs):
 
         self.is_fit = False
+        self.is_torch = False
         super().__init__(*args, **kwargs)
 
     def transform(self, X, y=None, **fit_params):
+        if hasattr(self, 'is_torch'):
+            if self.is_torch and fit_params.get('wrap_torch', True) and hasattr(self, '_spec_dict'):
+                for spec in self._spec_dict:
+                    trafo = self._spec_dict[spec]
+                    trafo.torch_transform = convert_torch_wrapper(trafo.torch_transform)
+
         was_tuple = False
         if isinstance(X, tuple):
             y = X[1]
@@ -48,7 +70,10 @@ class GroupedTransformer(ABC):
                     results_dict[spec] = self._spec_dict[spec].transform(x[spec])
                 results.append(results_dict)
             else:
-                results.append(system_shape(super().transform(atomic_shape(x)), x.shape[-2]))
+                if hasattr(self,'is_torch') and self.is_torch:
+                    results.append(system_shape(self.torch_transform(atomic_shape(x)), x.shape[-2]))
+                else:
+                    results.append(system_shape(super().transform(atomic_shape(x)), x.shape[-2]))
 
         if made_list:
             results = results[0]
@@ -123,14 +148,25 @@ class GroupedTransformer(ABC):
     def fit_transform(self, X, y=None, **fit_params):
         return self.fit(X).transform(X)
 
+    def forward(self, X):
+        if self.is_torch:
+            return self.transform(X, wrap_torch = False)
+        else:
+            raise Exception("Must call to_torch before using it as PyTorch Module")
 
-# TODO: The better solution might be to have a factory, pass an instance of the object
-# and copy this instance. Abstract factory?
-class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
+    def to_torch(self):
+        TorchModule.__init__(self)
+        self.is_torch = True
+        if hasattr(self,'_spec_dict'):
+            for spec in self._spec_dict:
+                self._spec_dict[spec].is_torch = True
+
+class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModule):
     def __init__(self, threshold=0.0):
         """ GroupedTransformer version of sklearn VarianceThreshold.
             See their documentation for more information
         """
+        TorchModule.__init__(self)
         self._before_fit = identity  # lambdas can't be pickled
         self._initargs = []
         self.treshold = threshold
@@ -149,8 +185,14 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold):
         X_grad[:, support] = X
         return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])
 
+    def torch_transform(self, X):
+        X_shape = X.size()
+        if not len(X_shape) == 2:
+            X = X.view(-1,X_shape[-1])
+        support = torch.from_numpy(self.get_support()).bool()
+        return X[:, support]
 
-class GroupedPCA(GroupedTransformer, PCA):
+class GroupedPCA(GroupedTransformer, PCA, TorchModule):
     def __init__(self,
                  n_components=None,
                  copy=True,
@@ -163,6 +205,7 @@ class GroupedPCA(GroupedTransformer, PCA):
             See their documentation for more information
         """
 
+        TorchModule.__init__(self)
         self.n_components = n_components
         self.copy = copy
         self.whiten = whiten
@@ -209,12 +252,19 @@ class GroupedPCA(GroupedTransformer, PCA):
         X_grad = X.dot(self.components_)
         return X_grad.reshape(*X_shape[:-1], X_grad.shape[-1])
 
+    def torch_transform(self, X):
+        if self.n_components == 1:
+            return X
+        else:
+            return torch.matmul(X,torch.from_numpy(self.components_).T)
 
-class GroupedStandardScaler(GroupedTransformer, StandardScaler):
+
+class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
     def __init__(self, threshold=0.0):
         """ GroupedTransformer version of sklearn StandardScaler.
             See their documentation for more information
         """
+        TorchModule.__init__(self)
         self._before_fit = identity  # lambdas can't be pickled
         self._initargs = []
         self._initkwargs = {}
@@ -230,6 +280,13 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler):
         X = X / np.sqrt(self.var_).reshape(1, -1)
         return X.reshape(*X_shape[:-1], X.shape[-1])
 
+
+    def torch_transform(self, X):
+        X_shape = X.size()
+        if not len(X_shape) == 2:
+            X = X.view(-1,X_shape[-1])
+        X = (X - torch.from_numpy(self.mean_))/torch.sqrt(torch.from_numpy(self.var_))
+        return X
 
 def identity(x):
     return x
