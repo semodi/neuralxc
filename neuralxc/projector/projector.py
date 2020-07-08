@@ -116,16 +116,16 @@ class DefaultProjector(BaseProjector):
                 W[species] = self.get_W(basis_instructions[species])
 
         # Determine unitcell constants
-        U = np.array(unitcell)  # Matrix to go from real space to mesh coordinates
+        U = np.array(unitcell)  # Matrix to go from mesh to real space
         for i in range(3):
             U[i, :] = U[i, :] / grid[i]
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
 
         self.unitcell = unitcell
         self.grid = grid
-        self.V_cell = np.linalg.det(U)
+        self.V_cell = np.abs(np.linalg.det(U))
         self.U = U.T
-        self.U_inv = np.linalg.inv(U)
+        self.U_inv = np.linalg.inv(self.U)
         self.a = a
         self.W = W
         self.all_angs = {}
@@ -593,7 +593,7 @@ class DefaultProjector(BaseProjector):
         pos = pos.flatten()
 
         #Create box with max. distance = radius
-        rmax = np.ceil(radius / self.a).astype(int).tolist()
+        rmax = (np.ceil(radius / self.a).astype(int)+2).tolist()
         Xm, Ym, Zm = mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
         X, Y, Z = mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
 

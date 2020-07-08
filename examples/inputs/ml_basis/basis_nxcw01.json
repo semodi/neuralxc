@@ -2,12 +2,12 @@
     "preprocessor": {
         "C": {
             "n": 4,
-            "l": 3,
+            "l": 5,
             "r_o": 2
         },
         "H": {
             "n": 4,
-            "l": 3,
+            "l": 5,
             "r_o": 2
         },
         "extension": "RHOXC",
@@ -17,11 +17,7 @@
     "engine_kwargs": {
         "pseudoloc": null,
         "fdf_path": null,
-        "xc": "PBE",
-        "basis": "DZP",
-        "fdf_arguments": {
-            "MaxSCFIterations": 200
-        }
+        "xc": "PBE"
     },
     "n_workers": 1
 }

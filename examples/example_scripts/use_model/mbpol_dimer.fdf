@@ -49,4 +49,4 @@ SCF.H.Converge F
 SCF.EDM.Converge F
 SCF.FreeE.Converge T
 
-neuralxc ../../../models/MB-pol/model
+neuralxc ../../../models/NXC-W01/model
