@@ -5,7 +5,7 @@ import numpy as np
 import os
 from neuralxc.doc_inherit import doc_inherit
 from abc import ABC, abstractmethod
-import pickle
+import dill as pickle
 import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
@@ -52,6 +52,7 @@ def test_adiabatic():
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
+@pytest.mark.pyscf_iterative
 def test_iterative():
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')

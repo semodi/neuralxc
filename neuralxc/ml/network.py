@@ -11,22 +11,24 @@ from sklearn.base import BaseEstimator
 from neuralxc.formatter import atomic_shape
 from matplotlib import pyplot as plt
 import math
-import pickle
 from collections import namedtuple
 import h5py
 import json
 from ase.io import read
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.pipeline import Pipeline
-import pickle
+import dill as pickle
 import shutil
 from .activation import get_activation
 import copy
 import tensorflow as tf
 try:
     import torch
+    TorchModule = torch.nn.Module
 except ModuleNotFoundError:
-    pass
+    class TorchModule:
+         def __init__(self):
+             pass
 # import tensorflow
 Dataset = namedtuple("Dataset", "data species")
 
@@ -171,9 +173,9 @@ def load_pipeline(path):
 
 def compile_model(model, outpath, override = False):
 
-    class E_predictor(torch.nn.Module):
+    class E_predictor(TorchModule):
         def __init__(self, species, model):
-            torch.nn.Module.__init__(self)
+            TorchModule.__init__(self)
             self.species = species
             self.model = model
 
@@ -184,18 +186,18 @@ def compile_model(model, outpath, override = False):
                  x = steps[1].forward(x)
              return x
 
-    class ModuleBasis(torch.nn.Module):
+    class ModuleBasis(TorchModule):
         def __init__(self, projector):
-            torch.nn.Module.__init__(self)
+            TorchModule.__init__(self)
             self.projector = projector
 
         def forward(self, positions, unitcell, grid, my_box):
              # positions = torch.einsum('...i,ij->...j',positions, unitcell)
              return self.projector.forward_basis(positions, unitcell, grid, my_box)
 
-    class ModuleProject(torch.nn.Module):
+    class ModuleProject(TorchModule):
         def __init__(self, projector):
-            torch.nn.Module.__init__(self)
+            TorchModule.__init__(self)
             self.projector = projector
 
         def forward(self, rho, positions, unitcell, grid, radials, angulars, my_box):
@@ -265,13 +267,13 @@ def compile_model(model, outpath, override = False):
         torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
 
-class NumpyNetworkEstimator(torch.nn.Module, BaseEstimator):
+class NumpyNetworkEstimator(TorchModule, BaseEstimator):
 
     allows_threading = True
 
     def __init__(self, W, B, activation, trunc=False):
 
-        torch.nn.Module.__init__(self)
+        TorchModule.__init__(self)
         self.W = W
         self.B = B
         if isinstance(activation, str):
@@ -429,7 +431,7 @@ class NumpyNetworkEstimator(torch.nn.Module, BaseEstimator):
             if self.is_torch:
                 W = [w.detach().numpy() for w in W]
                 B = [b.detach().numpy() for b in B]
-                self.activation.lib = np
+                self.activation.lib = 'np'
         # del z_1/ del x_i
         gradient = np.array([np.eye(len(W[0]))] * len(x)).swapaxes(0, 1)
 
@@ -453,12 +455,12 @@ class NumpyNetworkEstimator(torch.nn.Module, BaseEstimator):
             return gradient.swapaxes(0, 1).swapaxes(1, 2)
 
     def to_torch(self):
-        torch.nn.Module.__init__(self)
+        TorchModule.__init__(self)
         self.W = {spec: [torch.from_numpy(w).double() for w in self.W[spec]] for spec in self.W}
         self.B = {spec: [torch.from_numpy(b).double() for b in self.B[spec]] for spec in self.B}
         self.get_energy_numpy = self.get_energy
         self.get_energy = self.get_energy_torch
-        self.activation.lib = torch
+        self.activation.lib = 'torch'
         self.is_torch = True
 
     def _make_serializable(self, path):

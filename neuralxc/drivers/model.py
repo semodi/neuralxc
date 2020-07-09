@@ -31,6 +31,7 @@ import numpy as np
 import neuralxc as xc
 import sys
 import copy
+# import dill as pickle
 import pickle
 from .data import *
 from .other import *
@@ -799,7 +800,11 @@ def fit_driver(preprocessor,
     real_targets = np.array(data[:, -1]).real.flatten()
     data[:, -1] = data[:, -1] * target_scale
 
+    # for step in estimator.estimator.steps[0][1].steps:
+    #     copy.deepcopy(step[1])
+
     estimator.fit(data)
+
     set_selection = (data[:, 0] == 0)
     dev = estimator.predict(data)[0].flatten() - real_targets
     dev0 = np.abs(dev - np.mean(dev))

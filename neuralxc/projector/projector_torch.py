@@ -16,11 +16,16 @@ from ..utils import geom_torch as geom
 from .projector import BaseProjector, OrthoProjector
 from periodictable import elements as element_dict
 import periodictable
-import torch
+try:
+    import torch
+    TorchModule = torch.nn.Module
+except ModuleNotFoundError:
+    class TorchModule:
+         def __init__(self):
+             pass
 
 
-
-class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
+class DefaultProjectorTorch(TorchModule, BaseProjector) :
 
     _registry_name = 'default_torch'
 
@@ -35,7 +40,7 @@ class DefaultProjectorTorch(torch.nn.Module, BaseProjector) :
         basis_instructions, dict
         	Instructions that defines basis
         """
-        torch.nn.Module.__init__(self)
+        TorchModule.__init__(self)
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
         W = {}

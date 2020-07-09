@@ -8,7 +8,13 @@ import numpy as np
 from ..formatter import expand
 from ..base import ABCRegistry
 from .symmetrizer import BaseSymmetrizer
-import torch
+try:
+    import torch
+    TorchModule = torch.nn.Module
+except ModuleNotFoundError:
+    class TorchModule:
+         def __init__(self):
+             pass
 
 def convert_torch_wrapper(func):
 
@@ -19,14 +25,14 @@ def convert_torch_wrapper(func):
 
     return wrapped_func
 
-class CasimirSymmetrizerTorch(torch.nn.Module, BaseSymmetrizer):
+class CasimirSymmetrizerTorch(TorchModule, BaseSymmetrizer):
 
     _registry_name = 'casimir_torch'
 
     def __init__(self, *args, **kwargs):
 
         BaseSymmetrizer.__init__(self, *args, **kwargs)
-        torch.nn.Module.__init__(self)
+        TorchModule.__init__(self)
 
     def forward(self, C):
         self._symmetrize_function = self._symmetrize_function_bare

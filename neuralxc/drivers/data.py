@@ -31,7 +31,7 @@ import numpy as np
 import neuralxc as xc
 import sys
 import copy
-import pickle
+import dill as pickle
 from types import SimpleNamespace as SN
 from .other import *
 

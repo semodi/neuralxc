@@ -22,7 +22,10 @@ from periodictable import elements as element_dict
 from .timer import timer
 import neuralxc.config as config
 from glob import glob
-import torch
+try:
+    import torch
+except ModuleNotFoundError:
+    pass
 agnostic_dict = {i: 'X' for i in np.arange(500)}
 
 

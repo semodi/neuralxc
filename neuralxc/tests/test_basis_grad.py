@@ -10,7 +10,7 @@ import numpy as np
 import os
 from neuralxc.doc_inherit import doc_inherit
 from abc import ABC, abstractmethod
-import pickle
+import dill as pickle
 import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree

@@ -10,7 +10,7 @@ import numpy as np
 import os
 from neuralxc.doc_inherit import doc_inherit
 from abc import ABC, abstractmethod
-import pickle
+import dill as pickle
 import copy
 import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
@@ -90,7 +90,7 @@ def test_siesta_density_getter():
 @pytest.mark.fast
 @pytest.mark.project
 @pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch']])
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch','ortho_torch']])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -119,7 +119,7 @@ def test_density_projector(projector_type):
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
 def test_symmetrizer(symmetrizer_type):
     with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
         C = pickle.load(file)

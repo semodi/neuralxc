@@ -596,8 +596,8 @@ class DefaultProjector(BaseProjector):
 
         #Create box with max. distance = radius
         rmax = (np.ceil(radius / self.a).astype(int)+2).tolist()
-        Xm, Ym, Zm = mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
-        X, Y, Z = mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
+        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
+        X, Y, Z = self.mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
 
         #Find mesh pos.
         cm = np.round(self.U_inv.dot(pos)).astype(int)

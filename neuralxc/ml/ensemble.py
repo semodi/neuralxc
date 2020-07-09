@@ -1,8 +1,13 @@
 from sklearn.base import BaseEstimator
 from neuralxc.ml.network import NumpyNetworkEstimator
 import numpy as np
-import torch
-
+try:
+    import torch
+    TorchModule = torch.nn.Module
+except ModuleNotFoundError:
+    class TorchModule:
+         def __init__(self):
+             pass
 class EnsembleEstimator(BaseEstimator):
     def __init__(self, estimators, operation='sum'):
 
