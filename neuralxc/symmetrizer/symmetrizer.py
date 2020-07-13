@@ -28,6 +28,7 @@ def Symmetrizer(symmetrize_instructions):
 
     symtype = sym_ins['symmetrizer_type']
 
+    print('Using symmetrizer ', symtype)
     if not symtype in registry:
         raise Exception('Symmetrizer: {} not registered'.format(symtype))
 
