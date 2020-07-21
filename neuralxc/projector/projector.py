@@ -549,15 +549,19 @@ class DefaultProjector(BaseProjector):
 
         if not small_rho:
             srho = rho[Xm, Ym, Zm]
-
+        else:
+            srho = rho
         #zero_pad_angs (so that it can be converted to numpy array):
         zeropad = np.zeros_like(Xm, dtype=np.float64)
         angs_padded = []
         for l in range(n_l):
             angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
         angs_padded = np.array(angs_padded)
-
         rads = np.array(rads) * self.V_cell
+        if srho.ndim == 1:
+            srho = np.expand_dims(srho, (1, 2))
+            angs_padded = np.expand_dims(angs_padded, (3, 4))
+            rads = np.expand_dims(rads, (2, 3))
         coeff_array = np.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho, optimize=config.OptLevel>0)
         coeff = []
 
@@ -1018,3 +1022,55 @@ def M_make_complex(n_l):
             M[idx, tensor['{},{}'.format(l, -m)]] = 1j / np.sqrt(2)
             idx += 1
     return M
+
+class RadialProjector(OrthoProjector):
+
+    _registry_name = 'ortho_radial'
+
+    def __init__(self, basis_instructions, grid_coords, grid_weights, **kwargs):
+
+        self.basis = basis_instructions
+        self.grid_coords = grid_coords
+        self.grid_weights = grid_weights
+
+        W = {}
+        for species in basis_instructions:
+            if len(species) < 3:
+                W[species] = self.get_W(basis_instructions[species])
+        self.W = W
+        self.all_angs = {}
+        self.V_cell = self.grid_weights
+
+    def box_around(self, pos, radius):
+        '''
+        Return dictionary containing box around an atom at position pos with
+        given radius. Dictionary contains box in mesh, euclidean and spherical
+        coordinates
+
+        Parameters
+        ---
+
+        Returns
+        ---
+            dict
+                {'mesh','real','radial'}, box in mesh,
+                euclidean and spherical coordinates
+        '''
+        if pos.shape != (1, 3) and (pos.ndim != 1 or len(pos) != 3):
+            raise Exception('please provide only one point for pos. shape = {}'.format(pos.shape))
+
+        pos = pos.flatten()
+
+        # Create box with max. distance = radius
+        # rmax = (np.ceil(radius / self.a).astype(int)+2).tolist()
+        Xm, Ym, Zm = np.arange(len(self.grid_weights)), None, None
+        X, Y, Z = [self.grid_coords[:,i] - pos[i] for i in range(3)]
+
+        #Find mesh pos.
+        R = np.sqrt(X**2 + Y**2 + Z**2)
+
+        Phi = np.arctan2(Y, X)
+        Theta = np.arccos(Z / R, where=(R > 1e-15))
+        Theta[R < 1e-15] = 0
+
+        return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}

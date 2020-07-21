@@ -78,7 +78,8 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         rho = torch.from_numpy(rho)
         positions = torch.from_numpy(positions)
         species = torch.Tensor([getattr(periodictable,s).number for s in species])
-        C = self.forward(rho, positions, species, self.unitcell, self.grid, self.a)
+        my_box = torch.Tensor([[0, self.grid[i]] for i in range(3)])
+        C = self.forward(rho, positions, species, self.unitcell, self.grid, my_box)
         return {spec: C[spec].detach().numpy() for spec in C}
 
     def set_species(self, species):
@@ -110,9 +111,9 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
 
 
 
-    def forward(self, rho, positions, species, unitcell, grid, a):
+    def forward(self, rho, positions, species, unitcell, grid, my_box):
 
-        self.set_cell_parameters(unitcell, grid, a)
+        self.set_cell_parameters(unitcell, grid)
         basis_rep = {}
         species = [str(element_dict[int(s.detach().numpy())]) for s in species]
 
@@ -120,11 +121,10 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
             if not spec in basis_rep:
                 basis_rep[spec] = []
 
-            basis = self.basis[spec]
-            box = self.box_around(pos, basis['r_o'])
-            projection = self.project(rho, box, basis, self.W[spec])
-
-            basis_rep[spec].append(projection)
+            self.species = spec
+            rad, ang = self.forward_basis(pos, unitcell, grid, my_box)
+            projection = self.forward_fast(rho,pos,unitcell, grid, rad, ang, my_box)
+            basis_rep[spec].append(projection.view(1, -1))
 
         for spec in basis_rep:
             basis_rep[spec] = torch.cat(basis_rep[spec], dim=0)
@@ -162,8 +162,12 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         #zero_pad_angs (so that it can be converted to numpy array):
         # n_rad = rads.shape[0]
         # n_l = angs.shape[0]
-        rads = rads * self.V_cell
-        coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs, rads, rho)
+        # rads = rads * self.V_cell
+        rho = rho * self.V_cell
+        if rho.ndim == 1:
+            coeff_array = torch.einsum('lmi,ni,i -> nlm', angs, rads, rho)
+        else:
+            coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs, rads, rho)
 
         indexing = torch.ones(coeff_array.size()[1:])
         indexing = (torch.tril(indexing, diagonal = n_l) * torch.flip(torch.tril(indexing, diagonal = n_l), (1,))).bool()
@@ -177,7 +181,7 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         n_l = basis['l']
         r_o = basis['r_o']
         R, Theta, Phi = box['radial']
-        Xm, Ym, Zm = box['mesh']
+        # Xm, Ym, Zm = box['mesh']
 
         #Build angular part of basis functions
         angs = []
@@ -499,6 +503,83 @@ class OrthoProjectorTorch(DefaultProjectorTorch, OrthoProjector):
                 S_matrix[j, i] = S_matrix[i, j]
         return S_matrix
 
+
+class RadialProjectorTorch(OrthoProjectorTorch):
+
+    _registry_name = 'ortho_radial_torch'
+
+    def __init__(self, grid_coords, grid_weights, basis_instructions, **kwargs):
+        """
+        Parameters
+        ------------------
+        unitcell, array float
+        	Unitcell in bohr
+        grid, array float
+        	Grid points per unitcell
+        basis_instructions, dict
+        	Instructions that defines basis
+        """
+        TorchModule.__init__(self)
+        self.basis = basis_instructions
+        # Initialize the matrix used to orthonormalize radial basis
+        W = {}
+        for species in basis_instructions:
+            if len(species) < 3:
+                W[species] = self.get_W(basis_instructions[species])
+
+        self.grid_coords = torch.from_numpy(grid_coords)
+        self.grid_weights = torch.from_numpy(grid_weights)
+
+        self.W = {w:torch.from_numpy(W[w]) for w in W}
+
+        for species in basis_instructions:
+            if len(species) < 3:
+                W[species] = self.get_W(basis_instructions[species])
+
+        self.my_box = torch.Tensor([[0, 1] for i in range(3)])
+        self.unitcell = self.grid_coords
+        self.grid = self.grid_weights
+
+    def set_cell_parameters(self, grid_coords, grid_weights):
+        self.grid_coords = grid_coords
+        self.grid_weights = grid_weights
+        self.V_cell = grid_weights
+
+
+    def forward_fast(self, rho, positions, grid_coords, grid_weights, radials, angulars, my_box):
+        self.set_cell_parameters(grid_coords, grid_weights)
+        basis = self.basis[self.species]
+        return  self.project_onto(rho, radials, angulars, int(basis['l']))
+
+
+    def box_around(self, pos, radius, my_box):
+        '''
+        Return dictionary containing box around an atom at position pos with
+        given radius. Dictionary contains box in mesh, euclidean and spherical
+        coordinates
+
+        Parameters
+        ---
+
+        Returns
+        ---
+            dict
+                {'mesh','real','radial'}, box in mesh,
+                euclidean and spherical coordinates
+        '''
+        pos = pos.view(-1)
+
+        # my_box = my_box - cm.view(3,1)
+
+        Xm, Ym, Zm = torch.arange(self.grid_weights.size()[0]), None, None
+        X, Y, Z = [self.grid_coords[:,i] - pos[i] for i in range(3)]
+
+        R = torch.sqrt(X**2 + Y**2 + Z**2)
+
+        Phi = torch.atan2(Y, X)
+        Theta = torch.acos(Z/ R)
+        Theta[R < 1e-15] = 0
+        return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
 
 def shift(c, g):
     c = torch.fmod(c + torch.ceil(torch.abs(torch.min(c)/g))*g, g)

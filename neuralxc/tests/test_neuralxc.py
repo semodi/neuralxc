@@ -24,10 +24,16 @@ try:
     torch_found =True
 except ModuleNotFoundError:
     torch_found = False
+try:
+    import pyscf
+    pyscf_found = True
+except ModuleNotFoundError:
+    pyscf_found = False
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
 save_test_density_projector = False
+save_test_radial_projector = False
 save_siesta_density_getter = False
 save_test_symmetrizer = False
 save_grouped_transformer = False
@@ -90,7 +96,8 @@ def test_siesta_density_getter():
 @pytest.mark.fast
 @pytest.mark.project
 @pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch','ortho_torch']])
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch']\
+    and not 'radial' in name])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -116,10 +123,45 @@ def test_density_projector(projector_type):
             for spec in basis_rep:
                 assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 
+@pytest.mark.fast
+@pytest.mark.radial
+@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
+@pytest.mark.parametrize('projector_type',[name for name in \
+    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch','ortho_torch']\
+    and 'radial' in name])
+def test_radial_projector(projector_type):
+    from pyscf import gto, dft
+    mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
+    mf = dft.RKS(mol)
+    mf.xc = 'PBE'
+    mf.grids.level = 5
+    mf.kernel()
+
+    rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
+
+    basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}, 'projector_type': projector_type}
+
+    density_projector = xc.projector.DensityProjector(grid_coords=mf.grids.coords,
+        grid_weights=mf.grids.weights, basis_instructions=basis_set)
+
+    positions = np.array([[0.0, 0.0, 0.0], [0, 1, 0.0], [0, 0, 1]
+                          ]) / xc.constants.Bohr
+
+    basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
+
+    if projector_type in ['ortho_radial']:
+        if save_test_radial_projector:
+            with open(os.path.join(test_dir, 'h2o_rad.pckl'), 'wb') as file:
+                pickle.dump(basis_rep, file)
+    with open(os.path.join(test_dir, 'h2o_rad.pckl'), 'rb') as file:
+        basis_rep_ref = pickle.load(file)
+
+    for spec in basis_rep:
+        assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch','mixed_casimir_torch']])
 def test_symmetrizer(symmetrizer_type):
     with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
         C = pickle.load(file)
@@ -153,7 +195,8 @@ def test_symmetrizer(symmetrizer_type):
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']\
+    and not 'torch' in name])
 def test_symmetrizer_rot_invariance(symmetrizer_type):
     C_list = []
     for i in range(3):
@@ -176,7 +219,8 @@ def test_symmetrizer_rot_invariance(symmetrizer_type):
 
 @pytest.mark.fast
 @pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']])
+    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']\
+    and not 'torch' in name])
 def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     with open(os.path.join(test_dir, 'rotated_synthetic.pckl'), 'rb') as file:
         C_list = pickle.load(file)
