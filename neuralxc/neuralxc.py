@@ -70,7 +70,7 @@ class NXCAdapter(ABC):
     def __init__(self, path, options={}):
         # from mpi4py import MPI
         path = ''.join(path.split())
-        if path[-len('.jit'):] == '.jit' :
+        if path[-len('.jit'):] == '.jit' or path[-len('.jit/'):]== '.jit/' :
             self._adaptee = NeuralXCJIT(path)
         else:
             self._adaptee = NeuralXC(path)
@@ -106,11 +106,11 @@ class PySCFNXC(NXCAdapter):
 
 class PySCFRadNXC(NXCAdapter):
 
-    def initialize(self, grid_coords, grid_weights, positions, species):
+    def initialize(self, grid_coords, grid_weights, mol):
         self.initialized = True
         self.grid_weights = np.array(grid_weights)
         self._adaptee.initialize(unitcell=np.array(grid_coords), grid=np.array(grid_weights),
-        positions=np.array(positions)/Bohr, species=species)
+        positions=mol.atom_coords(), species=[mol.atom_symbol(i) for i in range(mol.natm)])
 
     def get_V(self, rho):
         E, V = self._adaptee.get_V(rho=rho)
@@ -407,7 +407,6 @@ class NeuralXCJIT:
         timer.start('MD step')
         self.projector_kwargs = kwargs
         periodic = (kwargs['unitcell'].shape == (3,3)) #TODO: this is just a workaround
-        print('periodic', periodic)
         self.unitcell = torch.from_numpy(kwargs['unitcell']).double()
         # self.unitcell_inv = torch.inverse(self.unitcell).detach().numpy()
         self.epsilon = torch.zeros([3,3]).double()
