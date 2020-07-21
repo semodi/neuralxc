@@ -74,12 +74,11 @@ class GroupedTransformer(ABC):
                     results.append(system_shape(self.torch_transform(atomic_shape(x)), x.shape[-2]))
                 else:
                     mask = ~np.all(atomic_shape(x) == 0, axis=-1)
-                    res = atomic_shape(x)
-                    res[mask] = super().transform(atomic_shape(x)[mask])
-
-                    mask = ~np.all(res== 0, axis=-1)
+                    res = np.array(atomic_shape(x))
+                    transformed = super().transform(atomic_shape(x)[mask])
+                    res = res[:,:transformed.shape[-1]]
+                    res[mask] = transformed
                     results.append(system_shape(res, x.shape[-2]))
-                    # results.append(system_shape(super().transform(atomic_shape(x)), x.shape[-2]))
 
         if made_list:
             results = results[0]
