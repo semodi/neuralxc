@@ -66,8 +66,8 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     # if spec_agnostic: atoms = atoms[0:1]
     if is_file:
         parsed_basis = gto.basis.parse(open(basis,'r').read())
-    symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()] + ['O']))
-    # if spec_agnostic: symbols += ['O']
+    symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()]))
+    if spec_agnostic: np.unique(np.concatenate([symbols, np.array(['O'])]))
     if is_file:
         basis ={s: parsed_basis for s in symbols}
     atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]

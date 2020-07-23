@@ -327,7 +327,7 @@ def test_neuralxc_benzene():
 
 @pytest.mark.skipif(not ase_found, reason='requires ase')
 @pytest.mark.force
-@pytest.mark.parametrize('use_delta', [False, True])
+@pytest.mark.parametrize('use_delta', [False])
 def test_force_correction(use_delta):
 
     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')

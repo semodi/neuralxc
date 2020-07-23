@@ -50,14 +50,20 @@ class PySCFDensityGetter(BaseDensityGetter):
     _registry_name = 'pyscf_rad'
 
     def __init__(self, binary=None, valence=False, **kwargs):
-        self.valence = int(valence)
+        self.valence = valence
 
     def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
-
         if self.valence:
-            print('Using only valence density (mo_occ[:{}] = 0)'.format(self.valence))
-            results['mo_occ'][:self.valence] = 0
+            print('Using only valence density'.format(self.valence))
+            core = 0
+            for aidx, _ in enumerate(mol.atom) :
+                charge = mol.atom_charge(aidx)
+                if charge > 10:
+                    core += 2
+                elif charge > 2:
+                    core += 1
+            results['mo_occ'][:core] = 0
 
         dm = get_dm(results['mo_coeff'],results['mo_occ'])
         mf = dft.RKS(mol)
