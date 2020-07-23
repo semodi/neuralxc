@@ -63,25 +63,31 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     from ..pyscf import BasisPadder
     real_basis = {}
     is_file = os.path.isfile(basis)
-    if spec_agnostic: atoms = atoms[0:1]
+    # if spec_agnostic: atoms = atoms[0:1]
     if is_file:
         parsed_basis = gto.basis.parse(open(basis,'r').read())
-    for a in atoms:
-        symbols = a.get_chemical_symbols()
-        if spec_agnostic: symbols += ['X']
-        if is_file:
-            basis ={s: parsed_basis for s in symbols}
-        atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
+    symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()] + ['O']))
+    # if spec_agnostic: symbols += ['O']
+    if is_file:
+        basis ={s: parsed_basis for s in symbols}
+    atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
+
+    try:
         auxmol = gto.M(atom=atom, basis=basis)
-        bp = BasisPadder(auxmol)
-        padded_basis = bp.get_basis_json()
-        for sym in padded_basis:
-            if sym in real_basis:
-                if real_basis[sym] != padded_basis[sym]:
-                    raise Exception('Different basis sets across systems currently not supported')
+    except RuntimeError: # If spin != 0 compensate with Hydrogen
+        atom += [['H', np.array([2 * len(symbols)+1, 0, 0])]]
+        auxmol = gto.M(atom=atom, basis=basis)
 
-            real_basis[sym] = padded_basis[sym]
+    bp = BasisPadder(auxmol)
+    padded_basis = bp.get_basis_json()
+    for sym in padded_basis:
+        if sym in real_basis:
+            if real_basis[sym] != padded_basis[sym]:
+                raise Exception('Different basis sets across systems currently not supported')
 
+        real_basis[sym] = padded_basis[sym]
+
+    if spec_agnostic: real_basis = {'X': real_basis['X']}
     return real_basis
 
 

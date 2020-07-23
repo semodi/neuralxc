@@ -67,9 +67,24 @@ class Tanh(BaseActivation):
         lib = get_lib(self.lib)
         return (1 - lib.tanh(x)**2)
 
+class Softplus(BaseActivation):
+
+    _registry_name = 'softplus'
+
+    def __init__(self, lib = 'np'):
+        self.lib = lib
+
+    def f(self, x):
+        if not hasattr(self, 'lib'):
+            self.lib = 'np'
+        lib = get_lib(self.lib)
+        return lib.log(lib.exp(x) + 1)
+
+    def df(self, x):
+        pass
 
 def get_activation(activation):
-    act_dict = {'sigmoid': Sigmoid, 'tanh': Tanh}
+    act_dict = {'sigmoid': Sigmoid, 'tanh': Tanh, 'softplus': Softplus}
     if not activation in act_dict:
         raise NotImplementedError('This activation function was not implemented')
     return act_dict[activation]()

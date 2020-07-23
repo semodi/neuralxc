@@ -229,7 +229,11 @@ def compile_model(model, outpath, override = False):
         if len(spec) < 3:
             species.append(spec)
 
-    model.initialize(unitcell=unitcell_c, grid=grid_c, positions=pos_c, species=species)
+    try:
+        model.initialize(unitcell=unitcell_c, grid=grid_c, positions=pos_c, species=species)
+    except TypeError:
+        rho_c = np.array([1,2,3])
+        model.initialize(grid_coords=unitcell_c, grid_weights = grid_c)
 
     unitcell_c = torch.from_numpy(unitcell_c).double()
     grid_c = torch.from_numpy(grid_c).double()
@@ -918,16 +922,8 @@ class Energy_Network():
             build_graph = False
 
         with self.graph.as_default():
-            config = tf.ConfigProto(intra_op_parallelism_threads=1,
-                                    inter_op_parallelism_threads=1,
-                                    device_count={"CPU": 1},
-                                    use_per_session_threads=True)
-            # log_device_placement=True)
-            config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-            pool = config.session_inter_op_thread_pool.add()
-            pool.num_threads = 1
             if self.sess == None:
-                sess = tf.Session(config=config)
+                sess = tf.Session()
                 self.sess = sess
             else:
                 sess = self.sess

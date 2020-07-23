@@ -49,7 +49,7 @@ def get_nxc_adapter(kind, path, options={}):
     """ Adapter factory for NeuralXC
     """
     kind = kind.lower()
-    adapter_dict = {'siesta': SiestaNXC, 'pyscf': PySCFNXC}
+    adapter_dict = {'siesta': SiestaNXC, 'pyscf': PySCFNXC, 'pyscf_rad':PySCFRadNXC}
     if not kind in adapter_dict:
         raise ValueError('Selected Adapter not available')
     else:
@@ -70,7 +70,7 @@ class NXCAdapter(ABC):
     def __init__(self, path, options={}):
         # from mpi4py import MPI
         path = ''.join(path.split())
-        if path[-len('.jit'):] == '.jit' :
+        if path[-len('.jit'):] == '.jit' or path[-len('.jit/'):]== '.jit/' :
             self._adaptee = NeuralXCJIT(path)
         else:
             self._adaptee = NeuralXC(path)
@@ -104,6 +104,19 @@ class PySCFNXC(NXCAdapter):
         V /= Hartree
         return E, V
 
+class PySCFRadNXC(NXCAdapter):
+
+    def initialize(self, grid_coords, grid_weights, mol):
+        self.initialized = True
+        self.grid_weights = np.array(grid_weights)
+        self._adaptee.initialize(unitcell=np.array(grid_coords), grid=np.array(grid_weights),
+        positions=mol.atom_coords(), species=[mol.atom_symbol(i) for i in range(mol.natm)])
+
+    def get_V(self, rho):
+        E, V = self._adaptee.get_V(rho=rho)
+        E /= Hartree
+        V /= Hartree
+        return E, V
 
 class SiestaNXC(NXCAdapter):
     @prints_error
@@ -393,21 +406,32 @@ class NeuralXCJIT:
         """
         timer.start('MD step')
         self.projector_kwargs = kwargs
+        periodic = (kwargs['unitcell'].shape == (3,3)) #TODO: this is just a workaround
         self.unitcell = torch.from_numpy(kwargs['unitcell']).double()
-        self.unitcell_inv = torch.inverse(self.unitcell).detach().numpy()
+        # self.unitcell_inv = torch.inverse(self.unitcell).detach().numpy()
         self.epsilon = torch.zeros([3,3]).double()
         self.epsilon.requires_grad = True
-        self.unitcell_we = torch.mm((torch.eye(3) + self.epsilon), self.unitcell)
+        if periodic:
+            self.unitcell_we = torch.mm((torch.eye(3) + self.epsilon), self.unitcell)
+        else:
+            self.unitcell_we = self.unitcell
         self.grid = torch.from_numpy(kwargs['grid']).double()
         self.positions = torch.from_numpy(kwargs['positions']).double()
         self.positions_we = torch.mm(torch.eye(3) + self.epsilon, self.positions.T).T
         # self.positions = torch.mm(self.positions_scaled,self.unitcell)
-        U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
-        self.V_cell = torch.abs(torch.det(U))
-        self.V_ucell = torch.abs(torch.det(self.unitcell)).detach().numpy()
         self.species = kwargs['species']
-        self.my_box = torch.zeros([3,2])
-        self.my_box[:,1] = self.grid
+        if periodic:
+            U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
+            self.V_cell = torch.abs(torch.det(U))
+            self.V_ucell = torch.abs(torch.det(self.unitcell)).detach().numpy()
+            self.my_box = torch.zeros([3,2])
+            self.my_box[:,1] = self.grid
+        else:
+            self.V_cell = self.grid
+            self.V_ucell = 1
+            self.my_box = torch.zeros([3,2])
+            self.my_box[:,1] = 1
+
         with torch.jit.optimized_execution(should_optimize=True):
             self.compute_basis(False)
 
