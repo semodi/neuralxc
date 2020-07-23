@@ -127,6 +127,29 @@ def parse_sets_input(path):
             line = setsfile.readline().rstrip()
     return hdf5
 
+def compile(in_path, jit_path, as_radial):
+    success = False
+    while(not success):
+        model = xc.NeuralXC(in_path)
+        projector_type = model._pipeline.get_basis_instructions().get('projector_type', 'ortho')
+        if as_radial:
+            projector_type += '_radial'
+            model._pipeline.basis_instructions.update({'projector_type': projector_type})
+        else:
+            if projector_type[-len('_radial'):] == '_radial':
+                projector_type = projector_type[:-len('_radial')]
+                model._pipeline.basis_instructions.update({'projector_type': projector_type})
+        try:
+            xc.ml.network.compile_model(model, jit_path, override=True)
+            success = True
+        except AttributeError:
+            convert_tf(in_path, '.tmp.np')
+            in_path = '.tmp.np'
+
+    if os.path.exists('.tmp.np'):
+        shutil.rmtree('.tmp.np')
+    print('Success!')
+
 
 def convert_tf(tf_path, np_path):
     """ Converts the tensorflow estimator inside a NXCPipeline to a simple
@@ -142,7 +165,7 @@ def convert_tf(tf_path, np_path):
 
     for sym in basis:
         if len(sym) > 2: continue
-        C[sym] = np.zeros([1, 1, basis[sym]['n'] * basis[sym]['l']**2])
+        C[sym] = np.ones([1, 1, basis[sym]['n'] * basis[sym]['l']**2])
     D = nxc_tf.symmetrizer.get_symmetrized(C)
     nxc_tf._pipeline.predict(D)
     nxc_tf._pipeline.save(np_path, True, True)

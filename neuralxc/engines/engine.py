@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from ..base import ABCRegistry
 try:
     from ..pyscf.pyscf import compute_KS
+    from pyscf.scf.chkfile import load_scf
 except ModuleNotFoundError:
     compute_KS = None
 from ase.calculators.singlepoint import SinglePointCalculator
@@ -44,12 +45,23 @@ class PySCFEngine(BaseEngine):
         self.xc = kwargs.get('xc', 'PBE')
         self.basis = kwargs.get('basis', 'ccpvdz')
         self.nxc = kwargs.get('nxc', '')
+        self.skip_calculated = kwargs.pop('skip_calculated', True)
 
     def compute(self, atoms):
-        mf, mol = compute_KS(atoms, basis=self.basis, xc=self.xc, nxc=self.nxc)
+        if 'pyscf.chkpt' in os.listdir('.') and self.skip_calculated:
+            mol, results = load_scf('pyscf.chkpt')
+            e = results['e_tot']
+        else:
+            mf, mol = compute_KS(atoms, basis=self.basis, xc=self.xc, nxc=self.nxc)
+            e = mf.energy_tot()
+
         atoms.calc = SinglePointCalculator(atoms)
-        atoms.calc.results = {'energy': mf.energy_tot() * Hartree}
+        atoms.calc.results = {'energy': e * Hartree}
         return atoms
+
+class PySCFEngine(PySCFEngine):
+
+    _registry_name = 'pyscf_rad'
 
 
 class SiestaEngine(BaseEngine):

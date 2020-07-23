@@ -8,6 +8,7 @@ import re
 try:
     from pyscf.scf.chkfile import load_scf
     from ..pyscf.pyscf import get_dm
+    from pyscf import dft
     pyscf_found = True
 except ModuleNotFoundError:
     pyscf_found = False
@@ -32,7 +33,7 @@ class PySCFDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf'
 
-    def __init__(self, binary=None):
+    def __init__(self, binary=None,**kwargs):
         pass
 
     def get_density(self, file_path, return_dict=False):
@@ -44,12 +45,39 @@ class PySCFDensityGetter(BaseDensityGetter):
         else:
             return res
 
+class PySCFDensityGetter(BaseDensityGetter):
+
+    _registry_name = 'pyscf_rad'
+
+    def __init__(self, binary=None, valence=False, **kwargs):
+        self.valence = int(valence)
+
+    def get_density(self, file_path, return_dict=False):
+        mol, results = load_scf(file_path)
+
+        if self.valence:
+            print('Using only valence density (mo_occ[:{}] = 0)'.format(self.valence))
+            results['mo_occ'][:self.valence] = 0
+
+        dm = get_dm(results['mo_coeff'],results['mo_occ'])
+        mf = dft.RKS(mol)
+        mf.xc = 'PBE'
+        mf.grids.level = 7
+        mf.grids.build()
+        rho = dft.numint.get_rho(mf._numint, mol, dm, mf.grids)
+        grid_coords = mf.grids.coords
+        grid_weights = mf.grids.weights
+        res = rho, grid_coords, grid_weights
+        if return_dict:
+            return {'rho': res[0], 'grid_coords': res[1], 'grid_weights': res[2]}
+        else:
+            return res
 
 class SiestaDensityGetter(BaseDensityGetter):
 
     _registry_name = 'siesta'
 
-    def __init__(self, binary):
+    def __init__(self, binary, **kwargs):
         self._binary = binary
 
     def get_density(self, file_path, return_dict=False):
