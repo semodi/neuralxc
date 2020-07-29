@@ -91,7 +91,7 @@ If error persists, try to recompile SIESTA while being in the same anaconda envi
 
 If you use this code in your work, please cite it as 
 
-[1] *Dick, Sebastian, and Marivi Fernandez-Serra. "Machine Learning Accurate Exchange and Correlation Functionals of the Electronic Density". Sebastian Dick and Marivi Fernandez-Serra, Nature Communications 11, 3509 (2020)
+[1]  *Machine Learning Accurate Exchange and Correlation Functionals of the Electronic Density.* Sebastian Dick and Marivi Fernandez-Serra, Nature Communications 11, 3509 (2020)
 
 ### Copyright
 
