@@ -893,7 +893,8 @@ def chain_driver(hyper, model, dest='chained_estimator'):
     old_model.save(dest, True)
 
 
-def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', sample='', invert_sample=False):
+def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', sample='',
+                invert_sample=False, keep_mean = False):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5
@@ -959,7 +960,10 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         dev = dev[sample]
         targets = targets[sample]
         predictions = predictions[sample]
-    dev0 = np.abs(dev - np.mean(dev))
+    if keep_mean:
+        dev0 = np.abs(dev)
+    else:
+        dev0 = np.abs(dev - np.mean(dev))
     results.update({
         'mean deviation': np.mean(dev).round(4),
         'rmse': np.std(dev).round(4),
