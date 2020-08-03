@@ -7,8 +7,11 @@ except ModuleNotFoundError:
     compute_KS = None
 from ase.calculators.singlepoint import SinglePointCalculator
 from .siesta import CustomSiesta
+from .cp2k import CustomCP2K
 import os
 from ase.units import Hartree
+import ase.calculators as calculators
+import ase.calculators.cp2k
 
 
 class EngineRegistry(ABCRegistry):
@@ -49,6 +52,7 @@ class PySCFEngine(BaseEngine):
 
     def compute(self, atoms):
         if 'pyscf.chkpt' in os.listdir('.') and self.skip_calculated:
+            print('Re-using results')
             mol, results = load_scf('pyscf.chkpt')
             e = results['e_tot']
         else:
@@ -64,7 +68,29 @@ class PySCFEngine(PySCFEngine):
     _registry_name = 'pyscf_rad'
 
 
-class SiestaEngine(BaseEngine):
+class ASECalcEngine(BaseEngine):
+
+    _registry_name = 'ase'
+
+    def __init__(self, **kwargs):
+        calc = calculators
+        for c in kwargs.pop('calculator','cp2k.CP2K').split('.'):
+            calc = getattr(calc, c)
+        self.calc = calc(**kwargs)
+
+    def compute(self, atoms):
+        atoms.calc  =self.calc
+        atoms.get_potential_energy()
+        return atoms
+
+class CP2KEngine(ASECalcEngine):
+
+    _registry_name = 'cp2k'
+
+    def __init__(self, **kwargs):
+        self.calc = CustomCP2K(**kwargs)
+
+class SiestaEngine(ASECalcEngine):
 
     _registry_name = 'siesta'
 
@@ -85,8 +111,3 @@ class SiestaEngine(BaseEngine):
             os.environ['SIESTA_COMMAND'] = exec_prepend + ' siesta < ./%s > ./%s'
 
         self.calc = CustomSiesta(fdf_path, **kwargs)
-
-    def compute(self, atoms):
-        atoms.calc = self.calc
-        atoms.get_potential_energy()
-        return atoms

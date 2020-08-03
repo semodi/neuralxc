@@ -1,6 +1,7 @@
 """Utility functions for real-space grid properties
 """
 import numpy as np
+import pandas as pd
 import struct
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
@@ -28,6 +29,34 @@ class BaseDensityGetter(metaclass=DensityGetterRegistry):
     def get_density(self, file_path):
         pass
 
+class CubeDensityGetter(BaseDensityGetter):
+
+    _registry_name = 'cube'
+
+    def __init__(self,**kwargs):
+        pass
+
+    def get_density(self, file_path, return_dict=False):
+
+        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9,header = None)
+        mask = (~rho.isna()).values.flatten()
+        rho = rho.values.flatten()
+        rho = rho[mask]
+        grid_dh = pd.read_csv(file_path, delim_whitespace=True,skiprows=3,header = None,nrows=3).values
+        grid = grid_dh[:, 0].astype(int)
+        unitcell = grid_dh[:,1:] * grid
+
+        rho = rho.reshape(*grid)
+        res = [rho, unitcell, grid]
+
+        if return_dict:
+            return {'rho': res[0], 'unitcell': res[1], 'grid': res[2]}
+        else:
+            return res
+
+class CP2KDensityGetter(CubeDensityGetter):
+
+    _registry_name = 'cp2k'
 
 class PySCFDensityGetter(BaseDensityGetter):
 
@@ -45,7 +74,7 @@ class PySCFDensityGetter(BaseDensityGetter):
         else:
             return res
 
-class PySCFDensityGetter(BaseDensityGetter):
+class PySCFRadDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf_rad'
 

@@ -389,6 +389,8 @@ class NeuralXCJIT:
             if 'xc' in os.path.basename(mp):
                 self.energy_models[mp.split('_')[-1]] =\
                  torch.jit.load(mp)
+            if 'AGN' in os.path.basename(mp):
+                self.spec_agn = True
         print('NeuralXC: Model successfully loaded')
 
     @prints_error
@@ -420,6 +422,8 @@ class NeuralXCJIT:
         self.positions_we = torch.mm(torch.eye(3) + self.epsilon, self.positions.T).T
         # self.positions = torch.mm(self.positions_scaled,self.unitcell)
         self.species = kwargs['species']
+        if self.spec_agn:
+            self.species = ['X' for s in self.species]
         if periodic:
             U = torch.einsum('ij,i->ij', self.unitcell, 1/self.grid)
             self.V_cell = torch.abs(torch.det(U))

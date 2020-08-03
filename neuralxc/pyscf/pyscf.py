@@ -22,6 +22,8 @@ from ..projector import DefaultProjector, BaseProjector
 import neuralxc
 import os
 
+LAMBDA = 0.1
+
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
@@ -67,6 +69,17 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='',
     mf.set(chkfile=path)
     mf.xc = xc
     mf.kernel()
+    if os.path.isfile('dm.ref_eval.npy') or os.path.isfile('dm.ref.npy'):
+        try:
+            dm_ref = np.load('dm.ref_eval.npy')
+        except FileNotFoundError:
+            dm_ref = np.load('dm.ref.npy')
+
+        rho_ref = dft.numint.get_rho(mf._numint, mol, dm_ref, mf.grids)
+        rho = dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
+        with open('rho_error','a') as file:
+            file.write('{}\n'.format(np.sum((rho_ref-rho)**2*mf.grids.weights)))
+
     return mf, mol
 
 
@@ -95,8 +108,12 @@ def veff_mod_rad(mf, model) :
         rho0 = rho[:1]
         gamma = None
 
+
         exc, V_nxc = model.get_V(rho0.flatten())
 
+        if hasattr(model, 'rho_ref'):
+            print('Using reference density')
+            V_nxc += LAMBDA*(rho0.flatten()-model.rho_ref)
         exc = exc/rho0.flatten()
         exc = exc/model.grid_weights
         exc /= len(model.grid_weights)
@@ -122,6 +139,12 @@ def veff_mod_rad(mf, model) :
             dm_val = dm
 
         model.initialize(mf.grids.coords,mf.grids.weights, mol)
+
+        if os.path.isfile('dm.ref.npy'):
+            dm_ref = np.load('dm.ref.npy')
+            rho_ref = dft.numint.get_rho(mf._numint, mol, dm_ref, mf.grids)
+            model.rho_ref = rho_ref
+
         vnxc = pyscf.dft.rks.get_veff(mf, mol, dm_val, dm_last,
             vhf_last, hermi)
         veff[:, :] += (vnxc[:, :] - vnxc.vj[:,:])

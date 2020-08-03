@@ -41,6 +41,7 @@ if __name__ == '__main__':
         type=float,
         default=None,
         help='Shift energies by this value, if not set, use minimum of dataset.')
+    adddat.add_argument('--addto', metavar='addto', type=str, default='', help='If adding energies add to these energies in hdf5 file')
     adddat.set_defaults(func=add_data_driver)
 
     def inspectdat_driver(args):
@@ -252,6 +253,8 @@ if __name__ == '__main__':
     eval.add_argument('--plot', action='store_true', help='Create scatterplot?')
     eval.add_argument('--savefig', action='store', type=str, default='', help='Save scatterplot?')
     eval.add_argument('--cutoff', metavar='cutoff', type=float, default=0.0, help='Cut off extreme datapoints')
+    eval.add_argument('--sample', action='store',metavar='sample', type=str, default='', help='Evaluate on sample. Path to sample file')
+    eval.add_argument('--invert_sample', action='store_true', help='Invert the sample provided (evaluate on datapoints not in sample)')
     eval.set_defaults(predict=False)
     eval.set_defaults(func=eval_driver)
 

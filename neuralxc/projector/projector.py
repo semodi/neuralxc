@@ -158,7 +158,6 @@ class DefaultProjector(BaseProjector):
             basis = self.basis[spec]
             box = self.box_around(pos, basis['r_o'])
             projection, angs = self.project(rho, box, basis, self.W[spec], angs=self.all_angs.get(idx, None))
-
             basis_rep[spec].append(projection)
             if config.UseMemory:
                 self.all_angs[idx] = angs

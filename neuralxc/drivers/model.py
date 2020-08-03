@@ -133,15 +133,20 @@ def compile(in_path, jit_path, as_radial):
         model = xc.NeuralXC(in_path)
         projector_type = model._pipeline.get_basis_instructions().get('projector_type', 'ortho')
         if as_radial:
-            projector_type += '_radial'
-            model._pipeline.basis_instructions.update({'projector_type': projector_type})
+            if not 'radial' in projector_type:
+                projector_type += '_radial'
+                model._pipeline.basis_instructions.update({'projector_type': projector_type})
         else:
             if projector_type[-len('_radial'):] == '_radial':
                 projector_type = projector_type[:-len('_radial')]
                 model._pipeline.basis_instructions.update({'projector_type': projector_type})
         try:
             xc.ml.network.compile_model(model, jit_path, override=True)
+            if model._pipeline.get_basis_instructions().get('spec_agnostic','False'):
+                with open(jit_path + '/AGN','w') as file:
+                    file.write('# This model is species agnostic')
             success = True
+
         except AttributeError:
             convert_tf(in_path, '.tmp.np')
             in_path = '.tmp.np'
@@ -379,17 +384,19 @@ def adiabatic_driver(xyz,
 
             if sets:
                 open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
-            shutil.rmtree('workdir')
+            # shutil.rmtree('workdir')
             mkdir('workdir')
-            engine_kwargs = {'nxc': '../../merged'}
+            engine_kwargs = {'nxc': '../../merged.jit','skip_calculated':False}
             engine_kwargs.update(pre.get('engine_kwargs', {}))
             shcopytreedel('best_model', 'model_it{}'.format(it_label))
-
+            compile('merged','merged.jit',
+                'radial' in pre['preprocessor'].get('projector_type','ortho'))
             driver(read(xyz, ':'),
                    pre['preprocessor'].get('application', 'siesta'),
                    workdir='workdir',
                    nworkers=pre.get('n_workers', 1),
                    kwargs=engine_kwargs)
+
             pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
             add_data_driver(hdf5='data.hdf5',
@@ -430,7 +437,9 @@ def adiabatic_driver(xyz,
     os.chdir('testing')
     mkdir('workdir')
 
-    engine_kwargs = {'nxc': '../../nxc'}
+    compile('nxc','nxc.jit',
+                'radial' in pre['preprocessor'].get('projector_type','ortho'))
+    engine_kwargs = {'nxc': '../../nxc.jit'}
     engine_kwargs.update(pre.get('engine_kwargs', {}))
     driver(read('../testing.traj', ':'),
            pre['preprocessor'].get('application', 'siesta'),
@@ -884,7 +893,7 @@ def chain_driver(hyper, model, dest='chained_estimator'):
     old_model.save(dest, True)
 
 
-def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction'):
+def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', sample='', invert_sample=False):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5
@@ -943,6 +952,13 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         except Exception:
             pass
 
+    if sample:
+        sample = np.load(sample)
+        if invert_sample:
+            sample = np.array([f for f in np.arange(len(dev)) if not f in sample])
+        dev = dev[sample]
+        targets = targets[sample]
+        predictions = predictions[sample]
     dev0 = np.abs(dev - np.mean(dev))
     results.update({
         'mean deviation': np.mean(dev).round(4),
