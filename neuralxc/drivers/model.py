@@ -965,10 +965,10 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
     else:
         dev0 = np.abs(dev - np.mean(dev))
     results.update({
-        'mean deviation': np.mean(dev).round(4),
-        'rmse': np.std(dev).round(4),
-        'mae': np.mean(dev0).round(4),
-        'max': np.max(dev0).round(4)
+        'mean deviation': np.mean(dev).round(5),
+        'rmse': np.sqrt(np.mean(dev**2)).round(5),
+        'mae': np.mean(dev0).round(5),
+        'max': np.max(dev0).round(5)
     })
     pprint(results)
     if plot:
