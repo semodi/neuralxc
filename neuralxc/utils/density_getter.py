@@ -38,7 +38,7 @@ class CubeDensityGetter(BaseDensityGetter):
 
     def get_density(self, file_path, return_dict=False):
 
-        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9,header = None)
+        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=8,header = None)
         mask = (~rho.isna()).values.flatten()
         rho = rho.values.flatten()
         rho = rho[mask]
@@ -68,7 +68,17 @@ class PySCFDensityGetter(BaseDensityGetter):
     def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
         res = get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
-
+        if self.valence:
+            print('Using only valence density'.format(self.valence))
+            core = 0
+            for aidx, _ in enumerate(mol.atom) :
+                charge = mol.atom_charge(aidx)
+                if charge > 10:
+                    core += 2
+                elif charge > 2:
+                    core += 1
+            results['mo_occ'][:core] = 0
+            
         if return_dict:
             return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
         else:

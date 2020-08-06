@@ -975,7 +975,7 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         if model == '':
             plt.figure(figsize=(10, 8))
             plt.subplot(2, 1, 1)
-            plt.hist(dev.flatten())
+            plt.hist(dev.flatten(),bins = np.max(10,int(len(dev.flatten())/100)))
             plt.xlabel('Target energies [eV]')
             plt.subplot(2, 1, 2)
         targets -= np.mean(targets)
