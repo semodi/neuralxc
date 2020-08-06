@@ -62,8 +62,8 @@ class PySCFDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf'
 
-    def __init__(self, binary=None,**kwargs):
-        pass
+    def __init__(self, binary=None, valence = False,**kwargs):
+        self.valence =valence
 
     def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
@@ -78,7 +78,7 @@ class PySCFDensityGetter(BaseDensityGetter):
                 elif charge > 2:
                     core += 1
             results['mo_occ'][:core] = 0
-            
+
         if return_dict:
             return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
         else:
