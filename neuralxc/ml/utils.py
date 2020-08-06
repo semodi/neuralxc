@@ -411,7 +411,7 @@ def get_preprocessor(preprocessor, atoms, src_path):
 
     basis_grid = get_basis_grid(pre)
 
-    preprocessor = Preprocessor(basis, src_path, atoms, pre.get('n_workers', 1))
+    preprocessor = Preprocessor(basis, src_path, atoms, num_workers=pre.get('n_workers', 1))
     return preprocessor
 
 

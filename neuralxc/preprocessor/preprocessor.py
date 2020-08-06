@@ -15,7 +15,7 @@ from dask.distributed import Client, LocalCluster
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):
-    def __init__(self, basis_instructions, src_path, atoms, target_path, num_workers=1):
+    def __init__(self, basis_instructions, src_path, atoms, target_path='', num_workers=1):
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.atoms = atoms
