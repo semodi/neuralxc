@@ -44,17 +44,27 @@ def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
     basis_instructions = json.loads(open(basis, 'r').read())
-    projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['preprocessor'])
+    projector = xc.projector.DensityProjector(unitcell = np.eye(3), grid=np.ones(3), basis_instructions=basis_instructions['preprocessor'])
 
-    for spec in basis_instructions['preprocessor']:
+    for spec in projector.basis:
         if not len(spec) == 1: continue
-        basis = basis_instructions['preprocessor'][spec]
-        n = basis_instructions['preprocessor'][spec]['n']
+        basis = projector.basis[spec]
+        if isinstance(basis, list):
+            r = np.linspace(0, np.max(basis[0]['r_o']), 500)
+        else:
+            r = np.linspace(0, np.max(basis['r_o']), 500)
         W = projector.get_W(basis)
-        r = np.linspace(0, basis['r_o'], 500)
-        radials = projector.radials(r, basis, W)
-        for rad in radials:
-            plt.plot(r, rad)
+        radials = projector.radials(r, basis, W=W)
+        for l, rad in enumerate(radials):
+            if not isinstance(rad, list):
+                rad = [rad]
+            for ir, rl in enumerate(rad):
+                if ir ==0:
+                    plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
+                else:
+                    plt.plot(r, rl, color='C{}'.format(l))
+
+        plt.legend()
         plt.show()
 
 
@@ -67,7 +77,7 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     if is_file:
         parsed_basis = gto.basis.parse(open(basis,'r').read())
     symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()]))
-    if spec_agnostic: np.unique(np.concatenate([symbols, np.array(['O'])]))
+    if spec_agnostic: symbols = np.unique(np.concatenate([symbols, np.array(['O'])]))
     if is_file:
         basis ={s: parsed_basis for s in symbols}
     atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]

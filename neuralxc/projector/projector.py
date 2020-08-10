@@ -121,7 +121,6 @@ class DefaultProjector(BaseProjector):
             U[i, :] = U[i, :] / grid[i]
 
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
-        print('a', a)
 
         self.unitcell = unitcell
         self.grid = grid

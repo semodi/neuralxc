@@ -17,6 +17,7 @@ except ModuleNotFoundError:
     PYSCF_FOUND = False
 from . import config
 from .neuralxc import NeuralXC, SiestaNXC, get_nxc_adapter, get_V
+from . import pyscf
 from . import projector
 from . import utils
 from . import constants
@@ -25,7 +26,6 @@ from . import ml
 from . import base
 from . import datastructures
 from . import drivers
-from . import pyscf
 # from . import formatter
 #from .projector import *
 #from .mlpipeline import *

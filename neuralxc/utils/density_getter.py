@@ -38,7 +38,7 @@ class CubeDensityGetter(BaseDensityGetter):
 
     def get_density(self, file_path, return_dict=False):
 
-        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=8,header = None)
+        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9,header = None)
         mask = (~rho.isna()).values.flatten()
         rho = rho.values.flatten()
         rho = rho[mask]
@@ -107,7 +107,7 @@ class PySCFRadDensityGetter(BaseDensityGetter):
         dm = get_dm(results['mo_coeff'],results['mo_occ'])
         mf = dft.RKS(mol)
         mf.xc = 'PBE'
-        mf.grids.level = 7
+        mf.grids.level = 4
         mf.grids.build()
         rho = dft.numint.get_rho(mf._numint, mol, dm, mf.grids)
         grid_coords = mf.grids.coords

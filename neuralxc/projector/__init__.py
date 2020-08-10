@@ -4,3 +4,7 @@ try:
     from . import projector_torch
 except ModuleNotFoundError:
     pass
+try:
+    from . import projector_gaussian
+except ModuleNotFoundError:
+    pass
