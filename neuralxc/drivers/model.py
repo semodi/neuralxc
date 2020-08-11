@@ -894,7 +894,7 @@ def chain_driver(hyper, model, dest='chained_estimator'):
 
 
 def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', sample='',
-                invert_sample=False, keep_mean = False):
+                invert_sample=False, keep_mean = False, hashkey=''):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5
@@ -909,7 +909,10 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
     if not model == '':
         model = xc.NeuralXC(model)._pipeline
         basis = model.get_basis_instructions()
-        basis_key = basis_to_hash(basis)
+        if not hashkey:
+            basis_key = basis_to_hash(basis)
+        else:
+            basis_key = hashkey
     else:
         basis_key = ''
 

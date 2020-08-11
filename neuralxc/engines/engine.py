@@ -45,10 +45,11 @@ class PySCFEngine(BaseEngine):
     _registry_name = 'pyscf'
 
     def __init__(self, **kwargs):
-        self.xc = kwargs.get('xc', 'PBE')
-        self.basis = kwargs.get('basis', 'ccpvdz')
-        self.nxc = kwargs.get('nxc', '')
+        self.xc = kwargs.pop('xc', 'PBE')
+        self.basis = kwargs.pop('basis', 'ccpvdz')
+        self.nxc = kwargs.pop('nxc', '')
         self.skip_calculated = kwargs.pop('skip_calculated', True)
+        self.engine_kwargs = kwargs
 
     def compute(self, atoms):
         if 'pyscf.chkpt' in os.listdir('.') and self.skip_calculated:
@@ -56,7 +57,7 @@ class PySCFEngine(BaseEngine):
             mol, results = load_scf('pyscf.chkpt')
             e = results['e_tot']
         else:
-            mf, mol = compute_KS(atoms, basis=self.basis, xc=self.xc, nxc=self.nxc)
+            mf, mol = compute_KS(atoms, basis=self.basis, xc=self.xc, nxc=self.nxc, **self.engine_kwargs)
             e = mf.energy_tot()
 
         atoms.calc = SinglePointCalculator(atoms)

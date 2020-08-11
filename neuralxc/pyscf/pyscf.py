@@ -44,7 +44,7 @@ def RKS(mol, nxc='', nxc_type='pyscf', **kwargs):
 
 
 def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='',
-    nxc_type='pyscf', approx_val=False):
+    nxc_type='pyscf', approx_val=False, **kwargs):
     """ Given an ase atoms object, run a pyscf RKS calculation on it and
     return the results
     """
@@ -52,7 +52,7 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='',
     spec = atoms.get_chemical_symbols()
     mol_input = [[s, p] for s, p in zip(spec, pos)]
 
-    mol = gto.M(atom=mol_input, basis=basis)
+    mol = gto.M(atom=mol_input, basis=basis, **kwargs)
     if '.jit' in nxc:
         nxc_type='pyscf_rad'
     if approx_val:

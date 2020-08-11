@@ -555,7 +555,11 @@ class DefaultProjector(BaseProjector):
         for l in range(n_l):
             angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
         angs_padded = np.array(angs_padded)
-        rads = np.array(rads) * self.V_cell
+        if isinstance(self.V_cell,np.ndarray):
+            V_cell = self.V_cell[Xm]
+        else:
+            V_cell = self.V_cell
+        rads = np.array(rads) * V_cell
         if srho.ndim == 1:
             srho = np.expand_dims(srho, (1, 2))
             angs_padded = np.expand_dims(angs_padded, (3, 4))
@@ -1066,6 +1070,10 @@ class RadialProjector(OrthoProjector):
 
         #Find mesh pos.
         R = np.sqrt(X**2 + Y**2 + Z**2)
+        filt = (R <= radius)
+        R = R[filt]
+        X, Y, Z = X[filt], Y[filt], Z[filt]
+        Xm = Xm[filt]
 
         Phi = np.arctan2(Y, X)
         Theta = np.arccos(Z / R, where=(R > 1e-15))

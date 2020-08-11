@@ -256,6 +256,7 @@ if __name__ == '__main__':
     eval.add_argument('--sample', action='store',metavar='sample', type=str, default='', help='Evaluate on sample. Path to sample file')
     eval.add_argument('--invert_sample', action='store_true', help='Invert the sample provided (evaluate on datapoints not in sample)')
     eval.add_argument('--keep_mean', action='store_true', help="If set, don't subract parallelity error from MAE and RMSE")
+    eval.add_argument('--hashkey', action='store',default='', help="Manually choose which basis hash key to apply model to")
     eval.set_defaults(predict=False)
     eval.set_defaults(func=eval_driver)
 
@@ -269,6 +270,7 @@ if __name__ == '__main__':
                       nargs=2,
                       help='Path to hdf5 file, baseline data, reference data')
     pred.add_argument('--dest', metavar='dest', type=str, default='prediction', help='Destination where to store data')
+    pred.add_argument('--hashkey', action='store',default='', help="Manually choose which basis hash key to apply model to")
     pred.set_defaults(predict=True)
     pred.set_defaults(func=eval_driver)
 
