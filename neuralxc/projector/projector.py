@@ -347,8 +347,6 @@ class DefaultProjector(BaseProjector):
                 angs.append([])
                 ang_l = self.angulars_real(l, Theta, Phi)
                 for m in range(-l, l + 1):
-                    # angs[l].append(sph_harm(m, l, Phi, Theta).conj()) TODO: In theory should be conj!?
-                    # angs[l].append(self.angulars(l, m, Theta, Phi))
                     angs[l].append(ang_l[l + m])
 
         timer.start('force:basis_functions:dangular')
@@ -401,7 +399,7 @@ class DefaultProjector(BaseProjector):
                 idx_l = 0
                 for l in range(n_l):
                     for m in range(2 * l + 1):
-                        v2 = (radbyrl[n][l] * dangs[idx_l, :, :, :, ix])
+                        v2 = (radbyrl[n][l] * dangs[idx_l, :, ix])
                         v += coeffs[idx_coeff] * ((vmult[n][l][m] * rhat[ix]) + v2)
                         idx_l += 1
                         idx_coeff += 1
@@ -486,7 +484,7 @@ class DefaultProjector(BaseProjector):
             angs_flat = np.array([a for ang in angs for a in ang]).reshape(n_l**2, *Xm.shape)
             rads = np.array(rads)
 
-            v = np.einsum('nl,lijk,nijk-> ijk',coeffs_rs,angs_flat,rads)
+            v = np.einsum('nl,li,ni-> i',coeffs_rs,angs_flat,rads)
         timer.stop('build:build', False)
         return v
 
@@ -557,11 +555,7 @@ class DefaultProjector(BaseProjector):
             angs_padded.append([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l))
         angs_padded = np.array(angs_padded)
         rads = np.array(rads) * self.V_cell
-        if srho.ndim == 1:
-            srho = np.expand_dims(srho, (1, 2))
-            angs_padded = np.expand_dims(angs_padded, (3, 4))
-            rads = np.expand_dims(rads, (2, 3))
-        coeff_array = np.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho, optimize=config.OptLevel>0)
+        coeff_array = np.einsum('lmi,ni,i -> nlm', angs_padded, rads, srho, optimize=config.OptLevel>0)
         coeff = []
 
         #remove zero padding from m
@@ -599,30 +593,31 @@ class DefaultProjector(BaseProjector):
 
         #Create box with max. distance = radius
         rmax = (np.ceil(radius / self.a).astype(int)+2).tolist()
-        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, scaled=False, rmax=rmax, indexing='ij')
-        X, Y, Z = self.mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
+        Xm, X  = self.mesh_3d(self.U, self.a, both = True, rmax=rmax, indexing='ij')
+        # X, Y, Z = self.mesh_3d(self.U, self.a, scaled=True, rmax=rmax, indexing='ij')
 
         #Find mesh pos.
         cm = np.round(self.U_inv.dot(pos)).astype(int)
         dr = pos - self.U.dot(cm)
-        X -= dr[0]
-        Y -= dr[1]
-        Z -= dr[2]
+        X -= dr.reshape(-1,1,1,1)
 
-        Xm = (Xm + cm[0]) % self.grid[0]
-        Ym = (Ym + cm[1]) % self.grid[1]
-        Zm = (Zm + cm[2]) % self.grid[2]
+        Xm = (Xm + cm.reshape(-1,1,1,1)) % self.grid.reshape(-1,1,1,1)
 
-        R = np.sqrt(X**2 + Y**2 + Z**2)
+        R = np.linalg.norm(X, axis=0)
 
-        Phi = np.arctan2(Y, X)
-        Theta = np.arccos(Z / R, where=(R > 1e-15))
+        co = (R <= radius)
+        R = R[co]
+        X = X[:, co]
+        Xm = Xm[:, co]
+
+        Phi = np.arctan2(X[1], X[0])
+
+        Theta = np.arccos(X[2] / R, where=(R > 1e-15))
         Theta[R < 1e-15] = 0
-
-        return {'mesh': [Xm, Ym, Zm], 'real': [X, Y, Z], 'radial': [R, Theta, Phi]}
+        return {'mesh': Xm, 'real': X, 'radial': [R, Theta, Phi]}
 
     @staticmethod
-    def mesh_3d(U, a, rmax, scaled=False, indexing='xy'):
+    def mesh_3d(U, a, rmax, scaled=False, indexing='xy',both=False):
         """
         Returns a 3d mesh taking into account periodic boundary conditions
 
@@ -650,16 +645,17 @@ class DefaultProjector(BaseProjector):
 
         Xm, Ym, Zm = np.meshgrid(x_pbc, y_pbc, z_pbc, indexing=indexing)
 
-        Rm = np.concatenate([Xm.reshape(*Xm.shape, 1), Ym.reshape(*Xm.shape, 1), Zm.reshape(*Xm.shape, 1)], axis=3)
+        Rm = np.concatenate([Xm.reshape(1,*Xm.shape), Ym.reshape(1,*Xm.shape), Zm.reshape(1, *Xm.shape)])
 
-        if scaled:
-            R = np.einsum('ij,klmj -> iklm', U, Rm)
-            X = R[0, :, :, :]
-            Y = R[1, :, :, :]
-            Z = R[2, :, :, :]
-            return X, Y, Z
+        if both:
+            R = np.einsum('ij,jklm -> iklm', U, Rm)
+            return Rm, R
         else:
-            return Xm, Ym, Zm
+            if scaled:
+                R = np.einsum('ij,jklm -> iklm', U, Rm)
+                return R
+            else:
+                return Rm
 
 class OrthoProjector(DefaultProjector):
 

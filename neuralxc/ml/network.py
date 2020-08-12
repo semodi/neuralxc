@@ -251,9 +251,9 @@ def compile_model(model, outpath, override = False):
         for spec in species:
             basismod.projector.set_species(spec)
             basis_models[spec] = torch.jit.trace(basismod, (pos_c, unitcell_c, grid_c, my_box), optimize=True, check_trace = True)
-            radials , angulars = basis_models[spec](pos_c, unitcell_c, grid_c, my_box)
-            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box), optimize=True, check_trace = True)
-            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, radials, angulars, my_box).unsqueeze(0)
+            radials , angulars, box = basis_models[spec](pos_c, unitcell_c, grid_c, my_box)
+            projector_models[spec] = torch.jit.trace(projector, (rho_c, pos_c, unitcell_c, grid_c, radials, angulars, box), optimize=True, check_trace = True)
+            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, radials, angulars, box).unsqueeze(0)
             epred = E_predictor(spec, model)
             e_models[spec] = torch.jit.trace(epred, C, optimize=True, check_trace = False)
 

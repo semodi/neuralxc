@@ -375,6 +375,7 @@ class NeuralXCJIT:
         self.basis_models = {}
         self.projector_models = {}
         self.energy_models = {}
+        self.spec_agn = False
         # print(model_paths)
         print('NeuralXC: Instantiate NeuralXC, using jit model')
         print('NeuralXC: Loading model from ' + path)
@@ -452,11 +453,13 @@ class NeuralXCJIT:
 
         self.radials = []
         self.angulars = []
+        self.boxes = []
         timer.start('build_basis')
         for pos, spec in zip(positions, self.species):
-            rad, ang = self.basis_models[spec](pos, unitcell, self.grid, self.my_box)
+            rad, ang, box = self.basis_models[spec](pos, unitcell, self.grid, self.my_box)
             self.radials.append(rad)
             self.angulars.append(ang)
+            self.boxes.append(box)
         timer.stop('build_basis')
 
     @prints_error
@@ -479,13 +482,13 @@ class NeuralXCJIT:
             rho = torch.from_numpy(rho).double()
             rho.requires_grad = True
             e_list = []
-            for pos, spec, rad, ang in zip(positions, self.species,
-                                                self.radials, self.angulars):
+            for pos, spec, rad, ang, box in zip(positions, self.species,
+                                                self.radials, self.angulars, self.boxes):
                 e_list.append(self.energy_models[spec](
                     self.projector_models[spec](rho, pos,
                                                 unitcell,
                                                 self.grid,
-                                                rad, ang, self.my_box).unsqueeze(0)
+                                                rad, ang, box).unsqueeze(0)
                                                 )
                                             )
 

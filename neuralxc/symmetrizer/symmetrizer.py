@@ -218,6 +218,7 @@ class CasimirSymmetrizer(BaseSymmetrizer):
 class TotalCasimirSymmetrizer(CasimirSymmetrizer):
 
     _registry_name = 'total_casimir'
+    _unit_test = False 
 
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
