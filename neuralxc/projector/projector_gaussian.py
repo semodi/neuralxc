@@ -20,6 +20,7 @@ GAMMA = np.array([1/2,3/4,15/8,105/16,945/32,10395/64,135135/128])*np.sqrt(np.pi
 class GaussianProjector(DefaultProjector):
 
     _registry_name = 'gaussian'
+    _unit_test = False
 
     def __init__(self, unitcell, grid, basis_instructions, **kwargs):
 
@@ -91,77 +92,37 @@ class GaussianProjector(DefaultProjector):
                     dictionary containing the coefficients
             '''
 
-        timer.start('master')
-        timer.start('project')
-        start = time.time()
         for i in range(1):
             coeff = []
             r_o_max = np.max([np.max(b['r_o']) for b in basis_instructions])
-            timer.start('box')
             box = self.box_around(pos, r_o_max)
-            rho_small = rho[box['mesh']]
+            rho_small = rho[[box['mesh'][i] for i in range(3)]]
             box['radial'] = np.stack(box['radial'])
             if isinstance(self.V_cell, np.ndarray) == 1:
                 box['mesh'] = np.stack(box['mesh'][0:1])
             else:
                 box['mesh'] = np.stack(box['mesh'])
 
-            timer.stop('box')
             for ib, basis in enumerate(basis_instructions):
                 l = basis['l']
                 r_o_max = np.max(basis['r_o'])
-                timer.start('apply_filt')
                 filt = (box['radial'][0] <= r_o_max)
                 box_rad = box['radial'][:,filt]
                 box_m = box['mesh'][:,filt]
-                timer.stop('apply_filt')
-                timer.start('ang')
                 ang = self.angulars_real(l, *box_rad[1:]) # shape (m, x, y, z)
-                timer.stop('ang')
-                timer.start('rad')
                 rad = np.stack(self.radials(box_rad[0], [basis])[0]) # shape (n, x, y, z)
-                timer.stop('rad')
                 if isinstance(self.V_cell,np.ndarray):
                     V_cell = self.V_cell[box_m[0]]
                 else:
                     V_cell = self.V_cell
                 rad *= V_cell
-                timer.start('int')
                 if rho.ndim == 1:
-                    c = np.einsum('i,mi,ni -> nm', rho[box_m[0]], ang, rad, optimize=True)
+                    c = np.einsum('i,mi,ni -> nm', rho[box_m[0]], ang, rad)
                 else:
-                    # c = np.einsum('ijk,mijk,nijk -> nm',rho[box_m[0],box_m[1],box_m[2]], ang, rad, optimize=True)
-                    c = np.einsum('i,mi,ni -> nm', rho_small[filt], ang, rad, optimize=True)
-                timer.stop('int')
+                    c = np.einsum('i,mi,ni -> nm', rho_small[filt], ang, rad)
                 coeff += c.flatten().tolist()
 
         end = time.time()
-        print('TIMING: {}s'.format(end-start))
-        timer.stop('project')
-        timer.stop('master')
-        timer.create_report('report.times')
-        # start = time.time()
-        # for i in range(10):
-        #     coeff = []
-        #     for ib, basis in enumerate(basis_instructions):
-        #         l = basis['l']
-        #         for alpha, r_o in zip(basis['alpha'],basis['r_o']):
-        #             box = self.box_around(pos, r_o)
-        #             ang = self.angulars_real(l, *box['radial'][1:]) # shape (m, x, y, z)
-        #             rad = np.stack(self.radials(box['radial'][0], {'alpha':alpha,'r_o':r_o,'l':l})[0]) # shape (n, x, y, z)
-        #             if isinstance(self.V_cell,np.ndarray):
-        #                 V_cell = self.V_cell[box['mesh'][0]]
-        #             else:
-        #                 V_cell = self.V_cell
-        #             rad *= V_cell
-        #             if rho.ndim == 1:
-        #                 c = np.einsum('i,mi,ni -> nm', rho[box['mesh'][0]], ang, rad, optimize=True)
-        #             else:
-        #                 c = np.einsum('ijk,mijk,nijk -> nm',rho[box['mesh']], ang, rad, optimize=True)
-        #             coeff += c.flatten().tolist()
-        #
-        # end = time.time()
-        print('TIMING: {}s'.format(end-start))
         mol = gto.M(atom='O 0 0 0',
                     basis={'O': gtobasis.parse(basis_string)})
 
@@ -198,7 +159,7 @@ class GaussianProjector(DefaultProjector):
 class RadialGaussianProjector(GaussianProjector):
 
     _registry_name = 'gaussian_radial'
-
+    _unit_test = False
 
     def __init__(self, basis_instructions, grid_coords, grid_weights, **kwargs):
         self.grid_coords = grid_coords
@@ -221,11 +182,15 @@ def parse_basis(basis_instructions):
             basis_strings[species] = open(basis_instructions[species]['basis'],'r').read()
             bas = gtobasis.parse(basis_strings[species])
             sigma = basis_instructions[species].get('sigma',2.0)
-            basis = []
+            basis = {}
             for b in bas:
                 l = b[0]
+                if l not in basis:
+                    basis[l] = {'alpha':[],'r_o':[]}
                 alpha = np.array(b[1:])[:,0]
                 r_o = alpha**(-1/2)*sigma*(1+l/5)
-                basis.append({'l':l,'alpha':alpha,'r_o':r_o})
+                basis[l]['alpha'].append(alpha)
+                basis[l]['r_o'].append(r_o)
+            basis = [{'l': l,'alpha':basis[l]['alpha'],'r_o':basis[l]['r_o']} for l in basis]
             full_basis[species] = basis
     return full_basis, basis_strings

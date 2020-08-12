@@ -99,14 +99,15 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
     def forward_basis(self, positions, unitcell, grid, my_box):
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
-        box = self.box_around(positions, basis['r_o'], my_box)
-        return self.get_basis_on_mesh(box, basis, self.W[self.species])
+        box, mesh = self.box_around(positions, basis['r_o'], my_box)
+        rad, ang  =  self.get_basis_on_mesh(box, basis, self.W[self.species])
+        return rad, ang, mesh
 
 
     def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, my_box):
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
-        Xm, Ym, Zm = self.mesh_around(positions, basis['r_o'], my_box)
+        Xm, Ym, Zm = my_box.long()
         return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, int(basis['l']))
 
 
@@ -122,8 +123,8 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
                 basis_rep[spec] = []
 
             self.species = spec
-            rad, ang = self.forward_basis(pos, unitcell, grid, my_box)
-            projection = self.forward_fast(rho,pos,unitcell, grid, rad, ang, my_box)
+            rad, ang, mesh = self.forward_basis(pos, unitcell, grid, my_box)
+            projection = self.forward_fast(rho,pos,unitcell, grid, rad, ang, mesh)
             basis_rep[spec].append(projection.view(1, -1))
 
         for spec in basis_rep:
@@ -159,10 +160,6 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
 
     def project_onto(self, rho, rads, angs, n_l):
 
-        #zero_pad_angs (so that it can be converted to numpy array):
-        # n_rad = rads.shape[0]
-        # n_l = angs.shape[0]
-        # rads = rads * self.V_cell
         rho = rho * self.V_cell
         if rho.ndim == 1:
             coeff_array = torch.einsum('lmi,ni,i -> nlm', angs, rads, rho)
@@ -181,7 +178,6 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         n_l = basis['l']
         r_o = basis['r_o']
         R, Theta, Phi = box['radial']
-        # Xm, Ym, Zm = box['mesh']
 
         #Build angular part of basis functions
         angs = []
@@ -203,86 +199,6 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         return rads, angs_padded
 
 
-    def project(self, rho, box, basis, W=None, return_dict=False, angs=None):
-        '''
-        Project the real space density rho onto a set of basis functions
-
-        Parameters
-        ----------
-            rho: np.ndarray
-                electron charge density on grid
-            box: dict
-                 contains the mesh in spherical and euclidean coordinates,
-                 can be obtained with get_box_around()
-            n_rad: int
-                 number of radial functions
-            n_l: int
-                 number of spherical harmonics
-            r_o: float
-                 outer radial cutoff in Angstrom
-            W: np.ndarray
-                 matrix used to orthonormalize radial basis functions
-
-        Returns
-        --------
-            dict
-                dictionary containing the coefficients
-        '''
-
-        n_rad = basis['n']
-        n_l = basis['l']
-        r_o = basis['r_o']
-        R, Theta, Phi = box['radial']
-        Xm, Ym, Zm = box['mesh']
-
-        #Build angular part of basis functions
-        angs = []
-        for l in range(n_l):
-            angs.append([])
-            ang_l = self.angulars_real(l, Theta, Phi)
-            for m in range(-l, l + 1):
-                angs[l].append(ang_l[l + m])
-
-        rads = self.radials(R, basis, W)
-
-
-        srho = rho[Xm.long(), Ym.long(), Zm.long()]
-
-        #zero_pad_angs (so that it can be converted to numpy array):
-        zeropad = torch.zeros_like(R)
-        angs_padded = []
-        for l in range(n_l):
-            angs_padded.append(torch.stack([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l)))
-
-        angs_padded = torch.stack(angs_padded)
-        rads = rads * self.V_cell
-        coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs_padded, rads, srho)
-        coeff = []
-
-        #remove zero padding from m
-        for n in range(n_rad):
-            for l in range(n_l):
-                for m in range(2 * n_l + 1):
-                    if abs(m - n_l) <= l:
-                        coeff.append(coeff_array[n, l, m])
-
-        return torch.stack(coeff).view(1, -1)
-
-    def mesh_around(self, pos, radius, my_box):
-        pos = pos.view(-1)
-        #Create box with max. distance = radius
-        rmax = torch.ceil(radius / self.a) + 2
-        cm = torch.round(self.U_inv.mv(pos))
-        # my_box -= my_box[:,0].unsqueeze(1)
-        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, my_box = my_box,cm =cm, scaled=False, rmax=rmax, indexing='ij')
-        #Find mesh pos.
-        cm = shift(cm, self.grid)
-        cm -= my_box[:,0]
-        Xm = torch.fmod((Xm + cm[0]), self.grid[0])
-        Ym = torch.fmod((Ym + cm[1]), self.grid[1])
-        Zm = torch.fmod((Zm + cm[2]), self.grid[2])
-
-        return Xm.long(), Ym.long(), Zm.long()
 
     def box_around(self, pos, radius, my_box):
         '''
@@ -306,31 +222,31 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         dr = pos - self.U.mv(cm)
         #Create box with max. distance = radius
         rmax = torch.ceil(radius / self.a) + 2
-
         # my_box = my_box - cm.view(3,1)
 
-        Xm, Ym, Zm = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=False, rmax=rmax, indexing='ij')
-        X, Y, Z = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=True, rmax=rmax, indexing='ij')
+        Xm = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=False, rmax=rmax, indexing='ij')
+        X = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=True, rmax=rmax, indexing='ij')
+
+        Xs = X - dr.view(-1,1,1,1)
+
+        cms = shift(cm, self.grid)
+        cms -= my_box[:,0]
+        Xm = torch.fmod((Xm + cms.view(-1,1,1,1)), self.grid.view(-1,1,1,1))
 
 
-        Xs = X - dr[0]
-        Ys = Y - dr[1]
-        Zs = Z - dr[2]
+        R = torch.norm(Xs, dim=0)
 
-        #TODO: this could probably be done in 1d and moved to mesh_3d
-        Xm = torch.fmod((Xm + cm[0]), self.grid[0])
-        Ym = torch.fmod((Ym + cm[1]), self.grid[1])
-        Zm = torch.fmod((Zm + cm[2]), self.grid[2])
+        co = (R <= radius)
+        R = R[co]
+        Xs = Xs[:, co]
+        Xm = Xm[:, co]
 
-
-        R = torch.sqrt(Xs**2 + Ys**2 + Zs**2)
-
-        Phi = torch.atan2(Ys, Xs)
-        Theta = torch.acos(Zs/ R)
+        Phi = torch.atan2(Xs[1], Xs[0])
+        Theta = torch.acos(Xs[2]/ R)
         Theta[R < 1e-15] = 0
-        return {'mesh': [Xm, Ym, Zm], 'real': [Xs, Ys, Zs], 'radial': [R, Theta, Phi]}
+        return {'radial': [R, Theta, Phi], 'co': co}, Xm
 
-    def mesh_3d(self, U, a, rmax, my_box, cm, scaled=False, indexing='xy'):
+    def mesh_3d(self, U, a, rmax, my_box, cm, scaled=False, indexing='xy', both=False):
         """
         Returns a 3d mesh taking into account periodic boundary conditions
 
@@ -363,7 +279,6 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         y_pbc = y_pbc[(y_pbc >= -rmax[1]) & (y_pbc <= rmax[1])]
         z_pbc = torch.arange(-1000, 1000, dtype=torch.float64)
         z_pbc = z_pbc[(z_pbc >= -rmax[2]) & (z_pbc <= rmax[2])]
-
         x_pbc_shifted = x_pbc + cm[0]
         y_pbc_shifted = y_pbc + cm[1]
         z_pbc_shifted = z_pbc + cm[2]
@@ -386,19 +301,15 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
 
         Xm, Ym, Zm = torch.meshgrid([x_pbc, y_pbc, z_pbc])
 
-        Rm = torch.cat([Xm.view(*Xm.shape, 1),
-                        Ym.view(*Xm.shape, 1),
-                        Zm.view(*Xm.shape, 1)], dim=3).double()
+        Rm = torch.stack([Xm,
+                        Ym,
+                        Zm]).double()
 
         if scaled:
-            R = torch.einsum('ij,klmj -> iklm', U, Rm)
-            X = R[0, :, :, :]
-            Y = R[1, :, :, :]
-            Z = R[2, :, :, :]
-            return X, Y, Z
+            R = torch.einsum('ij,jklm -> iklm', U, Rm)
+            return R
         else:
-            return Xm.double(), Ym.double(), Zm.double()
-
+            return Rm
 
 class OrthoProjectorTorch(DefaultProjectorTorch, OrthoProjector):
 

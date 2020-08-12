@@ -95,9 +95,9 @@ def test_siesta_density_getter():
 
 @pytest.mark.fast
 @pytest.mark.project
-@pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch']\
-    and not 'radial' in name])
+@pytest.mark.parametrize('projector_type',[name for name,cl in \
+    xc.projector.projector.BaseProjector.get_registry().items() if not name in ['default','base','pyscf','default_torch']\
+    and not 'radial' in name and cl._unit_test])
 def test_density_projector(projector_type):
 
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
@@ -126,9 +126,9 @@ def test_density_projector(projector_type):
 @pytest.mark.fast
 @pytest.mark.radial
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
-@pytest.mark.parametrize('projector_type',[name for name in \
-    xc.projector.projector.BaseProjector.get_registry() if not name in ['default','base','pyscf','default_torch','ortho_torch']\
-    and 'radial' in name])
+@pytest.mark.parametrize('projector_type',[name for name,cl in \
+    xc.projector.projector.BaseProjector.get_registry().items() if not name in ['default','base','pyscf','default_torch','ortho_torch']\
+    and 'radial' in name and cl._unit_test])
 def test_radial_projector(projector_type):
     from pyscf import gto, dft
     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
@@ -160,8 +160,9 @@ def test_radial_projector(projector_type):
         assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch','mixed_casimir_torch']])
+@pytest.mark.parametrize("symmetrizer_type",[name for name,cl in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry().items() if not name in ['default','base','casimir_torch','mixed_casimir_torch']
+    and cl._unit_test])
 def test_symmetrizer(symmetrizer_type):
     with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
         C = pickle.load(file)
@@ -194,9 +195,9 @@ def test_symmetrizer(symmetrizer_type):
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']\
-    and not 'torch' in name])
+@pytest.mark.parametrize("symmetrizer_type",[name for name,cl in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry().items() if not name in ['default','base']\
+    and not 'torch' in name and cl._unit_test])
 def test_symmetrizer_rot_invariance(symmetrizer_type):
     C_list = []
     for i in range(3):
@@ -218,9 +219,9 @@ def test_symmetrizer_rot_invariance(symmetrizer_type):
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base']\
-    and not 'torch' in name])
+@pytest.mark.parametrize("symmetrizer_type",[name for name, cl in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry().items() if not name in ['default','base']\
+    and not 'torch' in name and cl._unit_test])
 def test_symmetrizer_rot_invariance_synthetic(symmetrizer_type):
     with open(os.path.join(test_dir, 'rotated_synthetic.pckl'), 'rb') as file:
         C_list = pickle.load(file)

@@ -46,28 +46,28 @@ save_grouped_transformer = False
 #     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/MB-pol/model')
 #     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp.nxc.jit')
 
-@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
-@pytest.mark.skipif(not torch_found, reason='requires pyscf')
-def test_radial_comp():
-    from pyscf import gto, dft
-    mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
-    mf = dft.RKS(mol)
-    mf.xc = 'PBE'
-    mf.grids.level = 5
-    mf.kernel()
-
-    model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/model')
-    model._pipeline.basis_instructions.update({'projector_type':'ortho_radial'})
-    xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp_rad.nxc.jit'), override=True)
-
-    model = xc.neuralxc.NeuralXCJIT(os.path.join(test_dir,'mbp_rad.nxc.jit'))
-
-    rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
-    model.initialize(unitcell=mf.grids.coords, grid=mf.grids.weights,
-        positions=np.array([[0,0,0],[0,1,0],[0,0,1]])/Bohr, species=['O','H','H'])
-
-    res = model.get_V(rho)
-    assert np.allclose(res[0],np.load(test_dir + '/rad_energy.npy'))
+# @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
+# @pytest.mark.skipif(not torch_found, reason='requires pyscf')
+# def test_radial_comp():
+#     from pyscf import gto, dft
+#     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
+#     mf = dft.RKS(mol)
+#     mf.xc = 'PBE'
+#     mf.grids.level = 5
+#     mf.kernel()
+#
+#     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/model')
+#     model._pipeline.basis_instructions.update({'projector_type':'ortho_radial'})
+#     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp_rad.nxc.jit'), override=True)
+#
+#     model = xc.neuralxc.NeuralXCJIT(os.path.join(test_dir,'mbp_rad.nxc.jit'))
+#
+#     rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
+#     model.initialize(unitcell=mf.grids.coords, grid=mf.grids.weights,
+#         positions=np.array([[0,0,0],[0,1,0],[0,0,1]])/Bohr, species=['O','H','H'])
+#
+#     res = model.get_V(rho)
+#     assert np.allclose(res[0],np.load(test_dir + '/rad_energy.npy'))
 
 @pytest.mark.skipif(not torch_found, reason='requires pytorch')
 @pytest.mark.mybox
@@ -120,11 +120,11 @@ def test_mybox():
                     my_box = my_box.astype(int)
                     rho_jit = torch.from_numpy(rho[my_box[0,0]:my_box[0,1],my_box[1,0]:my_box[1,1],my_box[2,0]:my_box[2,1]]).double()
                     my_box = torch.from_numpy(my_box).double()
-                    rad, ang = basis_models[spec](pos, unitcell, grid, my_box)
+                    rad, ang, box= basis_models[spec](pos, unitcell, grid, my_box)
                     rsize = rad.size()
-                    if not rsize[-1]*rsize[-2]*rsize[-3]: continue
+                    if not rsize[-1]: continue
                     c_jit += projector_models[spec](rho_jit,
-                        pos, unitcell, grid,  rad, ang, my_box).detach().numpy()
+                        pos, unitcell, grid,  rad, ang, box).detach().numpy()
         c_np = C[spec].pop(0)
         assert np.allclose(c_jit, c_np)
 

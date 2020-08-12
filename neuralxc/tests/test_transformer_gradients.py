@@ -26,9 +26,9 @@ test_dir = os.path.dirname(os.path.abspath(__file__))
 
 @pytest.mark.fast
 @pytest.mark.symmetrizer_gradient
-@pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base', 'casimir_torch']\
-    and not 'mixed' in name])
+@pytest.mark.parametrize("symmetrizer_type",[name for name, cl in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry().items() if not name in ['default','base', 'casimir_torch']\
+    and not 'mixed' in name and cl._unit_test ])
 def test_symmetrizer_gradient(symmetrizer_type):
     """ Synthetic test to see if symmetrizer gradient respects chain rule of
         differentiation
@@ -86,9 +86,9 @@ def test_symmetrizer_gradient(symmetrizer_type):
 @pytest.mark.pipeline
 @pytest.mark.pipeline_gradient
 @pytest.mark.parametrize('random_seed', [41, 42])
-@pytest.mark.parametrize("symmetrizer_type",[name for name in \
-    xc.symmetrizer.BaseSymmetrizer.get_registry() if not name in ['default','base','casimir_torch']\
-    and not 'mixed' in name])
+@pytest.mark.parametrize("symmetrizer_type",[name for name, cl in \
+    xc.symmetrizer.BaseSymmetrizer.get_registry().items() if not name in ['default','base','casimir_torch']\
+    and not 'mixed' in name and cl._unit_test])
 def test_pipeline_gradient(random_seed, symmetrizer_type):
     # data = pickle.load(open(os.path.join(test_dir, 'ml_data.pckl'), 'rb'))
     data = np.load(os.path.join(test_dir, 'ml_data.npy')).real

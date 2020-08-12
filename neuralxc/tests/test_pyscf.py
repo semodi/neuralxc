@@ -33,6 +33,7 @@ def shcopytree(src, dest):
 
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
+@pytest.mark.project
 def test_radial_model():
     from pyscf import gto, dft
     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
