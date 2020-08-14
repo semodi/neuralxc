@@ -77,7 +77,7 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         """
         rho = torch.from_numpy(rho)
         positions = torch.from_numpy(positions)
-        species = torch.Tensor([getattr(periodictable,s).number for s in species])
+        # species = torch.Tensor([getattr(periodictable, s).number for s in species])
         my_box = torch.Tensor([[0, self.grid[i]] for i in range(3)])
         C = self.forward(rho, positions, species, self.unitcell, self.grid, my_box)
         return {spec: C[spec].detach().numpy() for spec in C}
@@ -116,7 +116,7 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
 
         self.set_cell_parameters(unitcell, grid)
         basis_rep = {}
-        species = [str(element_dict[int(s.detach().numpy())]) for s in species]
+        # species = [str(element_dict[int(s.detach().numpy())]) for s in species]
 
         for pos, spec in zip(positions, species):
             if not spec in basis_rep:
@@ -156,21 +156,17 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         res = []
         for m in range(-l,l+1):
             res.append(geom.SH(l,m,theta,phi))
-        return torch.stack(res)
+        return res
 
     def project_onto(self, rho, rads, angs, n_l):
 
         rho = rho * self.V_cell
         if rho.ndim == 1:
-            coeff_array = torch.einsum('lmi,ni,i -> nlm', angs, rads, rho)
+            coeff_array = torch.einsum('li,ni,i -> nl', angs, rads, rho)
         else:
             coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs, rads, rho)
 
-        indexing = torch.ones(coeff_array.size()[1:])
-        indexing = (torch.tril(indexing, diagonal = n_l) * torch.flip(torch.tril(indexing, diagonal = n_l), (1,))).bool()
-        coeff = coeff_array[:, indexing]
-
-        return coeff.view(-1)
+        return coeff_array.view(-1)
 
     def get_basis_on_mesh(self, box, basis, W):
 
@@ -182,21 +178,12 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
         #Build angular part of basis functions
         angs = []
         for l in range(n_l):
-            angs.append([])
-            ang_l = self.angulars_real(l, Theta, Phi)
-            for m in range(-l, l + 1):
-                angs[l].append(ang_l[l + m])
+            angs += self.angulars_real(l, Theta, Phi)
 
-        zeropad = torch.zeros_like(R)
-        angs_padded = []
-        for l in range(n_l):
-            angs_padded.append(torch.stack([zeropad] * (n_l - l) + angs[l] + [zeropad] * (n_l - l)))
-
-        angs_padded = torch.stack(angs_padded)
-
+        angs = torch.stack(angs)
         rads = self.radials(R, basis, W)
 
-        return rads, angs_padded
+        return rads, angs
 
 
 
@@ -267,10 +254,6 @@ class DefaultProjectorTorch(TorchModule, BaseProjector) :
             defines mesh.
         """
 
-
-        # x_pbc = torch.arange(-rmax[0], rmax[0] + 1, dtype=torch.float64)
-        # y_pbc = torch.arange(-rmax[1], rmax[1] + 1, dtype=torch.float64)
-        # z_pbc = torch.arange(-rmax[2], rmax[2] + 1, dtype=torch.float64)
 
         # Does the same as above but does not complain if unitcell.requires_gradient
         x_pbc = torch.arange(-1000, 1000, dtype=torch.float64)

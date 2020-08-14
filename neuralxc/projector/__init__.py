@@ -8,3 +8,7 @@ try:
     from . import projector_gaussian
 except ModuleNotFoundError:
     pass
+try:
+    from . import gaussian_torch
+except ModuleNotFoundError:
+    pass

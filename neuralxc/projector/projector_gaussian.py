@@ -17,6 +17,7 @@ from .projector import OrthoProjector, DefaultProjector,BaseProjector, RadialPro
 import neuralxc
 
 GAMMA = np.array([1/2,3/4,15/8,105/16,945/32,10395/64,135135/128])*np.sqrt(np.pi)
+
 class GaussianProjector(DefaultProjector):
 
     _registry_name = 'gaussian'
@@ -125,7 +126,6 @@ class GaussianProjector(DefaultProjector):
         end = time.time()
         mol = gto.M(atom='O 0 0 0',
                     basis={'O': gtobasis.parse(basis_string)})
-
         bp = neuralxc.pyscf.BasisPadder(mol)
         coeff = bp.pad_basis(np.array(coeff))['O']
         return np.array(coeff).reshape(1, -1), None
