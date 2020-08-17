@@ -356,8 +356,11 @@ def get_basis_grid(preprocessor):
 
 
 def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
+    if isinstance(preprocessor, str):
+        pre = json.loads(open(preprocessor, 'r').read())
+    else:
+        pre = preprocessor
     inp = json.loads(open(inputfile, 'r').read())
-    pre = json.loads(open(preprocessor, 'r').read())
 
     datafile = h5py.File(hdf5[0], 'r')
 

@@ -718,14 +718,19 @@ def fit_driver(preprocessor,
 
     inp = json.loads(open(inputfile, 'r').read())
     pre = json.loads(open(preprocessor, 'r').read())
+    basis_key = basis_to_hash(pre['preprocessor'])
+    if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
+        and pre['preprocessor'].get('spec_agnostic',False):
+            pre['preprocessor'].update(get_real_basis(None, pre['preprocessor']['X']['basis'], True))
 
+    print(pre['preprocessor'])
     apply_to = []
     for pidx, path in enumerate(hdf5[1]):
         if path[0] == '*':
             apply_to.append(pidx)
             hdf5[1][pidx] = path[1:]
 
-    grid_cv = get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=pre['preprocessor'].get('spec_agnostic', False))
+    grid_cv = get_grid_cv(hdf5, pre, inputfile, spec_agnostic=pre['preprocessor'].get('spec_agnostic', False))
 
     new_model = grid_cv.estimator
     param_grid = grid_cv.param_grid
@@ -739,7 +744,6 @@ def fit_driver(preprocessor,
             new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
 
     datafile = h5py.File(hdf5[0], 'r')
-    basis_key = basis_to_hash(pre['preprocessor'])
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
 
     if model:
