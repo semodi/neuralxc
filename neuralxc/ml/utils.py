@@ -186,9 +186,15 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         provide a energy value to subtract from the targets.
         If None tries to find this value as an attribute inside datafile
     """
+    no_energy = False
+    if baseline + '/energy' in datafile:
+        data_base = datafile[baseline + '/energy']
+        data_ref = datafile[reference + '/energy']
+    else:
+        data_base = np.array([0])
+        data_ref = np.array([0])
+        no_energy = True
 
-    data_base = datafile[baseline + '/energy']
-    data_ref = datafile[reference + '/energy']
     if E0 == None:
         E0_base = find_attr_in_tree(datafile, baseline, 'E0')
         E0_ref = find_attr_in_tree(datafile, reference, 'E0')
@@ -210,6 +216,13 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     # tar = data_ref[:] - E0_ref
     tar = tar.real
 
+    if basis_key == '':
+        data_base = np.zeros([len(tar), 0])
+    else:
+        data_base = datafile[baseline + '/density/' + basis_key][:, :]
+    if no_energy:
+        tar = np.zeros(len(data_base))
+
     if percentile_cutoff > 0:
         lim1 = np.percentile(tar, percentile_cutoff * 100)
         lim2 = np.percentile(tar, (1 - percentile_cutoff) * 100)
@@ -217,10 +230,7 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         filter = (tar > min_lim) & (tar < max_lim)
     else:
         filter = [True] * len(tar)
-    if basis_key == '':
-        data_base = np.zeros([len(tar), 0])
-    else:
-        data_base = datafile[baseline + '/density/' + basis_key][:, :]
+
     data_base = data_base[filter]
     tar = tar[filter]
     # feat = {}

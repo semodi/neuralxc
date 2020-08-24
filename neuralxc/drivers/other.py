@@ -50,7 +50,7 @@ def plot_basis(basis):
         if not len(spec) == 1: continue
         basis = projector.basis[spec]
         if isinstance(basis, list):
-            r = np.linspace(0, np.max(basis[0]['r_o']), 500)
+            r = np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500)
         else:
             r = np.linspace(0, np.max(basis['r_o']), 500)
         W = projector.get_W(basis)
@@ -63,7 +63,7 @@ def plot_basis(basis):
                     plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
                 else:
                     plt.plot(r, rl, color='C{}'.format(l))
-
+        # plt.ylim(0,1)
         plt.legend()
         plt.show()
 
@@ -80,7 +80,7 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
         symbols =  np.array(['O'])
     else:
         symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()]))
-        
+
     if is_file:
         basis ={s: parsed_basis for s in symbols}
     atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]

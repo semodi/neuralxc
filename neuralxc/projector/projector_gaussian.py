@@ -132,11 +132,16 @@ class GaussianProjector(DefaultProjector):
 
 
     @classmethod
-    def g(cls, r, r_o, alpha, l):
-        fc = 1-(.5*(1-np.cos(np.pi*r/r_o)))**8
-        N = (2*alpha)**(l/2+3/4)*np.sqrt(2)/np.sqrt(GAMMA[l])
-        f = r**l*np.exp(-alpha*r**2)*fc*N
-        f[r>r_o] = 0
+    def g(cls, r, r_o, alpha, l, coeff=[1]):
+        fc = 1-(.5*(1-np.cos(np.pi*r/np.max(r_o))))**8
+        f = np.zeros_like(r)
+        N = 0
+        for a, c in zip(alpha, coeff):
+            N += (2*a)**(l/2+3/4)*np.sqrt(2)/np.sqrt(GAMMA[l])
+            f += np.exp(-a*r**2)*c
+
+        f *= (r**l*fc*N)
+        f[r>np.max(r_o)] = 0
         return f
 
     @classmethod
@@ -150,10 +155,10 @@ class GaussianProjector(DefaultProjector):
             for b in basis:
                 res = []
                 for ib, alpha in enumerate(b['alpha']):
-                    res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l']))
+                    res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l'],b['coeff'][ib]))
                 result.append(res)
         elif isinstance(basis, dict):
-                result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'])])
+                result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'], b['coeff'])])
         return result
 
 class RadialGaussianProjector(GaussianProjector):
@@ -181,16 +186,20 @@ def parse_basis(basis_instructions):
         if len(species) < 3:
             basis_strings[species] = open(basis_instructions[species]['basis'],'r').read()
             bas = gtobasis.parse(basis_strings[species])
+            mol = gto.M(atom='O 0 0 0', basis = {'O':bas})
             sigma = basis_instructions[species].get('sigma',2.0)
             basis = {}
-            for b in bas:
-                l = b[0]
+            for bi in range(mol.atom_nshells(0)):
+                l = mol.bas_angular(bi)
                 if l not in basis:
-                    basis[l] = {'alpha':[],'r_o':[]}
-                alpha = np.array(b[1:])[:,0]
+                    basis[l] = {'alpha':[],'r_o':[],'coeff':[]}
+                # alpha = np.array(b[1:])[:,0]
+                alpha = mol.bas_exp(bi)
+                coeff = mol.bas_ctr_coeff(bi)
                 r_o = alpha**(-1/2)*sigma*(1+l/5)
                 basis[l]['alpha'].append(alpha)
                 basis[l]['r_o'].append(r_o)
-            basis = [{'l': l,'alpha':basis[l]['alpha'],'r_o':basis[l]['r_o']} for l in basis]
+                basis[l]['coeff'].append(coeff)
+            basis = [{'l': l,'alpha': basis[l]['alpha'],'r_o': basis[l]['r_o'],'coeff':basis[l]['coeff']} for l in basis]
             full_basis[species] = basis
     return full_basis, basis_strings
