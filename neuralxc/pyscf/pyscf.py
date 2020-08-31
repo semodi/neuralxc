@@ -18,7 +18,7 @@ from spher_grad import grlylm
 from ..base import ABCRegistry
 from numba import jit
 from ..timer import timer
-from ..projector import DefaultProjector, BaseProjector
+from ..projector import BaseProjector
 import neuralxc
 import os
 

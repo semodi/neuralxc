@@ -40,35 +40,6 @@ save_siesta_density_getter = False
 save_test_symmetrizer = False
 save_grouped_transformer = False
 
-# @pytest.mark.torchmbp
-# def test_compile_mbpolmodel():
-#
-#     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/MB-pol/model')
-#     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp.nxc.jit')
-
-# @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
-# @pytest.mark.skipif(not torch_found, reason='requires pyscf')
-# def test_radial_comp():
-#     from pyscf import gto, dft
-#     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
-#     mf = dft.RKS(mol)
-#     mf.xc = 'PBE'
-#     mf.grids.level = 5
-#     mf.kernel()
-#
-#     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/model')
-#     model._pipeline.basis_instructions.update({'projector_type':'ortho_radial'})
-#     xc.ml.network.compile_model(model, os.path.join(test_dir, 'mbp_rad.nxc.jit'), override=True)
-#
-#     model = xc.neuralxc.NeuralXCJIT(os.path.join(test_dir,'mbp_rad.nxc.jit'))
-#
-#     rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
-#     model.initialize(unitcell=mf.grids.coords, grid=mf.grids.weights,
-#         positions=np.array([[0,0,0],[0,1,0],[0,0,1]])/Bohr, species=['O','H','H'])
-#
-#     res = model.get_V(rho)
-#     assert np.allclose(res[0],np.load(test_dir + '/rad_energy.npy'))
-
 @pytest.mark.skipif(not torch_found, reason='requires pytorch')
 @pytest.mark.mybox
 def test_mybox():

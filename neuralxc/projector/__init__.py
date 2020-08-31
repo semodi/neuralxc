@@ -1,14 +1,7 @@
-from .projector import DensityProjector,BehlerProjector, NonOrthoProjector, DeltaProjector, DefaultProjector, BaseProjector, M_make_complex
+# from .projector import DensityProjector,BehlerProjector, NonOrthoProjector, DeltaProjector, DefaultProjector, BaseProjector, M_make_complex
+from .projector import DensityProjector, EuclideanProjector, BaseProjector, RadialProjector
+from .polynomial import OrthoProjector, OrthoRadialProjector
+from .gaussian import GaussianProjector, RadialGaussianProjector
 from . import projector
-try:
-    from . import projector_torch
-except ModuleNotFoundError:
-    pass
-try:
-    from . import projector_gaussian
-except ModuleNotFoundError:
-    pass
-try:
-    from . import gaussian_torch
-except ModuleNotFoundError:
-    pass
+from . import polynomial
+from . import gaussian

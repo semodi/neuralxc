@@ -9,7 +9,7 @@ and all other relevant classes
 import numpy as np
 from .ml.network import load_pipeline
 from .ml.network import NetworkEstimator
-from .projector import DensityProjector, DeltaProjector
+from .projector import DensityProjector
 from .symmetrizer import symmetrizer_factory
 from .utils.visualize import plot_density_cut
 from .constants import Rydberg, Bohr, Hartree
@@ -138,7 +138,7 @@ class SiestaNXC(NXCAdapter):
                 use_drho = True
                 print('NeuralXC: Using DRHO')
                 rho_reshaped = rho.reshape(*grid[::-1]).T
-                self._adaptee.projector = DeltaProjector(self._adaptee.projector)
+                # self._adaptee.projector = DeltaProjector(self._adaptee.projector)
                 self._adaptee.projector.set_constant_density(rho_reshaped, positions, elements)
             else:
                 print('NeuralXC: Using RHOXC')

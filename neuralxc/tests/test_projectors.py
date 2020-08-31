@@ -24,15 +24,78 @@ try:
     torch_found =True
 except ModuleNotFoundError:
     torch_found = False
-# try:
-#     import pyscf
-#     pyscf_found = True
-# except ModuleNotFoundError:
-#     pyscf_found = False
-pyscf_found = False
+try:
+    import pyscf
+    pyscf_found = True
+except ModuleNotFoundError:
+    pyscf_found = False
 #
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
+save_test_density_projector = False
+save_test_radial_projector = False
+
+@pytest.mark.fast
+@pytest.mark.project
+@pytest.mark.parametrize('projector_type',['ortho'])
+def test_density_projector(projector_type):
+
+    density_getter = xc.utils.SiestaDensityGetter(binary=True)
+    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
+
+    basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}, 'projector_type': projector_type}
+
+    density_projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_set)
+
+    positions = np.array([[0.0, 0.0, 0.0], [-0.75846035, -0.59257417, 0.0], [0.75846035, -0.59257417, 0.0]
+                          ]) / xc.constants.Bohr
+
+    basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
+
+    if 'ortho' in projector_type:
+        if save_test_density_projector:
+            with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'wb') as file:
+                pickle.dump(basis_rep, file)
+        else:
+            with open(os.path.join(test_dir, 'h2o_rep.pckl'), 'rb') as file:
+                basis_rep_ref = pickle.load(file)
+
+            for spec in basis_rep:
+                assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
+
+@pytest.mark.fast
+@pytest.mark.radial
+@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
+@pytest.mark.parametrize('projector_type',['ortho_radial'])
+def test_radial_projector(projector_type):
+    from pyscf import gto, dft
+    mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
+    mf = dft.RKS(mol)
+    mf.xc = 'PBE'
+    mf.grids.level = 5
+    mf.kernel()
+
+    rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
+
+    basis_set = {'O': {'n': 2, 'l': 3, 'r_o': 1}, 'H': {'n': 2, 'l': 2, 'r_o': 1.5}, 'projector_type': projector_type}
+
+    density_projector = xc.projector.DensityProjector(grid_coords=mf.grids.coords,
+        grid_weights=mf.grids.weights, basis_instructions=basis_set)
+
+    positions = np.array([[0.0, 0.0, 0.0], [0, 1, 0.0], [0, 0, 1]
+                          ]) / xc.constants.Bohr
+
+    basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['O', 'H', 'H'])
+
+    if projector_type in ['ortho_radial']:
+        if save_test_radial_projector:
+            with open(os.path.join(test_dir, 'h2o_rad.pckl'), 'wb') as file:
+                pickle.dump(basis_rep, file)
+    with open(os.path.join(test_dir, 'h2o_rad.pckl'), 'rb') as file:
+        basis_rep_ref = pickle.load(file)
+
+    for spec in basis_rep:
+        assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.gaussian
 def test_radial_gaussian():
@@ -68,8 +131,7 @@ def test_radial_gaussian():
     assert np.allclose(np.linalg.norm(coeff_analytical['X']), np.linalg.norm(coeff_grid['X']))
 
 @pytest.mark.gaussian
-@pytest.mark.parametrize('torch',['','_torch'])
-def test_gaussian_projector(torch):
+def test_gaussian_projector(torch=''):
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
 
@@ -100,7 +162,7 @@ def test_gaussian_compiled():
 
     basis_instructions = {"application":"siesta",
                             "spec_agnostic": True,
-                            "projector_type": "gaussian_torch",
+                            "projector_type": "gaussian",
                             "X": {
                                     "basis": os.path.join(test_dir, "basis-test"),
                                     "sigma": 2
@@ -127,14 +189,3 @@ def test_gaussian_compiled():
         ref = pickle.load(file)
     for spec in basis_rep:
         assert np.allclose(basis_rep[spec], ref[spec])
-
-
-
-
-    #
-    # basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['X', 'X', 'X'])
-    #
-    # with open(os.path.join(test_dir, 'h2o_gaussian_rep.pckl'), 'rb') as file:
-    #     ref = pickle.load(file)
-    # for spec in basis_rep:
-    #     assert np.allclose(basis_rep[spec], ref[spec])

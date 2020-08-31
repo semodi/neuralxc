@@ -1,7 +1,7 @@
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from ..utils.density_getter import density_getter_factory
-from ..projector import DensityProjector, BehlerProjector, NonOrthoProjector
+from ..projector import DensityProjector
 from ..formatter import atomic_shape, system_shape
 from dask import delayed
 from ase.io import read
