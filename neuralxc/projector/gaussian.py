@@ -1,14 +1,14 @@
-from abc import ABC, abstractmethod
 import numpy as np
-from scipy.special import sph_harm
-import scipy.linalg
-from sympy import N
 from functools import reduce
 import time
 import math
+from ..base import ABCRegistry
 from ..timer import timer
 import neuralxc.config as config
 from ..utils import geom
+from periodictable import elements as element_dict
+import periodictable
+import neuralxc.config as config
 import pyscf.gto.basis as gtobasis
 import pyscf.gto as gto
 import torch
@@ -33,7 +33,6 @@ def parse_basis(basis_instructions):
                 l = mol.bas_angular(bi)
                 if l not in basis:
                     basis[l] = {'alpha':[],'r_o':[],'coeff':[]}
-                # alpha = np.array(b[1:])[:,0]
                 alpha = mol.bas_exp(bi)
                 coeff = mol.bas_ctr_coeff(bi)
                 r_o = alpha**(-1/2)*sigma*(1+l/5)

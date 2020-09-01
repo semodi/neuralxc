@@ -1,17 +1,12 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from scipy.special import sph_harm
-import scipy.linalg
-from sympy import N
 from functools import reduce
 import time
 import math
-from spher_grad import grlylm
 from ..base import ABCRegistry
-from numba import jit
 from ..timer import timer
 import neuralxc.config as config
-from ..utils import geom_torch as geom
+from ..utils import geom
 from periodictable import elements as element_dict
 import periodictable
 import torch

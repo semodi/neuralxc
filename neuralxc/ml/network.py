@@ -264,10 +264,10 @@ def compile_model(model, outpath, override = False):
              return self.projector.forward_fast(rho, positions, unitcell, grid, radials, angulars, my_box)
 
     model._pipeline.to_torch()
-    model._pipeline.basis_instructions['projector_type'] = \
-        model._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
-    model._pipeline.symmetrize_instructions['symmetrizer_type'] = \
-        model._pipeline.symmetrize_instructions.get('symmetrizer_type','casimir') + '_torch'
+    # model._pipeline.basis_instructions['projector_type'] = \
+        # model._pipeline.basis_instructions.get('projector_type','ortho') + '_torch'
+    # model._pipeline.symmetrize_instructions['symmetrizer_type'] = \
+        # model._pipeline.symmetrize_instructions.get('symmetrizer_type','casimir') + '_torch'
 
 
     unitcell_c = np.eye(3)*5.0

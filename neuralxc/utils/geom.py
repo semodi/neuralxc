@@ -2,12 +2,12 @@
 # Spherical harmonics utility functions
 import numpy as np
 import math
-from numba import jit
-
+# from numba import jit
+import torch
 # @jit(nopython=True)
 def associated_legendre_polynomial(l, m, x, pmm, pll):
     if m > 0:
-        somx2 = np.sqrt((1 - x) * (1 + x))
+        somx2 = torch.sqrt((1 - x) * (1 + x))
         fact = 1.0
         for i in range(1, m + 1):
             pmm = pmm * (-fact) * somx2
@@ -30,13 +30,13 @@ def SH_renormalization(l, m):
 
 # @jit
 def SH(l, m, theta, phi):
-    pmm = np.ones_like(theta)
-    pll = np.zeros_like(theta)
+    pmm = torch.ones_like(theta)
+    pll = torch.zeros_like(theta)
     if m == 0:
-        return SH_renormalization(l, m) * associated_legendre_polynomial(l, m, np.cos(theta), pmm, pll)
+        return SH_renormalization(l, m) * associated_legendre_polynomial(l, m, torch.cos(theta), pmm, pll)
     elif m > 0:
         return math.sqrt(2.0) * SH_renormalization(l, m) * \
-            np.cos(m * phi) * associated_legendre_polynomial(l, m, np.cos(theta), pmm, pll)
+            torch.cos(m * phi) * associated_legendre_polynomial(l, m, torch.cos(theta), pmm, pll)
     else:
         return math.sqrt(2.0) * SH_renormalization(l, -m) * \
-            np.sin(-m * phi) * associated_legendre_polynomial(l, -m, np.cos(theta), pmm, pll)
+            torch.sin(-m * phi) * associated_legendre_polynomial(l, -m, torch.cos(theta), pmm, pll)

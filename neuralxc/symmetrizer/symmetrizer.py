@@ -7,13 +7,8 @@ from sympy import N
 import numpy as np
 from ..formatter import expand
 from ..base import ABCRegistry
-try:
-    import torch
-    TorchModule = torch.nn.Module
-except ModuleNotFoundError:
-    class TorchModule:
-         def __init__(self):
-             pass
+import torch
+TorchModule = torch.nn.Module
 
 def convert_torch_wrapper(func):
 
@@ -50,7 +45,7 @@ def Symmetrizer(symmetrize_instructions):
     return registry[symtype](sym_ins)
 
 
-class BaseSymmetrizer(BaseEstimator, TransformerMixin, metaclass=SymmetrizerRegistry):
+class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=SymmetrizerRegistry):
 
     _registry_name = 'base'
 
@@ -62,8 +57,12 @@ class BaseSymmetrizer(BaseEstimator, TransformerMixin, metaclass=SymmetrizerRegi
             Attributes needed to symmetrize input (such as angular momentum etc.)
         """
 
+        TorchModule.__init__(self)
         self._attrs = symmetrize_instructions
         self._cgs = 0
+
+    def forward(self, C):
+        return BaseSymmetrizer.get_symmetrized(self, C)
 
     @abstractmethod
     def _symmetrize_function(c, n_l, n, *args):
@@ -114,57 +113,22 @@ class BaseSymmetrizer(BaseEstimator, TransformerMixin, metaclass=SymmetrizerRegi
         else:
             return results
 
-    def get_gradient(self, dEdD, C=None):
-        """Uses chain rule to obtain dE/dC from dE/dD (unsymmetrized from symmetrized)
 
-        Parameters
-        ------------------
-        dEdD : dict of np.ndarrays or list of dict of np.ndarrays
-        	dE/dD
-
-        C : dict of np.ndarrays or list of dict of np.ndarrays
-        	C
-
-        Returns
-        -------------
-        dEdC: dict of np.ndarrays
-        """
-        if C == None:
-            C = self.C
-
-        basis = self._attrs['basis']
-
-        results = [{}] * len(C)
-
-        for idx, key, data in expand(dEdD, C):
-            results[idx][key] = self._gradient_function(*data, basis[key]['l'], basis[key]['n'])
-        if not isinstance(C, list):
-            self.C = None
-            return results[0]
-        else:
-            self.C = None
-            return results
-
-class CasimirSymmetrizerTorch(TorchModule, BaseSymmetrizer):
+class CasimirSymmetrizerTorch(BaseSymmetrizer):
 
     _registry_name = 'casimir'
 
     def __init__(self, *args, **kwargs):
 
         BaseSymmetrizer.__init__(self, *args, **kwargs)
-        TorchModule.__init__(self)
-
-    def forward(self, C):
-        self._symmetrize_function = self._symmetrize_function_bare
-        return BaseSymmetrizer.get_symmetrized(self, C)
 
     def get_symmetrized(self, C):
-        self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function_bare)
+        self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function)
         return BaseSymmetrizer.get_symmetrized(self, C)
 
 
     @staticmethod
-    def _symmetrize_function_bare(c, n_l, n, *args):
+    def _symmetrize_function(c, n_l, n, *args):
         """ Returns the casimir invariants of the tensors stored in c
 
         Parameters:
@@ -199,28 +163,21 @@ class CasimirSymmetrizerTorch(TorchModule, BaseSymmetrizer):
 
         return casimirs.view(*c_shape[:-1], -1)
 
-    _symmetrize_function = _symmetrize_function_bare
 
-
-class MixedCasimirSymmetrizer(TorchModule, BaseSymmetrizer):
+class MixedCasimirSymmetrizer(BaseSymmetrizer):
 
     _registry_name = 'mixed_casimir'
 
 
     def __init__(self, *args, **kwargs):
         BaseSymmetrizer.__init__(self, *args, **kwargs)
-        TorchModule.__init__(self)
-
-    def forward(self, C):
-        self._symmetrize_function = self._symmetrize_function_bare
-        return BaseSymmetrizer.get_symmetrized(self, C)
 
     def get_symmetrized(self, C):
-        self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function_bare)
+        self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function)
         return BaseSymmetrizer.get_symmetrized(self, C)
 
     @staticmethod
-    def _symmetrize_function_bare(c, n_l, n, *args):
+    def _symmetrize_function(c, n_l, n, *args):
         """ Returns the casimir invariants with mixed radial channels
         of the tensors stored in c
 
