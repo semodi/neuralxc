@@ -1,11 +1,10 @@
 from ..formatter import expand, atomic_shape, system_shape
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator
 from neuralxc.symmetrizer import symmetrizer_factory
 from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
@@ -20,28 +19,28 @@ from sklearn.linear_model import LinearRegression
 import h5py
 
 
-def opt_E0(file, baselines, references):
-
-    e_base = [file[data + '/energy'][:] for data in baselines]
-    species = [find_attr_in_tree(file, data, 'species') for data in baselines]
-    e_ref = [file[data + '/energy'][:] for data in references]
-    species2 = [find_attr_in_tree(file, data, 'species') for data in references]
-    for s, s2 in zip(species, species2):
-        assert s == s2
-
-    allspecies = np.unique([s for s in ''.join(species)])
-    X = np.zeros([len(baselines), len(allspecies)])
-    y = np.zeros(len(baselines))
-    for sysidx, sys in enumerate(species):
-        for sidx, spec in enumerate(allspecies):
-            X[sysidx, sidx] = sys.count(spec)
-        y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
-    lr = LinearRegression(fit_intercept=True)
-    lr.fit(X, y)
-    E0 = {}
-    for spec, coeff in zip(allspecies, lr.coef_):
-        E0[spec] = -coeff
-    return E0
+# def opt_E0(file, baselines, references):
+#
+#     e_base = [file[data + '/energy'][:] for data in baselines]
+#     species = [find_attr_in_tree(file, data, 'species') for data in baselines]
+#     e_ref = [file[data + '/energy'][:] for data in references]
+#     species2 = [find_attr_in_tree(file, data, 'species') for data in references]
+#     for s, s2 in zip(species, species2):
+#         assert s == s2
+#
+#     allspecies = np.unique([s for s in ''.join(species)])
+#     X = np.zeros([len(baselines), len(allspecies)])
+#     y = np.zeros(len(baselines))
+#     for sysidx, sys in enumerate(species):
+#         for sidx, spec in enumerate(allspecies):
+#             X[sysidx, sidx] = sys.count(spec)
+#         y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
+#     lr = LinearRegression(fit_intercept=True)
+#     lr.fit(X, y)
+#     E0 = {}
+#     for spec, coeff in zip(allspecies, lr.coef_):
+#         E0[spec] = -coeff
+#     return E0
 
 
 def E_from_atoms(traj):
@@ -233,31 +232,6 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
 
     data_base = data_base[filter]
     tar = tar[filter]
-    # feat = {}
-    # all_species = find_attr_in_tree(datafile, baseline, 'species')
-    # all_species = [c for c in all_species]
-    # unique_species = np.unique(all_species)
-    # attrs = {}
-
-    # for spec in unique_species:
-    # attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
-    # for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
-
-    # if grouped:
-    #     for spec in unique_species:
-    #         feat[spec] = []
-    #
-    #     current_loc = 0
-    #     for spec in all_species:
-    #         len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
-    #         feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
-    #         current_loc += len_descr
-    #
-    #     for spec in unique_species:
-    #         feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
-    #
-    #     return feat, tar, attrs, ''.join(all_species)
-    # else:
     return data_base, tar
 
 
@@ -305,8 +279,6 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
 
     pipeline_list.append(('scaler', GroupedStandardScaler()))
 
-    pca = GroupedPCA(n_components=pca_threshold, svd_solver='full')
-    pipeline_list.append(('pca', pca))
 
     pipeline_list.append(('estimator', estimator))
 
@@ -316,53 +288,6 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
     return NXCPipeline(pipeline_list,
                        basis_instructions=basis_instructions,
                        symmetrize_instructions=symmetrizer_instructions)
-
-
-def get_basis_grid(preprocessor):
-    """ Give a file containing several basis sets return a grid
-    of basis sets that can be used for hyperparameter optimization
-    """
-
-    basis = preprocessor['preprocessor']
-
-    from collections import abc
-
-    def nested_dict_iter(nested):
-        for key, value in nested.items():
-            if isinstance(value, abc.Mapping):
-                yield from nested_dict_iter(value)
-            else:
-                yield key, value
-
-    def nested_dict_build(nested, i):
-        select_dict = {}
-        for key, value in nested.items():
-            if isinstance(value, abc.Mapping):
-                select_dict[key] = nested_dict_build(value, i)
-            else:
-                if isinstance(value, list):
-                    select_dict[key] = value[i]
-                else:
-                    select_dict[key] = value
-        return select_dict
-
-    max_len = 0
-
-    dict_mask = {}
-    #Check for consistency and build dict mask
-    for key, value in nested_dict_iter(basis):
-        if isinstance(value, list):
-            new_len = len(value)
-            if new_len != max_len and max_len != 0:
-                raise ValueError('Inconsistent list lengths in basis sets')
-            else:
-                max_len = new_len
-
-    max_len = max(max_len, 1)
-    basis_grid = [nested_dict_build(basis, i) for i in range(max_len)]
-    basis_grid = {'preprocessor__basis_instructions': basis_grid}
-
-    return basis_grid
 
 
 def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):

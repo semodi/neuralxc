@@ -73,9 +73,7 @@ def test_formatter():
 
 @pytest.mark.fast
 @pytest.mark.parametrize(['transformer', 'filepath'],
-                         [[xc.ml.transformer.GroupedPCA(n_components=2),
-                           os.path.join(test_dir, 'pca1.pckl')],
-                          [xc.ml.transformer.GroupedStandardScaler(),
+                         [  [xc.ml.transformer.GroupedStandardScaler(),
                            os.path.join(test_dir, 'scaler.pckl')],
                           [xc.ml.transformer.GroupedVarianceThreshold(0.005),
                            os.path.join(test_dir, 'var09.pckl')]])
@@ -86,13 +84,8 @@ def test_grouped_transformers(transformer, filepath):
             C = pickle.load(file)
 
         transformer.fit(C)
-        # transformed_no_torch = transformer.transform(C)
-        # if use_torch:
-            # transformer.to_torch()
         transformed = transformer.transform(C)
 
-        # for spec in transformed:
-        #     assert np.allclose(transformed[spec], transformed_no_torch[spec])
         if save_grouped_transformer:
             with open(filepath, 'wb') as file:
                 pickle.dump(transformed, file)
@@ -121,7 +114,7 @@ def test_species_grouper():
 @pytest.mark.realspace
 def test_neuralxc_benzene():
 
-    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+    benzene_nxc = xc.NeuralXCJIT(os.path.join(test_dir, 'benzene_test', 'benzene.jit'))
     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
@@ -132,11 +125,6 @@ def test_neuralxc_benzene():
     V, forces = benzene_nxc.get_V(rho, calc_forces=True)[1]
     V = V / Hartree
     forces = forces / Hartree * Bohr
-    if torch_found:
-        benzene_nxc._pipeline.steps[-1][1].to_torch()
-        assert benzene_nxc._pipeline.steps[-1][1].is_torch
-        V_torch, forces_torch = benzene_nxc.get_V(rho, calc_forces=True)[1]
-        V_torch = V_torch / Hartree
-        forces_torch = forces_torch / Hartree * Bohr
-        assert np.allclose(V_torch, V)
-        assert np.allclose(forces_torch, forces)
+
+    assert np.allclose(V,np.load(os.path.join(test_dir, 'benzene_test', 'V_benzene.npy')))
+    assert np.allclose(forces[:-3],np.load(os.path.join(test_dir, 'benzene_test', 'forces_benzene.npy'))[:-3])

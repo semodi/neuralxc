@@ -145,41 +145,41 @@ def test_stress():
     print('Exact ' ,np.diag(stress))
     assert np.allclose(stress_diag,np.diag(stress))
 
-@pytest.mark.skipif(not torch_found, reason='requires pytorch')
-@pytest.mark.benzene_compiled
-def test_benzene_compiled():
-
-    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
-    xc.ml.network.compile_model(benzene_nxc, 'benzene.nxc.jit',
-        override=True)
-    benzene_nxc = xc.neuralxc.NeuralXCJIT('benzene.nxc.jit')
-
-    benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
-    density_getter = xc.utils.SiestaDensityGetter(binary=True)
-    rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
-
-    with torch.jit.optimized_execution(should_optimize=True):
-        a = np.linalg.norm(unitcell, axis=1) / grid[:3]
-        positions = benzene_traj.get_positions() / Bohr
-        positions_scaled = positions.dot(np.linalg.inv(unitcell))
-        species = benzene_traj.get_chemical_symbols()
-        start = time()
-        benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
-        V_comp = benzene_nxc.get_V(rho, calc_forces=True)
-        forces_comp = V_comp[1][1][:-3]
-        V_comp = V_comp[0], V_comp[1][0]
-        end = time()
-
-        time_torch = end - start
-
-    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
-    start = time()
-    benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
-    V_np = benzene_nxc.get_V(rho, calc_forces=True)
-    forces_np = V_np[1][1][:-3]
-    V_np = V_np[0], V_np[1][0]
-    end = time()
-    time_classical = end - start
-    assert np.allclose(V_np[0], V_comp[0])
-    assert np.allclose(V_np[1], V_comp[1])
-    assert np.allclose(forces_np, forces_comp)
+# @pytest.mark.skipif(not torch_found, reason='requires pytorch')
+# @pytest.mark.benzene_compiled
+# def test_benzene_compiled():
+#
+#     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+#     xc.ml.network.compile_model(benzene_nxc, 'benzene.nxc.jit',
+#         override=True)
+#     benzene_nxc = xc.neuralxc.NeuralXCJIT('benzene.nxc.jit')
+#
+#     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
+#     density_getter = xc.utils.SiestaDensityGetter(binary=True)
+#     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))
+#
+#     with torch.jit.optimized_execution(should_optimize=True):
+#         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
+#         positions = benzene_traj.get_positions() / Bohr
+#         positions_scaled = positions.dot(np.linalg.inv(unitcell))
+#         species = benzene_traj.get_chemical_symbols()
+#         start = time()
+#         benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+#         V_comp = benzene_nxc.get_V(rho, calc_forces=True)
+#         forces_comp = V_comp[1][1][:-3]
+#         V_comp = V_comp[0], V_comp[1][0]
+#         end = time()
+#
+#         time_torch = end - start
+#
+#     benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene'))
+#     start = time()
+#     benzene_nxc.initialize(unitcell=unitcell, grid=grid, positions=positions, species=species)
+#     V_np = benzene_nxc.get_V(rho, calc_forces=True)
+#     forces_np = V_np[1][1][:-3]
+#     V_np = V_np[0], V_np[1][0]
+#     end = time()
+#     time_classical = end - start
+#     assert np.allclose(V_np[0], V_comp[0])
+#     assert np.allclose(V_np[1], V_comp[1])
+#     assert np.allclose(forces_np, forces_comp)

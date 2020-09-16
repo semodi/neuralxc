@@ -28,18 +28,20 @@ def parse_basis(basis_instructions):
             bas = gtobasis.parse(basis_strings[species])
             mol = gto.M(atom='O 0 0 0', basis = {'O':bas})
             sigma = basis_instructions[species].get('sigma',2.0)
+            gamma = basis_instructions[species].get('gamma',1.0)
             basis = {}
             for bi in range(mol.atom_nshells(0)):
                 l = mol.bas_angular(bi)
                 if l not in basis:
-                    basis[l] = {'alpha':[],'r_o':[],'coeff':[]}
+                    basis[l] = {'alpha':[],'r_o':[],'coeff':[],'gamma':[]}
                 alpha = mol.bas_exp(bi)
                 coeff = mol.bas_ctr_coeff(bi)
                 r_o = alpha**(-1/2)*sigma*(1+l/5)
                 basis[l]['alpha'].append(alpha)
                 basis[l]['r_o'].append(r_o)
+                basis[l]['gamma'].append(gamma)
                 basis[l]['coeff'].append(coeff)
-            basis = [{'l': l,'alpha': basis[l]['alpha'],'r_o': basis[l]['r_o'],'coeff':basis[l]['coeff']} for l in basis]
+            basis = [{'l': l,'alpha': basis[l]['alpha'],'r_o': basis[l]['r_o'],'gamma': basis[l]['gamma'],'coeff':basis[l]['coeff']} for l in basis]
             full_basis[species] = basis
     return full_basis, basis_strings
 
@@ -184,8 +186,6 @@ class GaussianProjector(EuclideanProjector):
         coeff = torch.cat(coeff)
 
         sym = 'O'
-        print(bp.indexing_l[sym][0])
-        print(bp.indexing_r[sym][0])
         indexing_r = torch.from_numpy(np.array(bp.indexing_r[sym][0])).long()
         indexing_l = torch.from_numpy(np.array(bp.indexing_l[sym][0])).bool()
         coeff = coeff[indexing_r]
@@ -197,11 +197,11 @@ class GaussianProjector(EuclideanProjector):
 
 
     @classmethod
-    def g(cls, r, r_o, alpha, l):
-        fc = 1-(.5*(1-torch.cos(np.pi*r/r_o[0])))**8
+    def g(cls, r, r_o, alpha, l, gamma):
+        fc = 1-(.5*(1-torch.cos(np.pi*(r/gamma)/r_o[0])))**8
         N = (2*alpha[0])**(l/2+3/4)*np.sqrt(2)/np.sqrt(GAMMA[l])
-        f = r**l*torch.exp(-alpha[0]*r**2)*fc*N
-        f[r>r_o[0]] = 0
+        f = (r/gamma)**l*torch.exp(-alpha[0]*(r/gamma)**2)*fc*N
+        f[(r/gamma)>r_o[0]] = 0
         return f
 
     @classmethod
@@ -215,10 +215,10 @@ class GaussianProjector(EuclideanProjector):
             for b in basis:
                 res = []
                 for ib, alpha in enumerate(b['alpha']):
-                    res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l']))
+                    res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l'], b['gamma'][ib]))
                 result.append(res)
         elif isinstance(basis, dict):
-                result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'])])
+                result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'],basis['gamma'])])
         return result
 
 

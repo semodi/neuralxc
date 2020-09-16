@@ -13,9 +13,15 @@ TorchModule = torch.nn.Module
 def convert_torch_wrapper(func):
 
     def wrapped_func(X, *args, **kwargs):
-        X = torch.from_numpy(X)
+        made_tensor = False
+        if isinstance(X, np.ndarray):
+            X = torch.from_numpy(X)
+            made_tensor = True
         Y = func(X, *args, **kwargs)
-        return Y.detach().numpy()
+        if made_tensor:
+            return Y.detach().numpy()
+        else:
+            return Y
 
     return wrapped_func
 
@@ -114,7 +120,7 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
             return results
 
 
-class CasimirSymmetrizerTorch(BaseSymmetrizer):
+class CasimirSymmetrizer(BaseSymmetrizer):
 
     _registry_name = 'casimir'
 

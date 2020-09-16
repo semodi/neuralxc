@@ -8,7 +8,6 @@ where the outer list runs over independent systems.
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from ..formatter import atomic_shape, system_shape
 from abc import ABC, abstractmethod
@@ -19,9 +18,15 @@ TorchModule = torch.nn.Module
 def convert_torch_wrapper(func):
     # print('Wrapped function')
     def wrapped_func(X, *args, **kwargs):
-        X = torch.from_numpy(X)
+        made_tensor = False
+        if isinstance(X, np.ndarray):
+            X = torch.from_numpy(X)
+            made_tensor = True
         Y = func(X, *args, **kwargs)
-        return Y.detach().numpy()
+        if made_tensor:
+            return Y.detach().numpy()
+        else:
+            return Y
 
     return wrapped_func
 
@@ -41,12 +46,16 @@ class GroupedTransformer(ABC):
         super().__init__(*args, **kwargs)
 
     def transform(self, X, y=None, **fit_params):
+        if not hasattr(self, 'is_wrapped'):
+            self.is_wrapped = False
         if fit_params.get('wrap_torch', True) and hasattr(self, '_spec_dict'):
             for spec in self._spec_dict:
                 trafo = self._spec_dict[spec]
-                if not self._spec_dict[spec].is_wrapped:
-                    trafo.torch_transform = convert_torch_wrapper(trafo.torch_transform)
-                    self._spec_dict[spec].is_wrapped = True
+        #         if not hasattr(self._spec_dict[spec], 'is_wrapped'):
+        #             self._spec_dict[spec].is_wrapped = False
+        #         if not self._spec_dict[spec].is_wrapped:
+                trafo.torch_transform = convert_torch_wrapper(trafo.torch_transform)
+        #             self._spec_dict[spec].is_wrapped = True
         was_tuple = False
         if isinstance(X, tuple):
             y = X[1]
@@ -140,54 +149,6 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModul
             X = X.view(-1,X_shape[-1])
         support = torch.from_numpy(self.get_support()).bool()
         return X[:, support]
-
-class GroupedPCA(GroupedTransformer, PCA, TorchModule):
-    def __init__(self,
-                 n_components=None,
-                 copy=True,
-                 whiten=False,
-                 svd_solver='auto',
-                 tol=0.0,
-                 iterated_power='auto',
-                 random_state=None):
-        """ GroupedTransformer version of sklearn principal component analysis.
-            See their documentation for more information
-        """
-
-        TorchModule.__init__(self)
-        self.n_components = n_components
-        self.copy = copy
-        self.whiten = whiten
-        self.svd_solver = svd_solver
-        self.tol = tol
-        self.iterated_power = iterated_power
-        self.random_state = random_state
-
-        self._before_fit = StandardScaler().fit_transform
-        self._initargs = []
-        super().__init__(**self.get_kwargs())
-
-    def get_kwargs(self):
-        return dict(n_components=self.n_components,
-                    copy=self.copy,
-                    whiten=self.whiten,
-                    svd_solver=self.svd_solver,
-                    tol=self.tol,
-                    iterated_power=self.iterated_power,
-                    random_state=self.random_state)
-
-    def fit(self, *args, **kwargs):
-        if self.n_components == 1:
-            return self
-        else:
-            return super().fit(*args, **kwargs)
-
-    def torch_transform(self, X):
-        if self.n_components == 1:
-            return X
-        else:
-            return torch.matmul(X,torch.from_numpy(self.components_).T)
-
 
 class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
     def __init__(self, threshold=0.0):

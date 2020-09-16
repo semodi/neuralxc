@@ -16,7 +16,9 @@ try:
 except ModuleNotFoundError:
     PYSCF_FOUND = False
 from . import config
-from .neuralxc import NeuralXC, SiestaNXC, get_nxc_adapter, get_V
+from .neuralxc import NeuralXC, get_nxc_adapter
+from .neuralxc import NeuralXC as NeuralXCJIT
+
 from . import pyscf
 from . import projector
 from . import utils

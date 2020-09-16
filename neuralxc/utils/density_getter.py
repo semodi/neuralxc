@@ -8,12 +8,15 @@ from ..base import ABCRegistry
 import re
 try:
     from pyscf.scf.chkfile import load_scf
-    from ..pyscf.pyscf import get_dm
     from pyscf import dft
     pyscf_found = True
 except ModuleNotFoundError:
     pyscf_found = False
 
+
+def get_dm(mo_coeff, mo_occ):
+    """ Get density matrix"""
+    return np.einsum('ij,j,jk -> ik', mo_coeff, mo_occ, mo_coeff.T)
 
 class DensityGetterRegistry(ABCRegistry):
     REGISTRY = {}

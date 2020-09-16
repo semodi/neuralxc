@@ -1,5 +1,6 @@
 try:
-    from .pyscf import BasisPadder, get_eri3c, get_coeff, RKS
+    from .pyscf import RKS
+    from ..projector.pyscf import BasisPadder
 except ModuleNotFoundError:
     print('PySCF not found')
     pass
