@@ -127,26 +127,20 @@ def parse_sets_input(path):
     return hdf5
 
 def compile(in_path, jit_path, as_radial):
-    success = False
-    while(not success):
-        model = xc.NeuralXC(in_path)
-        projector_type = model._pipeline.get_basis_instructions().get('projector_type', 'ortho')
-        if as_radial:
-            if not 'radial' in projector_type:
-                projector_type += '_radial'
-                model._pipeline.basis_instructions.update({'projector_type': projector_type})
-        else:
-            if projector_type[-len('_radial'):] == '_radial':
-                projector_type = projector_type[:-len('_radial')]
-                model._pipeline.basis_instructions.update({'projector_type': projector_type})
-        try:
-            xc.ml.network.compile_model(model, jit_path, override=True)
-            if model._pipeline.get_basis_instructions().get('spec_agnostic','False'):
-                with open(jit_path + '/AGN','w') as file:
-                    file.write('# This model is species agnostic')
-            success = True
-        except:
-            pass
+    model = xc.ml.network.load_pipeline(in_path)
+    projector_type = model.get_basis_instructions().get('projector_type', 'ortho')
+    if as_radial:
+        if not 'radial' in projector_type:
+            projector_type += '_radial'
+            model.basis_instructions.update({'projector_type': projector_type})
+    else:
+        if projector_type[-len('_radial'):] == '_radial':
+            projector_type = projector_type[:-len('_radial')]
+            model.basis_instructions.update({'projector_type': projector_type})
+    xc.ml.network.compile_model(model, jit_path, override=True)
+    # if model.get_basis_instructions().get('spec_agnostic','False'):
+    #     with open(jit_path + '/AGN','w') as file:
+    #         file.write('# This model is species agnostic')
 
 
     if os.path.exists('.tmp.np'):

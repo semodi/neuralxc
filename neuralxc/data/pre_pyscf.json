@@ -7,5 +7,6 @@
 },
 "n_workers" : 1,
 "engine_kwargs": {"xc": "PBE",
-                  "basis" : "sto-3g"}
+                  "basis" : "3-21g"}
+
 }

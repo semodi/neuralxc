@@ -41,7 +41,7 @@ def test_radial_model():
     mf.grids.level = 5
     mf.kernel()
 
-    model = xc.NeuralXCJIT(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/nxc_w01_radial.jit')
+    model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/nxc_w01_radial.jit')
     rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
 
     model.initialize(unitcell = mf.grids.coords, grid = mf.grids.weights,
@@ -60,13 +60,13 @@ def test_adiabatic():
     os.chdir(test_dir + '/driver_data_tmp')
 
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
-    adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2)
+    adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2, b_decay=1)
     os.chdir(test_dir + '/driver_data_tmp')
-    engine = Engine('pyscf', nxc='it0/best_model')
+    engine = Engine('pyscf', nxc='testing/nxc.jit')
     engine.compute(read('benzene_small.traj', '0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
-if __name__ == '__main__':
-    test_iterative()
+if __name__=='__main__':
+    test_adiabatic()

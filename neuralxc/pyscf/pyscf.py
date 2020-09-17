@@ -34,7 +34,7 @@ def RKS(mol, nxc='', nxc_type='pyscf', **kwargs):
     """
     mf = dft.RKS(mol, **kwargs)
     if not nxc is '':
-        model = neuralxc.get_nxc_adapter(nxc_type, nxc)
+        model = neuralxc.PySCFNXC(nxc)
         model.initialize(mol)
         mf.get_veff = veff_mod(mf, model)
     return mf

@@ -21,6 +21,8 @@ import dill as pickle
 import shutil
 import copy
 import torch
+from ..projector import DensityProjector
+from ..symmetrizer import Symmetrizer
 TorchModule = torch.nn.Module
 # import tensorflow
 
@@ -118,6 +120,42 @@ def load_pipeline(path):
         pickle.load(open(os.path.join(path, 'pipeline.pckl'), 'rb'))
     return NXCPipeline(steps, basis_instructions, symmetrize_instructions)
 
+
+def compile_energy(model, C, outpath, override):
+
+    class E_predictor(TorchModule):
+        def __init__(self, species, model):
+            TorchModule.__init__(self)
+            self.species = species
+            steps = [model.symmetrizer] + [step[1] for step in model.steps]
+            steps[-1] = steps[-1]._network
+            self.model = torch.nn.Sequential(*steps)
+
+        def forward(self, *args):
+             C = {spec : c for spec,c in zip(self.species, args)}
+             return self.model(C)
+
+    e_models = {}
+    with torch.jit.optimized_execution(should_optimize=True):
+        for spec in C:
+            c = torch.from_numpy(C[spec])
+            epred = E_predictor(spec, model)
+            e_models[spec] = torch.jit.trace(epred, c, optimize=True, check_trace = False)
+
+    try:
+        os.mkdir(outpath)
+    except FileExistsError:
+        if override:
+            shutil.rmtree(outpath)
+            os.mkdir(outpath)
+        else:
+            raise Exception('Model exists, set override = True to save at this location')
+
+    for spec in C:
+        torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
+        open(outpath + '/bas.json','w').write(json.dumps(model.basis_instructions))
+
+
 def compile_projector(projector):
 
     class ModuleBasis(TorchModule):
@@ -176,14 +214,13 @@ def compile_model(model, outpath, override = False):
         def __init__(self, species, model):
             TorchModule.__init__(self)
             self.species = species
-            self.model = model
+            steps = [model.symmetrizer] + [step[1] for step in model.steps]
+            steps[-1] = steps[-1]._network
+            self.model = torch.nn.Sequential(*steps)
 
         def forward(self, *args):
              C = {spec : c for spec,c in zip(self.species, args)}
-             x = self.model.symmetrizer(C)
-             for steps in self.model._pipeline.steps[:]:
-                 x = steps[1].forward(x)
-             return x
+             return self.model(C)
 
     class ModuleBasis(TorchModule):
         def __init__(self, projector):
@@ -203,7 +240,6 @@ def compile_model(model, outpath, override = False):
              # positions = torch.einsum('...i,ij->...j',positions, unitcell)
              return self.projector.forward_fast(rho, positions, unitcell, grid, radials, angulars, my_box)
 
-    model._pipeline.to_torch()
 
     unitcell_c = np.eye(3)*5.0
     grid_c = np.array([9,9,9])
@@ -214,15 +250,29 @@ def compile_model(model, outpath, override = False):
 
 
     species = []
-    for spec in model._pipeline.basis_instructions:
+    basis_instructions = model.basis_instructions
+    for spec in basis_instructions:
         if len(spec) < 3:
             species.append(spec)
 
+    model.symmetrize_instructions.update({'basis':model.basis_instructions})
+    model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
     try:
-        model.initialize(unitcell=unitcell_c, grid=grid_c, positions=pos_c, species=species)
+        projector = DensityProjector(basis_instructions=basis_instructions, unitcell=unitcell_c, grid=grid_c)
     except TypeError:
-        rho_c = np.array([1,2,3])
-        model.initialize(grid_coords=unitcell_c, grid_weights = grid_c)
+        try:
+            rho_c = np.array([1,2,3])
+            projector = DensityProjector(basis_instructions=basis_instructions, grid_coords=unitcell_c, grid_weights=grid_c)
+        except TypeError:
+            C = {}
+            for spec in species:
+                n = basis_instructions[spec]['n']
+                l = basis_instructions[spec]['l']
+                C[spec] = np.ones([1,n*l**2])
+            compile_energy(model, C, outpath,override)
+            return 0
+
+    model.projector = projector
 
     unitcell_c = torch.from_numpy(unitcell_c).double()
     grid_c = torch.from_numpy(grid_c).double()
@@ -383,12 +433,12 @@ class NetworkEstimator(BaseEstimator):
 
         return -np.mean(scores)
 
+    # def forward(self, X):
+    #     return self._network.forward(X)
+
     def load_network(self, path):
         self.path = path
 
-    def get_np_estimator(self):
-        W, B = self._network.get_weights()
-        return NumpyNetworkEstimator(W, B, self.activation)
 
 def train_net(net, dataloader, max_steps=10000, check_point_every=10, lr=1e-3, weight_decay = 1e-7):
     # net.train()

@@ -114,7 +114,7 @@ def test_species_grouper():
 @pytest.mark.realspace
 def test_neuralxc_benzene():
 
-    benzene_nxc = xc.NeuralXCJIT(os.path.join(test_dir, 'benzene_test', 'benzene.jit'))
+    benzene_nxc = xc.NeuralXC(os.path.join(test_dir, 'benzene_test', 'benzene.jit'))
     benzene_traj = ase.io.read(os.path.join(test_dir, 'benzene_test', 'benzene.xyz'), '0')
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'benzene_test', 'benzene.RHOXC'))

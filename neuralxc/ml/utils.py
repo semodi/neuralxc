@@ -19,30 +19,6 @@ from sklearn.linear_model import LinearRegression
 import h5py
 
 
-# def opt_E0(file, baselines, references):
-#
-#     e_base = [file[data + '/energy'][:] for data in baselines]
-#     species = [find_attr_in_tree(file, data, 'species') for data in baselines]
-#     e_ref = [file[data + '/energy'][:] for data in references]
-#     species2 = [find_attr_in_tree(file, data, 'species') for data in references]
-#     for s, s2 in zip(species, species2):
-#         assert s == s2
-#
-#     allspecies = np.unique([s for s in ''.join(species)])
-#     X = np.zeros([len(baselines), len(allspecies)])
-#     y = np.zeros(len(baselines))
-#     for sysidx, sys in enumerate(species):
-#         for sidx, spec in enumerate(allspecies):
-#             X[sysidx, sidx] = sys.count(spec)
-#         y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
-#     lr = LinearRegression(fit_intercept=True)
-#     lr.fit(X, y)
-#     E0 = {}
-#     for spec, coeff in zip(allspecies, lr.coef_):
-#         E0[spec] = -coeff
-#     return E0
-
-
 def E_from_atoms(traj):
 
     energies = {}
@@ -211,8 +187,6 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     print('E0 base', E0_base)
     print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
-    #    if baseline == reference:
-    # tar = data_ref[:] - E0_ref
     tar = tar.real
 
     if basis_key == '':
@@ -311,7 +285,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
         basis = pre['preprocessor']
     else:
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
-        basis.update({'extension': 'DRHO'})
+        basis.update({'extension': 'RHOXC'})
     pipeline = get_default_pipeline(basis, all_species, symmetrizer_type=pre.get('symmetrizer_type','casimir'),
         spec_agnostic=spec_agnostic)
 
@@ -328,27 +302,69 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
     n_workers = inp.get('n_workers', 1)
     n_jobs = inp.get('n_jobs', 1)
     n_threads = inp.get('threads_per_worker', 1)
-    verbose = inp.get('verbose', 10)
+    verbose = inp.get('verbose', 1)
 
     pipe = Pipeline([('ml', pipeline)])
-    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=4)
+    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=verbose)
     return grid_cv
 
 
+def get_basis_grid(preprocessor):
+    """ Give a file containing several basis sets return a grid
+    of basis sets that can be used for hyperparameter optimization
+    """
+
+    basis = preprocessor['preprocessor']
+
+    from collections import abc
+
+    def nested_dict_iter(nested):
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                yield from nested_dict_iter(value)
+            else:
+                yield key, value
+
+    def nested_dict_build(nested, i):
+        select_dict = {}
+        for key, value in nested.items():
+            if isinstance(value, abc.Mapping):
+                select_dict[key] = nested_dict_build(value, i)
+            else:
+                if isinstance(value, list):
+                    select_dict[key] = value[i]
+                else:
+                    select_dict[key] = value
+        return select_dict
+
+    max_len = 0
+
+    dict_mask = {}
+    #Check for consistency and build dict mask
+    for key, value in nested_dict_iter(basis):
+        if isinstance(value, list):
+            new_len = len(value)
+            if new_len != max_len and max_len != 0:
+                raise ValueError('Inconsistent list lengths in basis sets')
+            else:
+                max_len = new_len
+
+    max_len = max(max_len, 1)
+    basis_grid = [nested_dict_build(basis, i) for i in range(max_len)]
+    basis_grid = {'preprocessor__basis_instructions': basis_grid}
+
+    return basis_grid
+    
 def get_preprocessor(preprocessor, atoms, src_path):
     pre = json.loads(open(preprocessor, 'r').read())
-
     species = ''.join(atoms[0].get_chemical_symbols())
-
     for a in atoms:
         species2 = ''.join(a.get_chemical_symbols())
         if not species2 == species:
             print('Warning (in get_preprocessor): Dataset not homogeneous')
 
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
-
-    basis_grid = get_basis_grid(pre)
-
+    basis.update(pre['preprocessor'])
     preprocessor = Preprocessor(basis, src_path, atoms, num_workers=pre.get('n_workers', 1))
     return preprocessor
 

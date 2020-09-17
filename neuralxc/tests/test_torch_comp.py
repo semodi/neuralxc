@@ -16,18 +16,7 @@ import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
 import periodictable
 from time import time
-try:
-    import pyscf
-    pyscf_found = True
-except ModuleNotFoundError:
-    pyscf_found = False
-
-try:
-    import ase
-    ase_found = True
-except ModuleNotFoundError:
-    ase_found = False
-
+import ase
 import torch
 
 test_dir = os.path.dirname(os.path.abspath(__file__))

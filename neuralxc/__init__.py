@@ -7,17 +7,14 @@ Implementation of a machine learned density functional
 import warnings
 warnings.filterwarnings("ignore")
 PYSCF_FOUND = True
-try:
-    import torch
-except ModuleNotFoundError:
-    TORCH_FOUND = False
+import torch
 try:
     import pyscf
 except ModuleNotFoundError:
     PYSCF_FOUND = False
 from . import config
 from .neuralxc import NeuralXC, PySCFNXC
-from .neuralxc import NeuralXC as NeuralXCJIT
+# from .neuralxc import NeuralXC as NeuralXCJIT
 
 from . import pyscf
 from . import projector

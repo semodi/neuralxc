@@ -123,7 +123,7 @@ def merge_sets(file, datasets, density_key=None, new_name='merged', E0={}):
         densities = [file[data + '/density/' + density_key][:] for data in datasets]
 
         densities_full = np.zeros(
-            [sum([len(d) for d in densities]), sum([d.shape[1] for d in densities])], dtype='complex')
+            [sum([len(d) for d in densities]), sum([d.shape[1] for d in densities])])
         line_mark = 0
         col_mark = 0
         for d in densities:
@@ -182,27 +182,3 @@ def basis_to_hash(basis):
         Encoding of the basis set
     """
     return hashlib.md5(json.dumps(basis).encode()).hexdigest()
-
-
-# def find_unique_root(file, group, path = '/'):
-#
-#     all_roots = find_root(file, args.group).split('//')
-#     if len(all_roots) == 1:
-#         raise Exception('No group with name {} found'.format(args.group))
-#     if len(all_roots) > 2:
-#         raise Exception('Group name must be unique, but {}\
-#             matches found for {}'.format(len(all_roots)-1, args.group))
-#     root = '/' + all_roots[1]
-#     return root
-#
-# def find_root(file, group, path = '/'):
-#     try:
-#         matches = ''
-#         for key in file[path].keys():
-#             if group == key:
-#                 return path + '/' + key
-#             else:
-#                 matches += find_root(file,group, path + '/' + key)
-#         return matches
-#     except AttributeError:
-#         return ''

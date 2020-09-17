@@ -4,6 +4,11 @@ Implementation of a machine learned density functional
 Interfaces to pyblibnxc classes. Here for compatibility reasons
 """
 from pylibnxc import AtomicFunc
+from pylibnxc.adapters import Hartree
+from .projector import DensityProjector
+from glob import glob
+import os
+import json
 
 class PySCFNXC(AtomicFunc):
 
@@ -12,19 +17,9 @@ class PySCFNXC(AtomicFunc):
         for mp in model_paths:
             if 'bas.json' == os.path.basename(mp):
                 self.basis = json.loads(open(mp,'r').read())
-
+        super().__init__(path)
+        
     def initialize(self, mol):
-        """Parameters
-        ------------------
-        unitcell, array float
-        	Unitcell in bohr
-        grid, array float
-        	Grid points per unitcell
-        positions, array float
-        	atomic positions
-        species, list string
-        	atomic species (chem. symbols)
-        """
         self.projector = DensityProjector(basis_instructions=self.basis, mol=mol)
         self.projector.initialize(mol)
 

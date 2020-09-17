@@ -92,3 +92,15 @@ def test_data():
     sample_driver(preprocessor='pre.json', size=5, dest='sample.npy', hdf5=['data.hdf5', 'system/it0'])
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
+
+def test_compile():
+
+
+    os.chdir(test_dir)
+    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    cwd = os.getcwd()
+    os.chdir(test_dir + '/driver_data_tmp')
+
+    compile('model','model.jit', False)
+    os.chdir(cwd)
+    shutil.rmtree(test_dir + '/driver_data_tmp')

@@ -60,7 +60,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                 paddedoffset[key] = cnt
                 cnt += width[key]
 
-        padded_data = np.zeros([len(self.data), paddedwidth], dtype='complex')
+        padded_data = np.zeros([len(self.data), paddedwidth])
 
         for lidx, (dat, atoms) in enumerate(zip(self.data, self.atoms)):
             syskey = ''.join(self.get_chemical_symbols(atoms))
