@@ -16,7 +16,7 @@ try:
 except ModuleNotFoundError:
     PYSCF_FOUND = False
 from . import config
-from .neuralxc import NeuralXC, get_nxc_adapter
+from .neuralxc import NeuralXC, PySCFNXC
 from .neuralxc import NeuralXC as NeuralXCJIT
 
 from . import pyscf
@@ -28,10 +28,6 @@ from . import ml
 from . import base
 from . import datastructures
 from . import drivers
-# from . import formatter
-#from .projector import *
-#from .mlpipeline import *
-#from .symmetrizer import *
 
 # Handle versioneer
 from ._version import get_versions

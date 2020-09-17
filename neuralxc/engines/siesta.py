@@ -201,18 +201,6 @@ class CustomSiesta(Siesta):
         if '0_NORMAL_EXIT' in os.listdir('.') and self.skip_calculated:
             Calculator.calculate(self, atoms, properties, system_changes)
             self.write_input(self.atoms, properties, system_changes)
-            # if self.command is None:
-            # raise CalculatorSetupError(
-            # 'Please set ${} environment variable '
-            # .format('ASE_' + self.name.upper() + '_COMMAND') +
-            # 'or supply the command keyword')
-            # command = self.command.replace('PREFIX', self.prefix)
-            # errorcode = subprocess.call(command, shell=True, cwd=self.directory)
-
-            # if errorcode:
-            #     raise CalculationFailed('{} in {} returned an error: {}'
-            #                             .format(self.name, self.directory,
-            #                                     errorcode))
             self.read_results()
         else:
             super().calculate(atoms, properties, system_changes)

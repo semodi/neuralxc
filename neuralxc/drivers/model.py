@@ -145,6 +145,8 @@ def compile(in_path, jit_path, as_radial):
                 with open(jit_path + '/AGN','w') as file:
                     file.write('# This model is species agnostic')
             success = True
+        except:
+            pass
 
 
     if os.path.exists('.tmp.np'):
