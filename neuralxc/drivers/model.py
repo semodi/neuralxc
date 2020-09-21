@@ -126,13 +126,31 @@ def parse_sets_input(path):
             line = setsfile.readline().rstrip()
     return hdf5
 
+
+def pyscf_to_gaussian_basis(basis):
+
+    for spec in basis:
+        if len(spec) < 3:
+            basis[spec] = {'basis':basis['basis'], 'sigma': 10}
+    basis.pop('basis')
+    return basis
+
 def compile(in_path, jit_path, as_radial):
     model = xc.ml.network.load_pipeline(in_path)
     projector_type = model.get_basis_instructions().get('projector_type', 'ortho')
+    print(model.basis_instructions)
     if as_radial:
         if not 'radial' in projector_type:
             projector_type += '_radial'
+
+            if projector_type == 'pyscf_radial' or \
+             (projector_type == 'ortho_radial' and\
+              model.get_basis_instructions().get('application','') == 'pyscf'):
+              projector_type = 'gaussian_radial'
+              model.basis_instructions = pyscf_to_gaussian_basis(model.basis_instructions)
+
             model.basis_instructions.update({'projector_type': projector_type})
+            print(model.basis_instructions)
     else:
         if projector_type[-len('_radial'):] == '_radial':
             projector_type = projector_type[:-len('_radial')]

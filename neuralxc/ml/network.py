@@ -263,6 +263,8 @@ def compile_model(model, outpath, override = False):
         try:
             rho_c = np.array([1,2,3])
             projector = DensityProjector(basis_instructions=basis_instructions, grid_coords=unitcell_c, grid_weights=grid_c)
+            model.symmetrize_instructions.update(projector.symmetrize_instructions)
+            model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
         except TypeError:
             C = {}
             for spec in species:

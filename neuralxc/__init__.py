@@ -8,10 +8,10 @@ import warnings
 warnings.filterwarnings("ignore")
 PYSCF_FOUND = True
 import torch
-try:
-    import pyscf
-except ModuleNotFoundError:
-    PYSCF_FOUND = False
+# try:
+#     import pyscf
+# except ModuleNotFoundError:
+#     PYSCF_FOUND = False
 from . import config
 from .neuralxc import NeuralXC, PySCFNXC
 # from .neuralxc import NeuralXC as NeuralXCJIT

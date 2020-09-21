@@ -22,7 +22,7 @@ def DensityProjector(**kwargs):
     basis_instructions = kwargs['basis_instructions']
     application = basis_instructions.get('application', 'siesta')
     projector_type = basis_instructions.get('projector_type', 'ortho')
-    if application == 'pyscf':
+    if application == 'pyscf' and projector_type == 'ortho':
         projector_type = 'pyscf'
 
     registry = BaseProjector.get_registry()
@@ -36,12 +36,8 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
     _registry_name = 'base'
     _unit_test = False
 
-    @abstractmethod
     def __init__(self):
-        """
-        Abstract base class for projectors
-        """
-        pass
+        TorchModule.__init__(self)
 
     @abstractmethod
     def get_basis_rep(self):
@@ -213,7 +209,7 @@ class EuclideanProjector(BaseProjector):
         basis_instructions, dict
         	Instructions that define basis
         """
-        TorchModule.__init__(self)
+        super().__init__()
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
         W = {}
@@ -379,7 +375,7 @@ class RadialProjector(EuclideanProjector):
         basis_instructions, dict
         	Instructions that defines basis
         """
-        TorchModule.__init__(self)
+        super().__init__()
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
         W = {}

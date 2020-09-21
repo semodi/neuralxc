@@ -2,6 +2,7 @@
 from .projector import DensityProjector, EuclideanProjector, BaseProjector, RadialProjector
 from .polynomial import OrthoProjector, OrthoRadialProjector
 from .gaussian import GaussianProjector, RadialGaussianProjector
+from .pyscf import PySCFProjector
 from . import projector
 from . import polynomial
 from . import gaussian

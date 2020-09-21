@@ -13,9 +13,10 @@ import pyscf.gto.basis as gtobasis
 import pyscf.gto as gto
 import torch
 from torch.nn import Module as TorchModule
-from .projector import EuclideanProjector
+from .projector import EuclideanProjector, BaseProjector
 from .polynomial import RadialProjector
 import neuralxc
+import os
 
 GAMMA = torch.from_numpy(np.array([1/2,3/4,15/8,105/16,945/32,10395/64,135135/128])*np.sqrt(np.pi))
 
@@ -24,9 +25,20 @@ def parse_basis(basis_instructions):
     basis_strings = {}
     for species in basis_instructions:
         if len(species) < 3:
-            basis_strings[species] = open(basis_instructions[species]['basis'],'r').read()
-            bas = gtobasis.parse(basis_strings[species])
-            mol = gto.M(atom='O 0 0 0', basis = {'O':bas})
+            if os.path.isfile(basis_instructions[species]['basis']):
+                basis_strings[species] = open(basis_instructions[species]['basis'],'r').read()
+                bas = gtobasis.parse(basis_strings[species])
+            else:
+                basis_strings[species] = basis_instructions[species]['basis']
+                bas = basis_strings[species]
+
+            spec = 'O' if species == 'X' else species
+            try:
+                mol = gto.M(atom='{} 0 0 0'.format(spec),
+                            basis={spec: bas})
+            except:
+                mol = gto.M(atom='{} 0 0 0'.format(spec),
+                            basis={spec: bas}, spin = 1)
             sigma = basis_instructions[species].get('sigma',2.0)
             gamma = basis_instructions[species].get('gamma',1.0)
             basis = {}
@@ -68,6 +80,7 @@ class GaussianProjector(EuclideanProjector):
         basis.update(full_basis)
         self.basis_strings = basis_strings
         EuclideanProjector.__init__(self, unitcell, grid, basis, **kwargs)
+        self.init_padder(basis_instructions)
 
 
     def forward_basis(self, positions, unitcell, grid, my_box):
@@ -179,22 +192,35 @@ class GaussianProjector(EuclideanProjector):
             # coeff.append(torch.einsum('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
             coeff.append(torch.einsum('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
 
-        mol = gto.M(atom='O 0 0 0',
-                    basis={'O': gtobasis.parse(basis_string)})
-        bp = neuralxc.pyscf.BasisPadder(mol)
-
         coeff = torch.cat(coeff)
 
-        sym = 'O'
-        indexing_r = torch.from_numpy(np.array(bp.indexing_r[sym][0])).long()
-        indexing_l = torch.from_numpy(np.array(bp.indexing_l[sym][0])).bool()
-        coeff = coeff[indexing_r]
-
-        coeff_out = torch.zeros([bp.max_n[sym] * (bp.max_l[sym] + 1)**2], dtype= torch.double)
-
-        coeff_out[indexing_l] = coeff
+        coeff_out = torch.mv(self.M[self.species], coeff)
         return coeff_out
 
+    def init_padder(self, basis_instructions):
+        basis_strings = self.basis_strings
+        self.M = {}
+        self.symmetrize_instructions = {'basis':{}}
+        for species in basis_instructions:
+            if len(species) < 3:
+                try:
+                    bas = gtobasis.parse(basis_strings[species])
+                except:
+                    bas = basis_strings[species]
+                spec = 'O' if species == 'X' else species
+                try:
+                    mol = gto.M(atom='{} 0 0 0'.format(spec),
+                                basis={spec: bas})
+                except:
+                    mol = gto.M(atom='{} 0 0 0'.format(spec),
+                                basis={spec: bas}, spin = 1)
+                bp = neuralxc.pyscf.BasisPadder(mol)
+                il = bp.indexing_l[spec][0]
+                ir = bp.indexing_r[spec][0]
+                M = np.zeros([len(il),len(ir)])
+                M[il, ir] = 1
+                self.M[species] = torch.from_numpy(M).double()
+                self.symmetrize_instructions['basis'].update(bp.get_basis_json())
 
     @classmethod
     def g(cls, r, r_o, alpha, l, gamma):
@@ -239,6 +265,7 @@ class RadialGaussianProjector(GaussianProjector, RadialProjector):
         basis_instructions, dict
         	Instructions that defines basis
         """
+        BaseProjector.__init__(self)
         self.grid_coords = torch.from_numpy(grid_coords)
         self.grid_weights = torch.from_numpy(grid_weights)
         self.V_cell = self.grid_weights
@@ -250,6 +277,7 @@ class RadialGaussianProjector(GaussianProjector, RadialProjector):
         self.all_angs = {}
         self.unitcell = self.grid_coords
         self.grid = self.grid_weights
+        self.init_padder(basis_instructions)
 
     def forward_fast(self, rho, positions, grid_coords, grid_weights, radials, angulars, my_box):
         self.set_cell_parameters(grid_coords, grid_weights)

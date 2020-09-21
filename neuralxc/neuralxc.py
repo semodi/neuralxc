@@ -18,14 +18,14 @@ class PySCFNXC(AtomicFunc):
             if 'bas.json' == os.path.basename(mp):
                 self.basis = json.loads(open(mp,'r').read())
         super().__init__(path)
-        
+
     def initialize(self, mol):
         self.projector = DensityProjector(basis_instructions=self.basis, mol=mol)
         self.projector.initialize(mol)
 
     def get_V(self, dm):
         C = self.projector.get_basis_rep(dm)
-        output = self.compute({'c': C}, do_forces=False)
+        output = self.compute({'c': C}, do_forces=False, edens=False)
         E = output['zk']
         dEdC = output['dEdC']
         V = self.projector.get_V(dEdC)
@@ -36,7 +36,7 @@ class PySCFNXC(AtomicFunc):
 class NeuralXC(AtomicFunc):
 
     def get_V(self, rho, calc_forces=False):
-        output = self.compute({'rho': rho}, do_forces=calc_forces)
+        output = self.compute({'rho': rho}, do_forces=calc_forces, edens=False)
         E, V = output['zk'],output['vrho']
         if calc_forces:
             forces = output['forces']

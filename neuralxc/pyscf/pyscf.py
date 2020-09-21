@@ -21,6 +21,8 @@ from ..timer import timer
 from ..projector import BaseProjector
 import neuralxc
 import os
+from pylibnxc import get_nxc_adapter
+from glob import glob
 
 LAMBDA = 0.1
 
@@ -28,7 +30,7 @@ l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 
-def RKS(mol, nxc='', nxc_type='pyscf', **kwargs):
+def RKS(mol, nxc='', **kwargs):
     """ Wrapper for the pyscf RKS (restricted Kohn-Sham) class
     that uses a NeuralXC potential
     """
@@ -40,8 +42,7 @@ def RKS(mol, nxc='', nxc_type='pyscf', **kwargs):
     return mf
 
 
-def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='',
-    nxc_type='pyscf', **kwargs):
+def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='', **kwargs):
     """ Given an ase atoms object, run a pyscf RKS calculation on it and
     return the results
     """
@@ -49,7 +50,14 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='',
     spec = atoms.get_chemical_symbols()
     mol_input = [[s, p] for s, p in zip(spec, pos)]
     mol = gto.M(atom=mol_input, basis=basis, **kwargs)
-    mf = RKS(mol, nxc=nxc, nxc_type=nxc_type)
+    if nxc:
+        model_paths = glob(nxc + '/*')
+        if any(['projector' in path for path in model_paths]):
+            mf = get_nxc_adapter('pyscf', nxc) # Model that uses projector on radial grid
+        else:
+            mf = RKS(mol, nxc=nxc) # Model that uses overlap integrals and density matrix
+    else:
+        mf = dft.RKS(mol)
     mf.set(chkfile=path)
     mf.xc = xc
     mf.kernel()

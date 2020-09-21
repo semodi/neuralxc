@@ -62,11 +62,34 @@ def test_adiabatic():
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
     adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2, b_decay=1)
     os.chdir(test_dir + '/driver_data_tmp')
+    assert False
     engine = Engine('pyscf', nxc='testing/nxc.jit')
     engine.compute(read('benzene_small.traj', '0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
+
+def test_pyscf_radial():
+    os.chdir(test_dir)
+    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    cwd = os.getcwd()
+    os.chdir(test_dir + '/driver_data_tmp')
+
+    compile('model','benzene.pyscf.jit',as_radial=False)
+    engine = Engine('pyscf', nxc='benzene.pyscf.jit')
+    atoms = engine.compute(read('benzene_small.traj', '0'))
+
+    compile('model','benzene.pyscf_radial.jit',as_radial=True)
+    engine = Engine('pyscf', nxc='benzene.pyscf_radial.jit')
+    atoms_rad = engine.compute(read('benzene_small.traj', '0'))
+
+    assert np.allclose(atoms_rad.get_potential_energy(),
+                       atoms.get_potential_energy())
+
+    os.chdir(cwd)
+    shutil.rmtree(test_dir + '/driver_data_tmp')
+    pass
+
 
 if __name__=='__main__':
     test_adiabatic()
