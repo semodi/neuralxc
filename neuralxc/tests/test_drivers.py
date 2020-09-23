@@ -51,9 +51,9 @@ def test_eval():
     os.chdir(test_dir + '/driver_data_tmp')
     eval_driver(hdf5=['data.hdf5', 'system/it1', 'system/ref'])
 
-    eval_driver(model='model', hdf5=['data.hdf5', 'system/it0', 'system/ref'])
+    eval_driver(model='model_old', hdf5=['data.hdf5', 'system/it0', 'system/ref'])
 
-    eval_driver(model='model', hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='prediction')
+    eval_driver(model='model_old', hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='prediction')
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')

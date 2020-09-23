@@ -375,7 +375,7 @@ class RadialProjector(EuclideanProjector):
         basis_instructions, dict
         	Instructions that defines basis
         """
-        super().__init__()
+        TorchModule.__init__(self)
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
         W = {}

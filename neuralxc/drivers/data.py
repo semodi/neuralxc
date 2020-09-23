@@ -17,8 +17,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import clone
 import pandas as pd
 from pprint import pprint
-from dask.distributed import Client, LocalCluster
-from sklearn.externals.joblib import parallel_backend
 import time
 import os
 import shutil
