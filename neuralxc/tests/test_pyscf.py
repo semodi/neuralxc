@@ -53,14 +53,14 @@ def test_radial_model():
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
-def test_adiabatic():
+def test_sc():
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
-    adiabatic_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2, b_decay=1)
+    sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2 )
     os.chdir(test_dir + '/driver_data_tmp')
     engine = Engine('pyscf', nxc='testing/nxc.jit')
     engine.compute(read('benzene_small.traj', '0'))

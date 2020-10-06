@@ -135,7 +135,7 @@ if __name__ == '__main__':
     fit.set_defaults(func=fit_driver)
 
     # =============  Adiabatic  ====================
-    ad = subparser.add_parser('adiabatic', description='Fit a NeuralXC model adiabatically')
+    ad = subparser.add_parser('sc', description='Fit a NeuralXC model selfconsistently')
     ad.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')
     ad.add_argument('hyper', action='store', help='Path to .json configuration file setting hyperparameters')
@@ -144,11 +144,6 @@ if __name__ == '__main__':
                     type=str,
                     default='',
                     help='Start from this dataset instead of computing iteration 0')
-    ad.add_argument('--hyper2',
-                    metavar='hyper2',
-                    type=str,
-                    default='',
-                    help='Path to .json configuration file setting hyperparameters used for iteration > 0')
     ad.add_argument('--maxit',
                     metavar='maxit',
                     type=int,
@@ -159,21 +154,6 @@ if __name__ == '__main__':
                     type=float,
                     default='0.0005',
                     help='Tolerance in energy defining whether iterative training converged (default: 0.0005 eV)')
-    ad.add_argument('--b0',
-                    metavar='b0',
-                    type=float,
-                    default='-1',
-                    help='Initial value for weight decay (default: -1, use value specified in hyper file)')
-    ad.add_argument('--b_decay',
-                    metavar='b_decay',
-                    type=float,
-                    default='0.1',
-                    help='Decay for regularization parameter b (applied after every iteration) (default: 0.1)')
-    ad.add_argument('--hotstart',
-                    metavar='hotstart',
-                    type=int,
-                    default='0',
-                    help='Continue workflow at this iteration ( -1: only do testing )')
     ad.add_argument('--sets', metavar='sets', type=str, default='', help='Path to file defining sets')
     ad.add_argument('--nozero',
                     action='store_true',
@@ -183,23 +163,8 @@ if __name__ == '__main__':
                     type=str,
                     default='',
                     help='Build new model on top of model0 as a stacked estimator')
-    ad.add_argument(
-        '--fullstack',
-        action='store_true',
-        help='If model0 specified do full stack instead of stacking estimators (means also stack PCA etc.)')
     ad.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
-    ad.add_argument('--scale_targets', action='store_true', help='Adiabatically scale targets')
-    ad.add_argument('--scale_exp',
-                    metavar='scale_exp',
-                    type=int,
-                    default='2',
-                    help='Exponent for scaling function 1-((Tmax-t)/Tmax))**scale_exp')
-    ad.add_argument('--max_epochs',
-                    metavar='max_epochs',
-                    type=int,
-                    default=0,
-                    help='Maximum number of epochs in adiabatic training')
-    ad.set_defaults(func=adiabatic_driver)
+    ad.set_defaults(func=sc_driver)
 
     # =============== Evaluate =====================
 

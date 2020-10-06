@@ -36,7 +36,6 @@ from neuralxc.preprocessor import driver
 from glob import glob
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
 def mkdir(dirname):
@@ -68,39 +67,12 @@ def shcopytreedel(src, dest):
         shutil.copytree(src, dest)
 
 
-def create_report(path='.'):
-    paths = glob('*/stat*')
-
-    stats = []
-    for p in paths:
-        stats.append(json.load(open(p, 'r')))
-        stats[-1]['path'] = p
-
-    stats = pd.DataFrame(stats)
-
-    stats['kind'] = stats['path'].apply(lambda x: x.split('/')[1].split('_')[1])
-    stats['it'] = stats['path'].apply(lambda x: x.split('/')[0].strip('it'))
-
-    stats.loc[stats['kind'] == 'test', 'it'] = 999
-    stats['it'] = stats['it'].astype(int)
-    stats.loc[stats['kind'] == 'fit', 'it'] += 1
-    stats = stats.sort_values(['it', 'kind'])
-    stats.loc[stats['kind'] == 'test', 'it'] = -1
-    stats = stats.reset_index(drop=True)
-    stats = stats.drop(len(stats) - 2, axis=0).drop('path', axis=1).drop('mean deviation', axis=1)
-
-    stats.columns = [{'it': 'Iteration', 'kind': 'Kind'}.get(x, x.upper() + ' (eV)') for x in stats.columns]
-    stats.loc[stats['Kind'] == 'test', 'Iteration'] = ''
-    stats.index = [k + '_' + str(it) for k, it in zip(stats['Kind'], stats['Iteration'])]
-    stats.index = [{'test_': 'test'}.get(i, i) for i in stats.index]
-    stats['Kind'] = stats['Kind'].apply(lambda x: {'sc': 'Self-consistent', 'fit': 'Fitting', 'test': 'Testing'}[x])
-
-    return stats
-
 
 def parse_sets_input(path):
-    """ Reads a file containing the sets used for fitting
-
+    """ Reads a file containing the sets used for fitting.
+        An asterisk before a group name indicates that model predictions
+        should be subtracted from saved energies (relevant for self consistent
+        training)
     Parameters
     ----------
     path: str
@@ -134,6 +106,9 @@ def pyscf_to_gaussian_basis(basis):
     return basis
 
 def compile(in_path, jit_path, as_radial):
+    """ Compile/serialize torch model so that it can be used by libnxc
+    """
+
     model = xc.ml.network.load_pipeline(in_path)
     projector_type = model.get_basis_instructions().get('projector_type', 'ortho')
     print(model.basis_instructions)
@@ -154,9 +129,9 @@ def compile(in_path, jit_path, as_radial):
             projector_type = projector_type[:-len('_radial')]
             model.basis_instructions.update({'projector_type': projector_type})
     xc.ml.network.compile_model(model, jit_path, override=True)
-    # if model.get_basis_instructions().get('spec_agnostic','False'):
-    #     with open(jit_path + '/AGN','w') as file:
-    #         file.write('# This model is species agnostic')
+    if model.get_basis_instructions().get('spec_agnostic','False'):
+        with open(jit_path + '/AGN','w') as file:
+            file.write('# This model is species agnostic')
 
 
     if os.path.exists('.tmp.np'):
@@ -164,24 +139,17 @@ def compile(in_path, jit_path, as_radial):
     print('Success!')
 
 
-def adiabatic_driver(xyz,
+def sc_driver(xyz,
                      preprocessor,
                      hyper,
                      data='',
-                     hyper2='',
                      maxit=5,
                      tol=0.0005,
-                     b0=-1,
-                     b_decay=0.1,
-                     hotstart=0,
                      sets='',
                      nozero=False,
                      model0='',
-                     fullstack=False,
                      hyperopt=False,
-                     max_epochs=0,
-                     scale_targets=False,
-                     scale_exp=2):
+                     keep_itdata=False):
 
     statistics_sc = {'mae': 1000}
     xyz = os.path.abspath(xyz)
@@ -190,228 +158,178 @@ def adiabatic_driver(xyz,
     if sets:
         sets = os.path.abspath(sets)
 
+
+    # ============ Start from pre-trained model ================
+    # Compile it for self-consistent deployment but keep original version
+    # to continue training it
     if model0:
-        model0 = 'model0'
+        if model0 == 'model0.jit':
+            raise Exception('Please choose a different name/path for model0 as it' +\
+            ' model0.jit would be overwritten by this routine')
+        compile(in_path=model0, jit_path='model0.jit', as_radial=False)
+
+        model0_orig = model0
+        model0_orig = os.path.abspath(model0_orig)
+
+        model0 = 'model0.jit'
         model0 = os.path.abspath(model0)
+
         engine_kwargs = {'nxc': model0}
         engine_kwargs.update(pre.get('engine_kwargs', {}))
-        ensemble = True
-        if fullstack:
-            model0_orig = model0
-            model0 = ''
-        else:
-            model0_orig = model0
-    else:
-        ensemble = False
-        model0 = ''
 
+    # If not nozero, automatically aligns energies between reference and
+    # baseline data by removing mean deviation
     if nozero:
         E0 = 0
     else:
         E0 = None
-    b = b0
+
+    #============= Iteration 0 =================
+    # Initial self-consistent calculation either with model0 or baseline method only
+    # if not neuralxc model provided. Hyperparameter optimization done in first fit
+    # and are kept for subsequent iterations.
+    print('====== Iteration 0 ======')
+    mkdir('sc')
+    shcopy(preprocessor, 'sc/pre.json')
+    shcopy(hyper, 'sc/hyper.json')
+    os.chdir('sc')
+
     iteration = 0
+    if model0:
+        open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+    else:
+        open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
 
-    if hotstart == 0:
-        if data:
-            mkdir('it0')
-            shcopy(data, 'it0/data.hdf5')
-            shcopy(preprocessor, 'it0/pre.json')
-            shcopy(hyper, 'it0/hyper.json')
-            os.chdir('it0')
-            open('sets.inp', 'w').write('data.hdf5 \n system/base \t system/ref')
-            if sets:
-                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
-            statistics_sc = \
-            eval_driver(hdf5=['data.hdf5','system/base','system/ref'])
-
-            open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            statistics_fit = fit_driver(
-                preprocessor='pre.json',
-                hyper='hyper.json',
-                model=model0,
-                ensemble=ensemble,
-                sets='sets.inp',
-                hyperopt=True,
-                b=b,
-                target_scale = \
-                    (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
-            open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-            os.chdir('../')
-        else:
-            print('====== Iteration {} ======'.format(iteration))
-            if ensemble and not fullstack:
-                shcopytree(model0, 'it0/nxc')
-            mkdir('it{}'.format(iteration))
-            shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            shcopy(hyper, 'it{}/hyper.json'.format(iteration))
-            os.chdir('it{}'.format(iteration))
-            open('sets.inp', 'w').write('data.hdf5 \n system/it{} \t system/ref'.format(iteration))
-            if sets:
-                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
-            mkdir('workdir')
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=engine_kwargs)
-            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it0',
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='ref',
-                            add=['energy'],
-                            traj=xyz,
-                            override=True,
-                            zero=E0)
-            statistics_sc = \
-            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'])
-
-            open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-            if hyperopt:
-                if scale_targets:
-                    raise Exception('Hyperpar optimization and scale_targets currently not supported')
-                statistics_fit = fit_driver(preprocessor='pre.json',
-                                            hyper='hyper.json',
-                                            model=model0,
-                                            ensemble=ensemble,
-                                            sets='sets.inp',
-                                            b=-1,
-                                            hyperopt=hyperopt)
-
-                shcopy('hyper.json', 'hyper_old.json')
-                best_pars = json.load(open('best_params.json', 'r'))
-                if max_epochs > 0:
-                    best_pars['hyperparameters']['estimator__max_steps'] = max_epochs
-                with open('hyper.json', 'w') as file:
-                    file.write(json.dumps(best_pars, indent=4))
-
-                statistics_fit = fit_driver(preprocessor='pre.json',
-                                            hyper='hyper.json',
-                                            model=model0,
-                                            ensemble=ensemble,
-                                            sets='sets.inp',
-                                            b=b)
-            else:
-                statistics_fit = fit_driver(
-                preprocessor='pre.json',
-                hyper='hyper.json',
-                model=model0,
-                ensemble=ensemble,
-                sets='sets.inp',
-                b=b,
-                target_scale = \
-                        (1 - ((maxit - 3  - iteration)/(maxit - 2))**scale_exp if scale_targets else 1))
-
-            open('statistics_fit', 'w').write(json.dumps(statistics_fit))
-
-            os.chdir('../')
-        hotstart += 1
-    it_label = 0
-    if not hotstart == -1:
-        for it in range(hotstart, maxit + 1):
-            b = b * b_decay
-            iteration = 0
-            print('====== Iteration {} ======'.format(it_label))
-            # mkdir('it{}'.format(iteration))
-            # shcopy(preprocessor, 'it{}/pre.json'.format(iteration))
-            # shcopy(hyper, 'it{}/hyper.json'.format(iteration))
-            os.chdir('it{}'.format(iteration))
-            open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
-
-            if ensemble:
-                ensemble_driver(dest='merged', models=[model0_orig, 'best_model_np'], estonly=not fullstack)
-            else:
-                shcopytreedel('best_model', 'merged')
-
-            if sets:
-                open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
-            # shutil.rmtree('workdir')
-            mkdir('workdir')
-            engine_kwargs = {'nxc': '../../merged.jit','skip_calculated':False}
-            engine_kwargs.update(pre.get('engine_kwargs', {}))
-            shcopytreedel('best_model', 'model_it{}'.format(it_label))
-            compile('merged','merged.jit',
-                'radial' in pre['preprocessor'].get('projector_type','ortho'))
-            driver(read(xyz, ':'),
-                   pre['preprocessor'].get('application', 'siesta'),
-                   workdir='workdir',
-                   nworkers=pre.get('n_workers', 1),
-                   kwargs=engine_kwargs)
-
-            pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
-
-            add_data_driver(hdf5='data.hdf5',
-                            system='system',
-                            method='it{}'.format(iteration),
-                            add=['energy'],
-                            traj='workdir/results.traj',
-                            override=True,
-                            zero=E0)
-            old_statistics = dict(statistics_sc)
-            statistics_sc = \
-            eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
-                    'system/ref'])
-
-            open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
-            open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
-
-            print(json.load(open('hyper.json', 'r')))
-            statistics_fit = fit_driver(preprocessor='pre.json',
-                                        hyper='hyper.json',
-                                        model='best_model',
-                                        sets='sets.inp',
-                                        b=b,
-                                        target_scale=min(1, (1 - ((maxit - 3 - it) /
-                                                                  (maxit - 2))**scale_exp if scale_targets else 1)))
-
-            open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
-            os.chdir('../')
-            it_label += 1
-        else:
-            print('Maximum number of iterations reached. Proceeding to test set...')
-
-    print('====== Testing ======'.format(iteration))
-    mkdir('testing')
-
-    shcopy('it{}/data.hdf5'.format(iteration), 'testing/data.hdf5')
-    shcopytree('it{}/best_model'.format(iteration), 'testing/nxc')
-    os.chdir('testing')
+    if sets:
+        open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
     mkdir('workdir')
-
-    compile('nxc','nxc.jit',
-                'radial' in pre['preprocessor'].get('projector_type','ortho'))
-    engine_kwargs = {'nxc': '../../nxc.jit'}
-    engine_kwargs.update(pre.get('engine_kwargs', {}))
-    driver(read('../testing.traj', ':'),
+    driver(read(xyz, ':'),
            pre['preprocessor'].get('application', 'siesta'),
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
            kwargs=engine_kwargs)
+    pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
     add_data_driver(hdf5='data.hdf5',
                     system='system',
-                    method='testing/ref',
-                    add=['energy'],
-                    traj='../testing.traj',
-                    override=True,
-                    zero=E0)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='testing/nxc',
+                    method='it0',
                     add=['energy'],
                     traj='workdir/results.traj',
                     override=True,
                     zero=E0)
+    add_data_driver(hdf5='data.hdf5',
+                    system='system',
+                    method='ref',
+                    add=['energy'],
+                    traj=xyz,
+                    override=True,
+                    zero=E0)
+    statistics_sc = \
+    eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+            'system/ref'])
 
-    statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
-    open('statistics_test', 'w').write(json.dumps(statistics_test))
+    open('statistics_sc', 'w').write(json.dumps(statistics_sc))
+    statistics_fit = fit_driver(
+        preprocessor='pre.json',
+        hyper='hyper.json',
+        model=model0,
+        sets='sets.inp',
+        hyperopt=hyperopt)
+
+    open('statistics_fit', 'w').write(json.dumps(statistics_fit))
+
+    #=================== Iterations > 0 ==============
+    it_label = 1
+    for it_label in range(1, maxit + 1):
+        if keep_itdata:
+            iteration = it_label
+        else:
+            iteration = 0
+
+        print('====== Iteration {} ======'.format(it_label))
+        open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
+
+        if sets:
+            open('sets.inp', 'a').write('\n' + open(sets, 'r').read())
+        mkdir('workdir')
+
+        shcopytreedel('best_model', 'model_it{}'.format(it_label))
+        compile('model_it{}'.format(it_label),'model_it{}.jit'.format(it_label),
+            'radial' in pre['preprocessor'].get('projector_type','ortho'))
+
+        engine_kwargs = {'nxc': '../../model_it{}.jit'.format(it_label),'skip_calculated':False}
+        engine_kwargs.update(pre.get('engine_kwargs', {}))
+
+        driver(read(xyz, ':'),
+               pre['preprocessor'].get('application', 'siesta'),
+               workdir='workdir',
+               nworkers=pre.get('n_workers', 1),
+               kwargs=engine_kwargs)
+
+        pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
+
+        add_data_driver(hdf5='data.hdf5',
+                        system='system',
+                        method='it{}'.format(iteration),
+                        add=['energy'],
+                        traj='workdir/results.traj',
+                        override=True,
+                        zero=E0)
+        old_statistics = dict(statistics_sc)
+        statistics_sc = \
+        eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
+                'system/ref'])
+
+        open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
+        open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
+        statistics_fit = fit_driver(preprocessor='pre.json',
+                                    hyper='hyper.json',
+                                    model='best_model',
+                                    sets='sets.inp')
+        open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
+    else:
+        print('Maximum number of iterations reached. Proceeding to test set...')
+
+    os.chdir('..')
+    print('====== Testing ======')
+    testfile=''
+    if os.path.isfile('testing.xyz'):
+        testfile = '../testing.xyz'
+    if os.path.isfile('testing.traj'):
+        testfile = '../testing.traj'
+
+    if testfile:
+        mkdir('testing')
+
+        shcopy('sc/data.hdf5'.format(iteration), 'testing/data.hdf5')
+        shcopytree('sc/model_it{}.jit'.format(it_label), 'testing/nxc.jit')
+        os.chdir('testing')
+        mkdir('workdir')
+        engine_kwargs = {'nxc': '../../nxc.jit'}
+        engine_kwargs.update(pre.get('engine_kwargs', {}))
+        driver(read(testfile, ':'),
+               pre['preprocessor'].get('application', 'siesta'),
+               workdir='workdir',
+               nworkers=pre.get('n_workers', 1),
+               kwargs=engine_kwargs)
+        add_data_driver(hdf5='data.hdf5',
+                        system='system',
+                        method='testing/ref',
+                        add=['energy'],
+                        traj=testfile,
+                        override=True,
+                        zero=E0)
+        add_data_driver(hdf5='data.hdf5',
+                        system='system',
+                        method='testing/nxc',
+                        add=['energy'],
+                        traj='workdir/results.traj',
+                        override=True,
+                        zero=E0)
+
+        statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
+        open('statistics_test', 'w').write(json.dumps(statistics_test))
+    else:
+        print('testing.traj or testing.xyz not found.')
 
 
 def fit_driver(preprocessor,
