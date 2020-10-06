@@ -184,8 +184,6 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         print('Warning: E0 for reference data not found, setting to 0')
         E0_ref = 0
 
-    print('E0 base', E0_base)
-    print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
     tar = tar.real
 
@@ -271,21 +269,20 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
         pre = preprocessor
     inp = json.loads(open(inputfile, 'r').read())
 
-    datafile = h5py.File(hdf5[0], 'r')
+    with h5py.File(hdf5[0], 'r') as datafile:
+        if not isinstance(hdf5[1], list):
+            hdf5[1] = [hdf5[1]]
 
-    if not isinstance(hdf5[1], list):
-        hdf5[1] = [hdf5[1]]
+        all_species = []
+        for set in hdf5[1]:
+            all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
 
-    all_species = []
-    for set in hdf5[1]:
-        all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
-
-    datafile.close()
     if pre:
         basis = pre['preprocessor']
     else:
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
         basis.update({'extension': 'RHOXC'})
+
     pipeline = get_default_pipeline(basis, all_species, symmetrizer_type=pre.get('symmetrizer_type','casimir'),
         spec_agnostic=spec_agnostic)
 
@@ -293,8 +290,6 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
         hyper = inp['hyperparameters']
     else:
         print('No hyperparameters specified, fitting default pipeline to data')
-        pipeline.fit(data)
-        sys.exit()
 
     hyper = to_full_hyperparameters(hyper, pipeline.get_params())
 
@@ -354,7 +349,7 @@ def get_basis_grid(preprocessor):
     basis_grid = {'preprocessor__basis_instructions': basis_grid}
 
     return basis_grid
-    
+
 def get_preprocessor(preprocessor, atoms, src_path):
     pre = json.loads(open(preprocessor, 'r').read())
     species = ''.join(atoms[0].get_chemical_symbols())

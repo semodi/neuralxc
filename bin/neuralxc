@@ -122,19 +122,10 @@ if __name__ == '__main__':
                      type=str,
                      default='',
                      help='Continue training model found at this location')
-    fit.add_argument('--ensemble',
-                     action='store_true',
-                     help='Derive pipeline from --model and only fit final estimator, to be able to build\
-    an ensemble of estimators later on')
     fit.add_argument('--hyperopt', action='store_true', help='Do a hyperparameter optimzation')
-    fit.add_argument('--b',
-                     metavar='b',
-                     type=float,
-                     default=-1,
-                     help='Weight decay parameter (supercedes the one specified in config file)')
     fit.set_defaults(func=fit_driver)
 
-    # =============  Adiabatic  ====================
+    # =============  Selfconsistent  ====================
     ad = subparser.add_parser('sc', description='Fit a NeuralXC model selfconsistently')
     ad.add_argument('xyz', action='store', help='Path to .xyz/.traj file containing structures and reference data')
     ad.add_argument('preprocessor', action='store', help='Path to configuration file for preprocessor')

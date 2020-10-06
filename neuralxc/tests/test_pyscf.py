@@ -60,8 +60,12 @@ def test_sc():
     os.chdir(test_dir + '/driver_data_tmp')
 
     fetch_default_driver(kind='pre', hint='./pre_hint.json')
-    sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2 )
+    sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2,
+        hyperopt=True)
+    sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=2,
+        hyperopt=False, model0= 'sc/model_it2' )
     os.chdir(test_dir + '/driver_data_tmp')
+
     engine = Engine('pyscf', nxc='testing/nxc.jit')
     engine.compute(read('benzene_small.traj', '0'))
 

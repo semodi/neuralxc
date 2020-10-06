@@ -140,16 +140,16 @@ def compile(in_path, jit_path, as_radial):
 
 
 def sc_driver(xyz,
-                     preprocessor,
-                     hyper,
-                     data='',
-                     maxit=5,
-                     tol=0.0005,
-                     sets='',
-                     nozero=False,
-                     model0='',
-                     hyperopt=False,
-                     keep_itdata=False):
+              preprocessor,
+              hyper,
+              data='',
+              maxit=5,
+              tol=0.0005,
+              sets='',
+              nozero=False,
+              model0='',
+              hyperopt=False,
+              keep_itdata=False):
 
     statistics_sc = {'mae': 1000}
     xyz = os.path.abspath(xyz)
@@ -162,6 +162,7 @@ def sc_driver(xyz,
     # ============ Start from pre-trained model ================
     # Compile it for self-consistent deployment but keep original version
     # to continue training it
+    model0_orig = ''
     if model0:
         if model0 == 'model0.jit':
             raise Exception('Please choose a different name/path for model0 as it' +\
@@ -231,7 +232,7 @@ def sc_driver(xyz,
     statistics_fit = fit_driver(
         preprocessor='pre.json',
         hyper='hyper.json',
-        model=model0,
+        model=model0_orig,
         sets='sets.inp',
         hyperopt=hyperopt)
 
@@ -328,6 +329,7 @@ def sc_driver(xyz,
 
         statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
         open('statistics_test', 'w').write(json.dumps(statistics_test))
+        os.chdir('..')
     else:
         print('testing.traj or testing.xyz not found.')
 
@@ -339,10 +341,7 @@ def fit_driver(preprocessor,
                sample='',
                cutoff=0.0,
                model='',
-               ensemble=False,
-               hyperopt=False,
-               b=-1,
-               target_scale=1):
+               hyperopt=False):
     """ Fits a NXCPipeline to the provided data
     """
     inputfile = hyper
@@ -359,6 +358,10 @@ def fit_driver(preprocessor,
             pre['preprocessor'].update(get_real_basis(None, pre['preprocessor']['X']['basis'], True))
 
     print(pre['preprocessor'])
+
+    # A * in hdf5 (if sets != '') indicates that the predictions of a pretrained
+    # model should be subtracted from the stored baseline energies
+    # This is relevant for self-consistent training
     apply_to = []
     for pidx, path in enumerate(hdf5[1]):
         if path[0] == '*':
@@ -373,22 +376,16 @@ def fit_driver(preprocessor,
     new_model.set_params(**param_grid)
 
     if model:
-        if ensemble:
-            new_model.steps[-1][1].steps[2:-1] = xc.ml.network.load_pipeline(model).steps[:-1]
-        else:
-            new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
+        hyperopt=False
+        new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
 
     datafile = h5py.File(hdf5[0], 'r')
     data = load_sets(datafile, hdf5[1], hdf5[2], basis_key, cutoff)
 
     if model:
-        if not new_model.steps[-1][1].steps[-1][1].fitted:
-            pipeline = Pipeline(new_model.steps[-1][1].steps[:-1])
-        else:
-            pipeline = new_model
         for set in apply_to:
             selection = (data[:, 0] == set)
-            prediction = pipeline.predict(data)[set]
+            prediction = new_model.predict(data)[set]
             print('Dataset {} old STD: {}'.format(set, np.std(data[selection][:, -1])))
             data[selection, -1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:, -1])))
@@ -398,85 +395,17 @@ def fit_driver(preprocessor,
         data = data[sample]
         print("Using sample of size {}".format(len(sample)))
 
-    class FilePipeline():
-        def __init__(self, path):
-            self.path = path
-            self.pipeline = pickle.load(open(self.path, 'rb'))
-
-        def predict(self, X, *args, **kwargs):
-            return self.pipeline.predict(X, *args, **kwargs)
-
-        def fit(self, X, y=None):
-            print('Fitting...')
-            return self
-
-        def transform(self, X, y=None, **fit_params):
-            return self.pipeline.transform(X, **fit_params)
-
-        def fit_transform(self, X, y=None):
-            return self.pipeline.transform(X)
 
     np.random.shuffle(data)
     if hyperopt:
-        if model:
-            if (new_model.steps[-1][1].steps[-2][1], NumpyNetworkEstimator) or ensemble:
-                new_param_grid = {key[len('ml__'):]: value for key,value in  grid_cv.param_grid.items()\
-                    if 'ml__estimator' in key}
-
-                if new_model.steps[-1][1].steps[2:-1]:
-                    pickle.dump(Pipeline(new_model.steps[-1][1].steps[2:-1]), open('.tmp.pckl', 'wb'))
-                    estimator = GridSearchCV(
-                        Pipeline(new_model.steps[-1][1].steps[:2] +
-                                 [('file_pipe',
-                                   FilePipeline('.tmp.pckl')), ('estimator', new_model.steps[-1][1].steps[-1][1])]),
-                        new_param_grid,
-                        cv=inp.get('cv', 2))
-                else:
-                    estimator = GridSearchCV(Pipeline(new_model.steps[-1][1].steps[:2] +
-                                                      [('estimator', new_model.steps[-1][1].steps[-1][1])]),
-                                             new_param_grid,
-                                             cv=inp.get('cv', 2))
-
-                new_model.steps[-1][1].steps = new_model.steps[-1][1].steps[:-1]
-                do_concat = True
-            else:
-                raise Exception('Cannot optimize hyperparameters for fitted model')
-        else:
-            estimator = grid_cv
-            do_concat = False
+        estimator = grid_cv
     else:
         estimator = new_model
 
-    # Test if every fold contains at least one sample from every dataset
-    passed_test = False
-    n_sets = len(np.unique(data[:, 0]))
-    n_splits = inp.get('cv', 2)
-    while (not passed_test):
-        groups = data[:int(np.floor(len(data) / n_splits) * n_splits)].reshape(n_splits,
-                                                                               int(np.floor(len(data) / n_splits)),
-                                                                               data.shape[-1])[:, :, 0]
-        n_unique = np.array([len(np.unique(g)) for g in groups])
-        if not np.all(n_unique == n_sets):
-            print(np.all(n_unique == n_sets))
-            np.random.shuffle(data)
-        else:
-            passed_test = True
-
-    if not b == -1:
-        print('Setting weight decay to b = {}'.format(b))
-        estimator.steps[-1][1].steps[-1][-1].b = b
-
-    if not target_scale == 1:
-        print('Scaling targets by factor: {}'.format(target_scale))
     real_targets = np.array(data[:, -1]).real.flatten()
-    data[:, -1] = data[:, -1] * target_scale
-
-    # for step in estimator.estimator.steps[0][1].steps:
-    #     copy.deepcopy(step[1])
 
     estimator.fit(data)
 
-    set_selection = (data[:, 0] == 0)
     dev = estimator.predict(data)[0].flatten() - real_targets
     dev0 = np.abs(dev - np.mean(dev))
     results = {
@@ -492,16 +421,8 @@ def fit_driver(preprocessor,
         open('best_params.json', 'w').write(json.dumps({'hyperparameters': bp}, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
         best_params_ = estimator.best_params_
-        if do_concat:
-            try:
-                os.remove('.tmp.pckl')
-            except FileNotFoundError:
-                pass
-            new_model.steps[-1][1].steps.append(estimator.best_estimator_.steps[-1])
-            new_model.steps[-1][1].start_at(2).save('best_model', True)
-        else:
-            best_estimator = estimator.best_estimator_.steps[-1][1].start_at(2)
-            best_estimator.save('best_model', True)
+        best_estimator = estimator.best_estimator_.steps[-1][1].start_at(2)
+        best_estimator.save('best_model', True)
     else:
         estimator = estimator.steps[-1][1]
         estimator.start_at(2).save('best_model', True)
@@ -539,7 +460,6 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
         spec_group = SpeciesGrouper(basis, species)
         symmetrizer = symmetrizer_factory(symmetrizer_instructions)
-        print('Symmetrizer instructions', symmetrizer_instructions)
         pipeline = NXCPipeline([('spec_group', spec_group), ('symmetrizer', symmetrizer)] + model.steps,
                                basis_instructions=basis,
                                symmetrize_instructions=symmetrizer_instructions)
