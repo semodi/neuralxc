@@ -30,6 +30,7 @@ import sys
 import copy
 import dill as pickle
 from types import SimpleNamespace as SN
+from ..formatter import make_nested_absolute
 from .data import *
 from neuralxc.preprocessor import driver
 os.environ['KMP_AFFINITY'] = 'none'
@@ -103,7 +104,7 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
 
 def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
 
-    pre = json.load(open(preprocessor, 'r'))
+    pre = make_nested_absolute(json.load(open(preprocessor, 'r')))
     try:
         os.mkdir(workdir)
     except FileExistsError:
@@ -114,7 +115,8 @@ def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
            workdir=workdir,
            nworkers=pre.get('n_workers', 1),
            kwargs=pre.get('engine_kwargs', {}))
-    shutil.move(workdir + '/results.traj', './results.traj')
+    # shutil.move(workdir + '/results.traj', './results.traj')
+    shutil.copy(workdir + '/results.traj', './results.traj')
     if workdir == '.tmp/':
         shutil.rmtree(workdir)
 
@@ -124,6 +126,8 @@ def fetch_default_driver(kind, hint='', out=''):
     from collections import abc
     if hint:
         hint_cont = json.load(open(hint, 'r'))
+    else:
+        hint_cont = {}
 
     def nested_dict_iter(nested):
         for key, value in nested.items():
@@ -140,9 +144,6 @@ def fetch_default_driver(kind, hint='', out=''):
 
     def make_absolute(val):
         if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
-            print(os.path.isfile(val))
-            print(os.path.isdir(val))
-            print('DIR', val)
             val = os.path.abspath(val)
         return val
 
@@ -155,22 +156,17 @@ def fetch_default_driver(kind, hint='', out=''):
     else:
         df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json', 'r'))
 
-    print(df_cont)
     if hint:
         for key1 in df_cont:
             if isinstance(df_cont[key1], dict):
                 for key2 in df_cont[key1]:
                     found = find_value_in_nested(hint_cont, key2)
                     if found:
-                        df_cont[key1][key2] = make_absolute(found)
-                    elif isinstance(df_cont[key1][key2], str):
-                        df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
+                        df_cont[key1][key2] = found
             else:
                 found = find_value_in_nested(hint_cont, key1)
                 if found:
-                    df_cont[key1] = make_absolute(found)
-                else:
-                    df_cont[key1] = make_absolute(df_cont[key1])
+                    df_cont[key1] = found
 
     if out == '':
         out = kind + '.json'
@@ -184,11 +180,11 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     """
     preprocessor_path = preprocessor
 
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     atoms = read(xyz, ':')
 
-    preprocessor = get_preprocessor(preprocessor, atoms, srcdir)
+    preprocessor = get_preprocessor(pre, atoms, srcdir)
     start = time.time()
 
     if 'hdf5' in dest:

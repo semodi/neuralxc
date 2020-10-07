@@ -300,7 +300,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
     verbose = inp.get('verbose', 1)
 
     pipe = Pipeline([('ml', pipeline)])
-    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=verbose)
+    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=verbose, return_train_score=True)
     return grid_cv
 
 
@@ -350,8 +350,7 @@ def get_basis_grid(preprocessor):
 
     return basis_grid
 
-def get_preprocessor(preprocessor, atoms, src_path):
-    pre = json.loads(open(preprocessor, 'r').read())
+def get_preprocessor(pre, atoms, src_path):
     species = ''.join(atoms[0].get_chemical_symbols())
     for a in atoms:
         species2 = ''.join(a.get_chemical_symbols())

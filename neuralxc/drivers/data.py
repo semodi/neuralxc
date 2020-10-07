@@ -31,7 +31,7 @@ import copy
 import dill as pickle
 from types import SimpleNamespace as SN
 from .other import *
-
+from ..formatter import make_nested_absolute
 bi_slice = slice
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
@@ -194,7 +194,7 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     preprocessor = preprocessor
     hdf5 = hdf5
 
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     datafile = h5py.File(hdf5[0], 'r')
     basis = pre['preprocessor']

@@ -36,7 +36,7 @@ def test_fit():
     # Fit model
     fit_driver(preprocessor='pre.json', hyper='hyper.json', sets='sets.inp', hyperopt=True)
     # Continue training
-    fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', ensemble=False, sets='sets.inp')
+    fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp')
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')

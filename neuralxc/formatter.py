@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
+import os
 
 
 class Formatter(TransformerMixin, BaseEstimator):
@@ -264,3 +265,17 @@ def atomic_shape(X):
 
 def system_shape(X, n):
     return X.reshape(-1, n, X.shape[-1])
+
+def make_nested_absolute(df_cont):
+
+    def make_absolute(val):
+        if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
+            val = os.path.abspath(val)
+        return val
+
+    for key in df_cont:
+        if isinstance(df_cont[key], dict):
+            df_cont[key] = make_nested_absolute(df_cont[key])
+        else:
+            df_cont[key] = make_absolute(df_cont[key])
+    return df_cont

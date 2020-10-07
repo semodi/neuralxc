@@ -33,6 +33,7 @@ import pickle
 from .data import *
 from .other import *
 from neuralxc.preprocessor import driver
+from ..formatter import make_nested_absolute
 from glob import glob
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
@@ -111,7 +112,6 @@ def compile(in_path, jit_path, as_radial):
 
     model = xc.ml.network.load_pipeline(in_path)
     projector_type = model.get_basis_instructions().get('projector_type', 'ortho')
-    print(model.basis_instructions)
     if as_radial:
         if not 'radial' in projector_type:
             projector_type += '_radial'
@@ -153,7 +153,7 @@ def sc_driver(xyz,
 
     statistics_sc = {'mae': 1000}
     xyz = os.path.abspath(xyz)
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
     engine_kwargs = pre.get('engine_kwargs', {})
     if sets:
         sets = os.path.abspath(sets)
@@ -351,7 +351,7 @@ def fit_driver(preprocessor,
         hdf5 = hdf5
 
     inp = json.loads(open(inputfile, 'r').read())
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
     basis_key = basis_to_hash(pre['preprocessor'])
     if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
         and pre['preprocessor'].get('spec_agnostic',False):
