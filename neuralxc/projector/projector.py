@@ -11,7 +11,7 @@ from periodictable import elements as element_dict
 import periodictable
 import torch
 from torch.nn import Module as TorchModule
-
+from opt_einsum import contract
 
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
@@ -168,9 +168,9 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
         rho = rho * self.V_cell.squeeze()
         print(rho.size())
         if rho.ndim == 1:
-            coeff_array = torch.einsum('li,ni,i -> nl', angs, rads, rho)
+            coeff_array = contract('li,ni,i -> nl', angs, rads, rho)
         else:
-            coeff_array = torch.einsum('lmijk,nijk,ijk -> nlm', angs, rads, rho)
+            coeff_array = contract('lmijk,nijk,ijk -> nlm', angs, rads, rho)
 
         return coeff_array.view(-1)
 
@@ -230,7 +230,7 @@ class EuclideanProjector(BaseProjector):
 
     def set_cell_parameters(self, unitcell, grid):
         a = torch.norm(unitcell, dim=1).double() / grid
-        U = torch.einsum('ij,i->ij', unitcell, 1/grid)
+        U = contract('ij,i->ij', unitcell, 1/grid)
         self.grid = grid
         self.V_cell = torch.abs(torch.det(U))
         self.U = torch.transpose(U,0,1)
@@ -355,7 +355,7 @@ class EuclideanProjector(BaseProjector):
                         Zm]).double()
 
         if scaled:
-            R = torch.einsum('ij,jklm -> iklm', U, Rm)
+            R = contract('ij,jklm -> iklm', U, Rm)
             return R
         else:
             return Rm

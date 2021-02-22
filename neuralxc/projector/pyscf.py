@@ -11,7 +11,7 @@ from ..doc_inherit import doc_inherit
 from ..base import ABCRegistry
 from ..projector import BaseProjector
 import os
-
+from opt_einsum import contract
 
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
@@ -36,7 +36,7 @@ def get_eri3c(mol, auxmol, op):
 def get_coeff(dm, eri3c):
     """ Given a density matrix, return coefficients from basis set projection
     """
-    return np.einsum('ijk, ij -> k', eri3c, dm)
+    return contract('ijk, ij -> k', eri3c, dm)
 
 
 class PySCFProjector(BaseProjector):
@@ -98,7 +98,7 @@ class PySCFProjector(BaseProjector):
 
             dEdC.pop('X')
         dEdC = self.bp.unpad_basis(dEdC)
-        V = np.einsum('ijk, k', self.eri3c, dEdC)
+        V = contract('ijk, k', self.eri3c, dEdC)
         return V
 
 

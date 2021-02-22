@@ -17,7 +17,7 @@ from .projector import EuclideanProjector, BaseProjector
 from .polynomial import RadialProjector
 import neuralxc
 import os
-
+from opt_einsum import contract 
 GAMMA = torch.from_numpy(np.array([1/2,3/4,15/8,105/16,945/32,10395/64,135135/128])*np.sqrt(np.pi))
 
 def parse_basis(basis_instructions):
@@ -189,8 +189,8 @@ class GaussianProjector(EuclideanProjector):
             filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
             rad *= self.V_cell
-            # coeff.append(torch.einsum('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            coeff.append(torch.einsum('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
+            # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
+            coeff.append(contract('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
 
         coeff = torch.cat(coeff)
 

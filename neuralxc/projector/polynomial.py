@@ -14,6 +14,7 @@ import torch
 from torch.nn import Module as TorchModule
 torch.set_default_dtype(torch.float64)
 from .projector import EuclideanProjector, RadialProjector
+from opt_einsum import contract
 
 class OrthoProjector(EuclideanProjector):
     """ Implements orthonormal basis functions on a euclidean grid.
@@ -37,7 +38,7 @@ class OrthoProjector(EuclideanProjector):
         for k in torch.arange(0, W.size()[0]):
             rad.append(func(r, basis, (k + 1).double()))
 
-        result = torch.einsum('ij,j...->i...', W, torch.stack(rad))
+        result = contract('ij,j...->i...', W, torch.stack(rad))
         result[:, r > r_o] = 0
         return result
 
