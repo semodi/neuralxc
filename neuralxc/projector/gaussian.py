@@ -1,3 +1,8 @@
+"""
+gaussian.py
+Implements density projection basis with radial functions based on Gaussians.
+Gaussians can be dampened (gamma) and truncated (r_o) for integration on numerical grids.
+"""
 import numpy as np
 from functools import reduce
 import time
@@ -18,6 +23,8 @@ from .polynomial import RadialProjector
 import neuralxc
 import os
 from opt_einsum import contract
+
+# Normalization factors
 GAMMA = torch.from_numpy(
     np.array([1 / 2, 3 / 4, 15 / 8, 105 / 16, 945 / 32, 10395 / 64, 135135 / 128]) * np.sqrt(np.pi))
 

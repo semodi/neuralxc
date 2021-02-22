@@ -1,3 +1,10 @@
+"""
+projector.py
+Defines the two base classes from which all other projectors are derived:
+EuclideanProjector for euclidean grids with periodic boundary conditions and
+RadialProjector for generalized grids without PBCs.
+"""
+
 from abc import ABC, abstractmethod
 import numpy as np
 from functools import reduce
@@ -363,6 +370,11 @@ class RadialProjector(EuclideanProjector):
 
     def __init__(self, grid_coords, grid_weights, basis_instructions, **kwargs):
         """
+        Projector for generalized grid (as provided by e.g. PySCF). More flexible
+        than euclidean grid as only grid point coordinates and their integration
+        weights need to be provided, however does not support periodic boundary
+        conditions. Special use case: Radial grids, as used by all-electron codes.
+
         Parameters
         ------------------
         grid_coords, numpy.ndarray (npoints, 3)

@@ -1,3 +1,8 @@
+"""
+polynomial.py
+Implements density projection basis with radial functions based on polynomials.
+"""
+
 from abc import ABC, abstractmethod
 import numpy as np
 from functools import reduce

@@ -1,3 +1,9 @@
+"""
+symmetrizer.py
+
+Implements different symmetrizers. Symmetrizers ensure that descriptors are
+invariant with respect to global rotations.
+"""
 from abc import ABC, abstractmethod
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator

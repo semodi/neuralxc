@@ -1,3 +1,8 @@
+"""
+engines.py
+Engines that act as adapters between NeuralXC and electronic structure codes (or their
+ASE calculator class if it exists). Used for dataset creation and passed to driver.
+"""
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
 try:

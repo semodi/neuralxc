@@ -1,3 +1,9 @@
+"""
+cp2k.py
+Extends the ASE CP2K calculator, by letting it read in custom input files.
+In particular it allows to add NeuralXC type functionals in the LIBXC section.
+Some code in this file was adapted from the original ASE implementation.
+"""
 from ase.calculators.cp2k import CP2K
 import re
 import os

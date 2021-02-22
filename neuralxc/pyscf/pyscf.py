@@ -1,3 +1,10 @@
+"""
+pyscf.py
+
+Defines the modified effective potential veff_mod that allows the integration
+of NeuralXC models in PySCF calculations. Provides utility functions for NeuralXC
+PySCF interoperability.
+"""
 import neuralxc
 from abc import ABC, abstractmethod
 import pyscf

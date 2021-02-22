@@ -1,3 +1,11 @@
+"""
+pyscf.py
+Contains all routines concerned with PySCF.
+For PySCF, projection integrals are computed analytical in the GTO basis and
+no grid operations are necessary.
+BasisPadder translates between NeuralXC and PySCF internal basis set orderings.
+"""
+
 import neuralxc
 from abc import ABC, abstractmethod
 import numpy as np
@@ -19,7 +27,10 @@ l_dict_inv = {l_dict[key]: key for key in l_dict}
 
 def get_eri3c(mol, auxmol, op):
     """ Returns three center-one electron intergrals need for basis
-    set projection
+    set projection.
+
+    TODO: Name misleading as no electron repulsion integrals computed,
+     will be changed in future versions.
     """
     pmol = mol + auxmol
     nao = mol.nao_nr()

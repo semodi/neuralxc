@@ -1,3 +1,11 @@
+"""
+preprocessor.py
+
+Preprocess electron density (either represented on grid or through density matrix with GTO) and
+into projected descriptors used to fit NeuralXC models. Part of training pipeline but not
+relevant for deployed models.
+
+"""
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from ..utils.density_getter import density_getter_factory
@@ -16,6 +24,10 @@ from dask.distributed import Client, LocalCluster
 
 class Preprocessor(TransformerMixin, BaseEstimator):
     def __init__(self, basis_instructions, src_path, atoms, target_path='', num_workers=1):
+        """
+        Following basis_instructions, applies a suitable DensityProjector to electron
+        densities stored to disk
+        """
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.atoms = atoms

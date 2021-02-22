@@ -1,3 +1,9 @@
+"""
+siesta.py
+Extends the ASE Siesta calculator, by letting it read in custom .fdf (input) files
+Some code in this file was adapted from the original ASE implementation.
+"""
+
 from ase.calculators.siesta.siesta import Siesta
 from ase.calculators.calculator import Calculator, all_changes
 import shutil
