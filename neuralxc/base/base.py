@@ -5,6 +5,7 @@ class ABCRegistry(ABCMeta):
     """Extends the ABCMeta class to include a registry
     """
     REGISTRY = {}
+
     def __new__(cls, name, bases, attrs):
         new_cls = type.__new__(cls, name, bases, attrs)
         if not hasattr(new_cls, '_registry_name'):

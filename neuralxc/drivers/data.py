@@ -4,7 +4,7 @@ import h5py
 from ase.io import read
 from neuralxc.symmetrizer import symmetrizer_factory
 from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import  GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
@@ -49,6 +49,7 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
         [None]*(3-len(slice.split(':')))
 
     ijk = bi_slice(i, j, k)
+
     def obs(which, zero):
         if which == 'energy':
             if traj:
@@ -200,15 +201,16 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     basis = pre['preprocessor']
     basis_key = basis_to_hash(basis)
     data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)
-    symmetrizer_instructions = {'symmetrizer_type': pre.get('symmetrizer_type','casimir')}
+    symmetrizer_instructions = {'symmetrizer_type': pre.get('symmetrizer_type', 'casimir')}
     symmetrizer_instructions.update({'basis': basis})
     species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
 
-    sampler_pipeline = get_default_pipeline(basis, species,
-     symmetrizer_type=symmetrizer_instructions['symmetrizer_type'],
-     pca_threshold=1)
+    sampler_pipeline = get_default_pipeline(basis,
+                                            species,
+                                            symmetrizer_type=symmetrizer_instructions['symmetrizer_type'],
+                                            pca_threshold=1)
 
     sampler_pipeline = Pipeline(sampler_pipeline.steps)
     sampler_pipeline.steps[-1] = ('sampler', SampleSelector(size))

@@ -35,7 +35,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis=0)
         if spec_agn:
-            self.species_string = unique_systems[0][0]*max([len(s) for s in unique_systems])
+            self.species_string = unique_systems[0][0] * max([len(s) for s in unique_systems])
         else:
             self.species_string = ''.join([s for s in unique_systems])
         # === Padding ===
@@ -126,6 +126,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
     def id(self, *args):
         return 1
+
 
 def transform_one(path, pos, species, basis_instructions):
 

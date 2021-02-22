@@ -10,8 +10,8 @@ from ..base import ABCRegistry
 import torch
 TorchModule = torch.nn.Module
 
-def convert_torch_wrapper(func):
 
+def convert_torch_wrapper(func):
     def wrapped_func(X, *args, **kwargs):
         made_tensor = False
         if isinstance(X, np.ndarray):
@@ -24,6 +24,7 @@ def convert_torch_wrapper(func):
             return Y
 
     return wrapped_func
+
 
 class SymmetrizerRegistry(ABCRegistry):
     REGISTRY = {}
@@ -132,7 +133,6 @@ class CasimirSymmetrizer(BaseSymmetrizer):
         self._symmetrize_function = convert_torch_wrapper(self._symmetrize_function)
         return BaseSymmetrizer.get_symmetrized(self, C)
 
-
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
         """ Returns the casimir invariants of the tensors stored in c
@@ -173,7 +173,6 @@ class CasimirSymmetrizer(BaseSymmetrizer):
 class MixedCasimirSymmetrizer(BaseSymmetrizer):
 
     _registry_name = 'mixed_casimir'
-
 
     def __init__(self, *args, **kwargs):
         BaseSymmetrizer.__init__(self, *args, **kwargs)
@@ -223,6 +222,7 @@ class MixedCasimirSymmetrizer(BaseSymmetrizer):
         casimirs = torch.stack(casimirs).T
 
         return casimirs.view(*c_shape[:-1], -1)
+
 
 def symmetrizer_factory(symmetrize_instructions):
     """

@@ -59,7 +59,6 @@ def test_eval():
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
 
-
 @pytest.mark.driver
 @pytest.mark.driver_data
 def test_data():
@@ -93,14 +92,14 @@ def test_data():
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
-def test_compile():
 
+def test_compile():
 
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    compile('model','model.jit', False)
+    compile('model', 'model.jit', False)
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')

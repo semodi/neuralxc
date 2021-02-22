@@ -68,7 +68,6 @@ def shcopytreedel(src, dest):
         shutil.copytree(src, dest)
 
 
-
 def parse_sets_input(path):
     """ Reads a file containing the sets used for fitting.
         An asterisk before a group name indicates that model predictions
@@ -102,9 +101,10 @@ def pyscf_to_gaussian_basis(basis):
 
     for spec in basis:
         if len(spec) < 3:
-            basis[spec] = {'basis':basis['basis'], 'sigma': 10}
+            basis[spec] = {'basis': basis['basis'], 'sigma': 10}
     basis.pop('basis')
     return basis
+
 
 def compile(in_path, jit_path, as_radial):
     """ Compile/serialize torch model so that it can be used by libnxc
@@ -119,8 +119,8 @@ def compile(in_path, jit_path, as_radial):
             if projector_type == 'pyscf_radial' or \
              (projector_type == 'ortho_radial' and\
               model.get_basis_instructions().get('application','') == 'pyscf'):
-              projector_type = 'gaussian_radial'
-              model.basis_instructions = pyscf_to_gaussian_basis(model.basis_instructions)
+                projector_type = 'gaussian_radial'
+                model.basis_instructions = pyscf_to_gaussian_basis(model.basis_instructions)
 
             model.basis_instructions.update({'projector_type': projector_type})
             print(model.basis_instructions)
@@ -129,10 +129,9 @@ def compile(in_path, jit_path, as_radial):
             projector_type = projector_type[:-len('_radial')]
             model.basis_instructions.update({'projector_type': projector_type})
     xc.ml.network.compile_model(model, jit_path, override=True)
-    if model.get_basis_instructions().get('spec_agnostic','False'):
-        with open(jit_path + '/AGN','w') as file:
+    if model.get_basis_instructions().get('spec_agnostic', 'False'):
+        with open(jit_path + '/AGN', 'w') as file:
             file.write('# This model is species agnostic')
-
 
     if os.path.exists('.tmp.np'):
         shutil.rmtree('.tmp.np')
@@ -157,7 +156,6 @@ def sc_driver(xyz,
     engine_kwargs = pre.get('engine_kwargs', {})
     if sets:
         sets = os.path.abspath(sets)
-
 
     # ============ Start from pre-trained model ================
     # Compile it for self-consistent deployment but keep original version
@@ -217,24 +215,17 @@ def sc_driver(xyz,
                     traj='workdir/results.traj',
                     override=True,
                     zero=E0)
-    add_data_driver(hdf5='data.hdf5',
-                    system='system',
-                    method='ref',
-                    add=['energy'],
-                    traj=xyz,
-                    override=True,
-                    zero=E0)
+    add_data_driver(hdf5='data.hdf5', system='system', method='ref', add=['energy'], traj=xyz, override=True, zero=E0)
     statistics_sc = \
     eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
             'system/ref'])
 
     open('statistics_sc', 'w').write(json.dumps(statistics_sc))
-    statistics_fit = fit_driver(
-        preprocessor='pre.json',
-        hyper='hyper.json',
-        model=model0_orig,
-        sets='sets.inp',
-        hyperopt=hyperopt)
+    statistics_fit = fit_driver(preprocessor='pre.json',
+                                hyper='hyper.json',
+                                model=model0_orig,
+                                sets='sets.inp',
+                                hyperopt=hyperopt)
 
     open('statistics_fit', 'w').write(json.dumps(statistics_fit))
 
@@ -254,10 +245,10 @@ def sc_driver(xyz,
         mkdir('workdir')
 
         shcopytreedel('best_model', 'model_it{}'.format(it_label))
-        compile('model_it{}'.format(it_label),'model_it{}.jit'.format(it_label),
-            'radial' in pre['preprocessor'].get('projector_type','ortho'))
+        compile('model_it{}'.format(it_label), 'model_it{}.jit'.format(it_label),
+                'radial' in pre['preprocessor'].get('projector_type', 'ortho'))
 
-        engine_kwargs = {'nxc': '../../model_it{}.jit'.format(it_label),'skip_calculated':False}
+        engine_kwargs = {'nxc': '../../model_it{}.jit'.format(it_label), 'skip_calculated': False}
         engine_kwargs.update(pre.get('engine_kwargs', {}))
 
         driver(read(xyz, ':'),
@@ -282,17 +273,14 @@ def sc_driver(xyz,
 
         open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
         open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
-        statistics_fit = fit_driver(preprocessor='pre.json',
-                                    hyper='hyper.json',
-                                    model='best_model',
-                                    sets='sets.inp')
+        statistics_fit = fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp')
         open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
     else:
         print('Maximum number of iterations reached. Proceeding to test set...')
 
     os.chdir('..')
     print('====== Testing ======')
-    testfile=''
+    testfile = ''
     if os.path.isfile('testing.xyz'):
         testfile = '../testing.xyz'
     if os.path.isfile('testing.traj'):
@@ -334,14 +322,7 @@ def sc_driver(xyz,
         print('testing.traj or testing.xyz not found.')
 
 
-def fit_driver(preprocessor,
-               hyper,
-               hdf5=None,
-               sets='',
-               sample='',
-               cutoff=0.0,
-               model='',
-               hyperopt=False):
+def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, model='', hyperopt=False):
     """ Fits a NXCPipeline to the provided data
     """
     inputfile = hyper
@@ -355,7 +336,7 @@ def fit_driver(preprocessor,
     basis_key = basis_to_hash(pre['preprocessor'])
     if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
         and pre['preprocessor'].get('spec_agnostic',False):
-            pre['preprocessor'].update(get_real_basis(None, pre['preprocessor']['X']['basis'], True))
+        pre['preprocessor'].update(get_real_basis(None, pre['preprocessor']['X']['basis'], True))
 
     print(pre['preprocessor'])
 
@@ -376,7 +357,7 @@ def fit_driver(preprocessor,
     new_model.set_params(**param_grid)
 
     if model:
-        hyperopt=False
+        hyperopt = False
         new_model.steps[-1][1].steps[2:] = xc.ml.network.load_pipeline(model).steps
 
     datafile = h5py.File(hdf5[0], 'r')
@@ -394,7 +375,6 @@ def fit_driver(preprocessor,
         sample = np.load(sample)
         data = data[sample]
         print("Using sample of size {}".format(len(sample)))
-
 
     np.random.shuffle(data)
     if hyperopt:
@@ -429,8 +409,17 @@ def fit_driver(preprocessor,
     return results
 
 
-def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=False, dest='prediction', sample='',
-                invert_sample=False, keep_mean = False, hashkey=''):
+def eval_driver(hdf5,
+                model='',
+                plot=False,
+                savefig='',
+                cutoff=0.0,
+                predict=False,
+                dest='prediction',
+                sample='',
+                invert_sample=False,
+                keep_mean=False,
+                hashkey=''):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
     hdf5 = hdf5
@@ -513,7 +502,7 @@ def eval_driver(hdf5, model='', plot=False, savefig='', cutoff=0.0, predict=Fals
         if model == '':
             plt.figure(figsize=(10, 8))
             plt.subplot(2, 1, 1)
-            plt.hist(dev.flatten(),bins = np.max([10,int(len(dev.flatten())/100)]))
+            plt.hist(dev.flatten(), bins=np.max([10, int(len(dev.flatten()) / 100)]))
             plt.xlabel('Target energies [eV]')
             plt.subplot(2, 1, 2)
         targets -= np.mean(targets)

@@ -16,6 +16,7 @@ from opt_einsum import contract
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
 
+
 def get_eri3c(mol, auxmol, op):
     """ Returns three center-one electron intergrals need for basis
     set projection
@@ -52,7 +53,6 @@ class PySCFProjector(BaseProjector):
         self.op = self.basis.get('operator', 'delta').lower()
         self.delta = self.basis.get('delta', False)
 
-
         if self.delta:
             mf = RKS(mol)
             self.dm_init = mf.init_guess_by_atom()
@@ -62,7 +62,7 @@ class PySCFProjector(BaseProjector):
             for atom_idx, _ in enumerate(mol.atom_charges()):
                 sym = mol.atom_pure_symbol(atom_idx)
                 if os.path.isfile(self.basis['basis']):
-                    basis[sym] = gto.basis.parse(open(self.basis['basis'],'r').read())
+                    basis[sym] = gto.basis.parse(open(self.basis['basis'], 'r').read())
                 else:
                     basis[sym] = gto.basis.load(self.basis['basis'], 'O')
         else:

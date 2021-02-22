@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     ase_found = False
 try:
     import torch
-    torch_found =True
+    torch_found = True
 except ModuleNotFoundError:
     torch_found = False
 try:
@@ -73,13 +73,13 @@ def test_formatter():
 
 @pytest.mark.fast
 @pytest.mark.parametrize(['transformer', 'filepath'],
-                         [  [xc.ml.transformer.GroupedStandardScaler(),
+                         [[xc.ml.transformer.GroupedStandardScaler(),
                            os.path.join(test_dir, 'scaler.pckl')],
                           [xc.ml.transformer.GroupedVarianceThreshold(0.005),
                            os.path.join(test_dir, 'var09.pckl')]])
 def test_grouped_transformers(transformer, filepath):
 
-    for use_torch in [False,True] if torch_found else [False]:
+    for use_torch in [False, True] if torch_found else [False]:
         with open(os.path.join(test_dir, 'transformer_in.pckl'), 'rb') as file:
             C = pickle.load(file)
 
@@ -126,5 +126,5 @@ def test_neuralxc_benzene():
     V = V / Hartree
     forces = forces / Hartree * Bohr
 
-    assert np.allclose(V,np.load(os.path.join(test_dir, 'benzene_test', 'V_benzene.npy')))
-    assert np.allclose(forces[:-3],np.load(os.path.join(test_dir, 'benzene_test', 'forces_benzene.npy'))[:-3])
+    assert np.allclose(V, np.load(os.path.join(test_dir, 'benzene_test', 'V_benzene.npy')))
+    assert np.allclose(forces[:-3], np.load(os.path.join(test_dir, 'benzene_test', 'forces_benzene.npy'))[:-3])

@@ -251,7 +251,6 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
 
     pipeline_list.append(('scaler', GroupedStandardScaler()))
 
-
     pipeline_list.append(('estimator', estimator))
 
     basis_instructions = basis
@@ -283,8 +282,10 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
         basis.update({'extension': 'RHOXC'})
 
-    pipeline = get_default_pipeline(basis, all_species, symmetrizer_type=pre.get('symmetrizer_type','casimir'),
-        spec_agnostic=spec_agnostic)
+    pipeline = get_default_pipeline(basis,
+                                    all_species,
+                                    symmetrizer_type=pre.get('symmetrizer_type', 'casimir'),
+                                    spec_agnostic=spec_agnostic)
 
     if 'hyperparameters' in inp:
         hyper = inp['hyperparameters']
@@ -349,6 +350,7 @@ def get_basis_grid(preprocessor):
     basis_grid = {'preprocessor__basis_instructions': basis_grid}
 
     return basis_grid
+
 
 def get_preprocessor(pre, atoms, src_path):
     species = ''.join(atoms[0].get_chemical_symbols())

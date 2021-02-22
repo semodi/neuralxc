@@ -16,6 +16,7 @@ torch.set_default_dtype(torch.float64)
 from .projector import EuclideanProjector, RadialProjector
 from opt_einsum import contract
 
+
 class OrthoProjector(EuclideanProjector):
     """ Implements orthonormal basis functions on a euclidean grid.
     Radial basis is based on polynomials.
@@ -29,7 +30,6 @@ class OrthoProjector(EuclideanProjector):
         N = math.sqrt(720*r_o**(11+2*a)*1/((2*a+11)*(2*a+10)*(2*a+9)*(2*a+8)*(2*a+7)*\
                                            (2*a+6)*(2*a+5)))
         return r.pow(2) * (r_o - r).pow(a + 2) / N
-
 
     @staticmethod
     def orthogonalize(func, r, basis, W):

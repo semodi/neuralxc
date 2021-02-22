@@ -3,6 +3,7 @@ import pandas as pd
 from tabulate import tabulate
 import neuralxc.config as config
 
+
 class DummyTimer():
     def start(self, name, *args, **kwargs):
         pass
@@ -70,6 +71,7 @@ class Timer():
             open(path, 'w').write(tabulate(report, tablefmt="pipe", headers="keys"))
         else:
             print(report)
+
 
 if config.UseTimer:
     timer = Timer()

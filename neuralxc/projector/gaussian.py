@@ -17,8 +17,10 @@ from .projector import EuclideanProjector, BaseProjector
 from .polynomial import RadialProjector
 import neuralxc
 import os
-from opt_einsum import contract 
-GAMMA = torch.from_numpy(np.array([1/2,3/4,15/8,105/16,945/32,10395/64,135135/128])*np.sqrt(np.pi))
+from opt_einsum import contract
+GAMMA = torch.from_numpy(
+    np.array([1 / 2, 3 / 4, 15 / 8, 105 / 16, 945 / 32, 10395 / 64, 135135 / 128]) * np.sqrt(np.pi))
+
 
 def parse_basis(basis_instructions):
     full_basis = {}
@@ -26,7 +28,7 @@ def parse_basis(basis_instructions):
     for species in basis_instructions:
         if len(species) < 3:
             if os.path.isfile(basis_instructions[species]['basis']):
-                basis_strings[species] = open(basis_instructions[species]['basis'],'r').read()
+                basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
                 bas = gtobasis.parse(basis_strings[species])
             else:
                 basis_strings[species] = basis_instructions[species]['basis']
@@ -34,28 +36,33 @@ def parse_basis(basis_instructions):
 
             spec = 'O' if species == 'X' else species
             try:
-                mol = gto.M(atom='{} 0 0 0'.format(spec),
-                            basis={spec: bas})
+                mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
             except:
-                mol = gto.M(atom='{} 0 0 0'.format(spec),
-                            basis={spec: bas}, spin = 1)
-            sigma = basis_instructions[species].get('sigma',2.0)
-            gamma = basis_instructions[species].get('gamma',1.0)
+                mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
+            sigma = basis_instructions[species].get('sigma', 2.0)
+            gamma = basis_instructions[species].get('gamma', 1.0)
             basis = {}
             for bi in range(mol.atom_nshells(0)):
                 l = mol.bas_angular(bi)
                 if l not in basis:
-                    basis[l] = {'alpha':[],'r_o':[],'coeff':[],'gamma':[]}
+                    basis[l] = {'alpha': [], 'r_o': [], 'coeff': [], 'gamma': []}
                 alpha = mol.bas_exp(bi)
                 coeff = mol.bas_ctr_coeff(bi)
-                r_o = alpha**(-1/2)*sigma*(1+l/5)
+                r_o = alpha**(-1 / 2) * sigma * (1 + l / 5)
                 basis[l]['alpha'].append(alpha)
                 basis[l]['r_o'].append(r_o)
                 basis[l]['gamma'].append(gamma)
                 basis[l]['coeff'].append(coeff)
-            basis = [{'l': l,'alpha': basis[l]['alpha'],'r_o': basis[l]['r_o'],'gamma': basis[l]['gamma'],'coeff':basis[l]['coeff']} for l in basis]
+            basis = [{
+                'l': l,
+                'alpha': basis[l]['alpha'],
+                'r_o': basis[l]['r_o'],
+                'gamma': basis[l]['gamma'],
+                'coeff': basis[l]['coeff']
+            } for l in basis]
             full_basis[species] = basis
     return full_basis, basis_strings
+
 
 class GaussianProjector(EuclideanProjector):
 
@@ -76,12 +83,11 @@ class GaussianProjector(EuclideanProjector):
         """
         TorchModule.__init__(self)
         full_basis, basis_strings = parse_basis(basis_instructions)
-        basis = {key:val for key,val in basis_instructions.items()}
+        basis = {key: val for key, val in basis_instructions.items()}
         basis.update(full_basis)
         self.basis_strings = basis_strings
         EuclideanProjector.__init__(self, unitcell, grid, basis, **kwargs)
         self.init_padder(basis_instructions)
-
 
     def forward_basis(self, positions, unitcell, grid, my_box):
         """Creates basis set (for projection) for a single atom, on grid points
@@ -110,7 +116,7 @@ class GaussianProjector(EuclideanProjector):
         basis = self.basis[self.species]
         box, mesh = self.box_around(positions, r_o_max, my_box)
         box['mesh'] = mesh
-        rad, ang  =  self.get_basis_on_mesh(box, basis)
+        rad, ang = self.get_basis_on_mesh(box, basis)
         return rad, ang, torch.cat([mesh.double(), box['radial']])
 
     def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, my_box):
@@ -145,7 +151,7 @@ class GaussianProjector(EuclideanProjector):
         box['mesh'] = my_box[:3]
         box['radial'] = my_box[3:]
         Xm, Ym, Zm = box['mesh'].long()
-        return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, basis, self.basis_strings[self.species], box)
+        return self.project_onto(rho[Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
 
     def get_basis_on_mesh(self, box, basis_instructions):
 
@@ -158,17 +164,17 @@ class GaussianProjector(EuclideanProjector):
             r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             filt = (box['radial'][0] <= 1000000)
-            box_rad = box['radial'][:,filt]
+            box_rad = box['radial'][:, filt]
             # box_m = box['mesh'][:,filt]
-            box_m = box['mesh'][:,filt]
-            ang = torch.zeros([2*l+1,filt.size()[0]], dtype=torch.double)
-            rad = torch.zeros([len(basis['r_o']),filt.size()[0]], dtype=torch.double)
+            box_m = box['mesh'][:, filt]
+            ang = torch.zeros([2 * l + 1, filt.size()[0]], dtype=torch.double)
+            rad = torch.zeros([len(basis['r_o']), filt.size()[0]], dtype=torch.double)
             # ang[:,filt] = torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])) # shape (m, x, y, z)
             # rad[:,filt] = torch.stack(self.radials(box_rad[0], [basis])[0]) # shape (n, x, y, z)
             # rads.append(rad)
             # angs.append(ang)
-            angs.append(torch.stack(self.angulars_real(l, box_rad[1], box_rad[2]))) # shape (m, x, y, z)
-            rads.append(torch.stack(self.radials(box_rad[0], [basis])[0])) # shape (n, x, y, z)
+            angs.append(torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])))  # shape (m, x, y, z)
+            rads.append(torch.stack(self.radials(box_rad[0], [basis])[0]))  # shape (n, x, y, z)
 
         return torch.cat(rads), torch.cat(angs)
 
@@ -181,10 +187,10 @@ class GaussianProjector(EuclideanProjector):
             # print(basis)
             l = basis['l']
             len_rad = len(basis['r_o'])
-            rad = rads[rad_cnt:rad_cnt+len_rad]
-            ang = angs[ang_cnt:ang_cnt + (2*l+1)]
+            rad = rads[rad_cnt:rad_cnt + len_rad]
+            ang = angs[ang_cnt:ang_cnt + (2 * l + 1)]
             rad_cnt += len_rad
-            ang_cnt += 2*l + 1
+            ang_cnt += 2 * l + 1
             r_o_max = np.max(basis['r_o'])
             filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
@@ -200,7 +206,7 @@ class GaussianProjector(EuclideanProjector):
     def init_padder(self, basis_instructions):
         basis_strings = self.basis_strings
         self.M = {}
-        self.symmetrize_instructions = {'basis':{}}
+        self.symmetrize_instructions = {'basis': {}}
         for species in basis_instructions:
             if len(species) < 3:
                 try:
@@ -209,25 +215,23 @@ class GaussianProjector(EuclideanProjector):
                     bas = basis_strings[species]
                 spec = 'O' if species == 'X' else species
                 try:
-                    mol = gto.M(atom='{} 0 0 0'.format(spec),
-                                basis={spec: bas})
+                    mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
                 except:
-                    mol = gto.M(atom='{} 0 0 0'.format(spec),
-                                basis={spec: bas}, spin = 1)
+                    mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
                 bp = neuralxc.pyscf.BasisPadder(mol)
                 il = bp.indexing_l[spec][0]
                 ir = bp.indexing_r[spec][0]
-                M = np.zeros([len(il),len(ir)])
+                M = np.zeros([len(il), len(ir)])
                 M[il, ir] = 1
                 self.M[species] = torch.from_numpy(M).double()
                 self.symmetrize_instructions['basis'].update(bp.get_basis_json())
 
     @classmethod
     def g(cls, r, r_o, alpha, l, gamma):
-        fc = 1-(.5*(1-torch.cos(np.pi*(r/gamma)/r_o[0])))**8
-        N = (2*alpha[0])**(l/2+3/4)*np.sqrt(2)/np.sqrt(GAMMA[l])
-        f = (r/gamma)**l*torch.exp(-alpha[0]*(r/gamma)**2)*fc*N
-        f[(r/gamma)>r_o[0]] = 0
+        fc = 1 - (.5 * (1 - torch.cos(np.pi * (r / gamma) / r_o[0])))**8
+        N = (2 * alpha[0])**(l / 2 + 3 / 4) * np.sqrt(2) / np.sqrt(GAMMA[l])
+        f = (r / gamma)**l * torch.exp(-alpha[0] * (r / gamma)**2) * fc * N
+        f[(r / gamma) > r_o[0]] = 0
         return f
 
     @classmethod
@@ -235,7 +239,7 @@ class GaussianProjector(EuclideanProjector):
         return np.eye(3)
 
     @classmethod
-    def radials(cls, r, basis, W = None):
+    def radials(cls, r, basis, W=None):
         result = []
         if isinstance(basis, list):
             for b in basis:
@@ -244,7 +248,7 @@ class GaussianProjector(EuclideanProjector):
                     res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l'], b['gamma'][ib]))
                 result.append(res)
         elif isinstance(basis, dict):
-                result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'],basis['gamma'])])
+            result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'], basis['gamma'])])
         return result
 
 
@@ -270,7 +274,7 @@ class RadialGaussianProjector(GaussianProjector, RadialProjector):
         self.grid_weights = torch.from_numpy(grid_weights)
         self.V_cell = self.grid_weights
         full_basis, basis_strings = parse_basis(basis_instructions)
-        basis = {key:val for key,val in basis_instructions.items()}
+        basis = {key: val for key, val in basis_instructions.items()}
         basis.update(full_basis)
         self.basis_strings = basis_strings
         self.basis = basis
@@ -286,4 +290,4 @@ class RadialGaussianProjector(GaussianProjector, RadialProjector):
         box['mesh'] = my_box[0]
         box['radial'] = my_box[1:]
         Xm = box['mesh'].long()
-        return  self.project_onto(rho[Xm], radials, angulars, basis, self.basis_strings[self.species], box)
+        return self.project_onto(rho[Xm], radials, angulars, basis, self.basis_strings[self.species], box)

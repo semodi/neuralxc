@@ -15,6 +15,7 @@ import numpy as np
 import torch
 TorchModule = torch.nn.Module
 
+
 def convert_torch_wrapper(func):
     # print('Wrapped function')
     def wrapped_func(X, *args, **kwargs):
@@ -29,6 +30,7 @@ def convert_torch_wrapper(func):
             return Y
 
     return wrapped_func
+
 
 class GroupedTransformer(ABC):
     """ Abstract base class, grouped transformer extend the functionality
@@ -51,9 +53,9 @@ class GroupedTransformer(ABC):
         if fit_params.get('wrap_torch', True) and hasattr(self, '_spec_dict'):
             for spec in self._spec_dict:
                 trafo = self._spec_dict[spec]
-        #         if not hasattr(self._spec_dict[spec], 'is_wrapped'):
-        #             self._spec_dict[spec].is_wrapped = False
-        #         if not self._spec_dict[spec].is_wrapped:
+                #         if not hasattr(self._spec_dict[spec], 'is_wrapped'):
+                #             self._spec_dict[spec].is_wrapped = False
+                #         if not self._spec_dict[spec].is_wrapped:
                 trafo.torch_transform = convert_torch_wrapper(trafo.torch_transform)
         #             self._spec_dict[spec].is_wrapped = True
         was_tuple = False
@@ -118,16 +120,16 @@ class GroupedTransformer(ABC):
             else:
                 return super().fit(atomic_shape(super_X))
 
-
     def fit_transform(self, X, y=None, **fit_params):
         return self.fit(X).transform(X)
 
     def forward(self, X):
-        return self.transform(X, wrap_torch = False)
+        return self.transform(X, wrap_torch=False)
 
     def to_torch(self):
         # TorchModule.__init__(self)
         pass
+
 
 class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModule):
     def __init__(self, threshold=0.0):
@@ -146,9 +148,10 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModul
     def torch_transform(self, X):
         X_shape = X.size()
         if not len(X_shape) == 2:
-            X = X.view(-1,X_shape[-1])
+            X = X.view(-1, X_shape[-1])
         support = torch.from_numpy(self.get_support()).bool()
         return X[:, support]
+
 
 class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
     def __init__(self, threshold=0.0):
@@ -164,13 +167,13 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
     def get_kwargs(self):
         return {}
 
-
     def torch_transform(self, X):
         X_shape = X.size()
         if not len(X_shape) == 2:
-            X = X.view(-1,X_shape[-1])
-        X = (X - torch.from_numpy(self.mean_))/torch.sqrt(torch.from_numpy(self.var_))
+            X = X.view(-1, X_shape[-1])
+        X = (X - torch.from_numpy(self.mean_)) / torch.sqrt(torch.from_numpy(self.var_))
         return X
+
 
 def identity(x):
     return x

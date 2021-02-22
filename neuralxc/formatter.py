@@ -266,8 +266,8 @@ def atomic_shape(X):
 def system_shape(X, n):
     return X.reshape(-1, n, X.shape[-1])
 
-def make_nested_absolute(df_cont):
 
+def make_nested_absolute(df_cont):
     def make_absolute(val):
         if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
             val = os.path.abspath(val)

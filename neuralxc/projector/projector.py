@@ -13,6 +13,7 @@ import torch
 from torch.nn import Module as TorchModule
 from opt_einsum import contract
 
+
 class ProjectorRegistry(ABCRegistry):
     REGISTRY = {}
 
@@ -30,6 +31,7 @@ def DensityProjector(**kwargs):
         raise Exception('Projector: {} not registered'.format(projector_type))
 
     return registry[projector_type](**kwargs)
+
 
 class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
 
@@ -93,7 +95,7 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
         box, mesh = self.box_around(positions, basis['r_o'], my_box)
-        rad, ang  =  self.get_basis_on_mesh(box, basis, self.W[self.species])
+        rad, ang = self.get_basis_on_mesh(box, basis, self.W[self.species])
         return rad, ang, mesh
 
     def forward(self, rho, positions, species, unitcell, grid, my_box):
@@ -131,7 +133,7 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
 
             self.species = spec
             rad, ang, mesh = self.forward_basis(pos, unitcell, grid, my_box)
-            projection = self.forward_fast(rho,pos,unitcell, grid, rad, ang, mesh)
+            projection = self.forward_fast(rho, pos, unitcell, grid, rad, ang, mesh)
             basis_rep[spec].append(projection.view(1, -1))
 
         for spec in basis_rep:
@@ -159,8 +161,8 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
             Value of angular function at provided point(s)
         """
         res = []
-        for m in range(-l,l+1):
-            res.append(geom.SH(l,m,theta,phi))
+        for m in range(-l, l + 1):
+            res.append(geom.SH(l, m, theta, phi))
         return res
 
     def project_onto(self, rho, rads, angs, n_l):
@@ -190,6 +192,7 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
         rads = self.radials(R, basis, W)
 
         return rads, angs
+
 
 class EuclideanProjector(BaseProjector):
 
@@ -221,22 +224,20 @@ class EuclideanProjector(BaseProjector):
         self.unitcell = torch.from_numpy(unitcell)
         self.grid = torch.from_numpy(grid).double()
         self.a = torch.from_numpy(a).double()
-        self.W = {w:torch.from_numpy(W[w]) for w in W}
+        self.W = {w: torch.from_numpy(W[w]) for w in W}
 
         for species in basis_instructions:
             if len(species) < 3:
                 W[species] = self.get_W(basis_instructions[species])
 
-
     def set_cell_parameters(self, unitcell, grid):
         a = torch.norm(unitcell, dim=1).double() / grid
-        U = contract('ij,i->ij', unitcell, 1/grid)
+        U = contract('ij,i->ij', unitcell, 1 / grid)
         self.grid = grid
         self.V_cell = torch.abs(torch.det(U))
-        self.U = torch.transpose(U,0,1)
+        self.U = torch.transpose(U, 0, 1)
         self.U_inv = torch.inverse(self.U)
         self.a = a
-
 
     def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, mesh):
         """Creates basis set (for projection) for a single atom, on grid points
@@ -266,9 +267,7 @@ class EuclideanProjector(BaseProjector):
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
         Xm, Ym, Zm = mesh.long()
-        return  self.project_onto(rho[Xm,Ym,Zm], radials, angulars, int(basis['l']))
-
-
+        return self.project_onto(rho[Xm, Ym, Zm], radials, angulars, int(basis['l']))
 
     def box_around(self, pos, radius, my_box):
         '''
@@ -300,15 +299,14 @@ class EuclideanProjector(BaseProjector):
         rmax = torch.ceil(radius / self.a) + 2
         # my_box = my_box - cm.view(3,1)
 
-        Xm = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=False, rmax=rmax, indexing='ij')
-        X = self.mesh_3d(self.U, self.a, my_box = my_box, cm = cm, scaled=True, rmax=rmax, indexing='ij')
+        Xm = self.mesh_3d(self.U, self.a, my_box=my_box, cm=cm, scaled=False, rmax=rmax, indexing='ij')
+        X = self.mesh_3d(self.U, self.a, my_box=my_box, cm=cm, scaled=True, rmax=rmax, indexing='ij')
 
-        Xs = X - dr.view(-1,1,1,1)
+        Xs = X - dr.view(-1, 1, 1, 1)
 
         cms = shift(cm, self.grid)
-        cms -= my_box[:,0]
-        Xm = torch.fmod((Xm + cms.view(-1,1,1,1)), self.grid.view(-1,1,1,1))
-
+        cms -= my_box[:, 0]
+        Xm = torch.fmod((Xm + cms.view(-1, 1, 1, 1)), self.grid.view(-1, 1, 1, 1))
 
         R = torch.norm(Xs, dim=0)
 
@@ -318,7 +316,7 @@ class EuclideanProjector(BaseProjector):
         Xm = Xm[:, co]
 
         Phi = torch.atan2(Xs[1], Xs[0])
-        Theta = torch.acos(Xs[2]/ R)
+        Theta = torch.acos(Xs[2] / R)
         Theta[R < 1e-15] = 0
         return {'radial': [R, Theta, Phi], 'co': co}, Xm
 
@@ -344,21 +342,20 @@ class EuclideanProjector(BaseProjector):
             y_pbc = shift(y_pbc, self.grid[1])
             z_pbc = shift(z_pbc, self.grid[2])
 
-        x_pbc = x_pbc[(x_pbc_shifted >= my_box[0,0]) & (x_pbc_shifted < my_box[0,1])]
-        y_pbc = y_pbc[(y_pbc_shifted >= my_box[1,0]) & (y_pbc_shifted < my_box[1,1])]
-        z_pbc = z_pbc[(z_pbc_shifted >= my_box[2,0]) & (z_pbc_shifted < my_box[2,1])]
+        x_pbc = x_pbc[(x_pbc_shifted >= my_box[0, 0]) & (x_pbc_shifted < my_box[0, 1])]
+        y_pbc = y_pbc[(y_pbc_shifted >= my_box[1, 0]) & (y_pbc_shifted < my_box[1, 1])]
+        z_pbc = z_pbc[(z_pbc_shifted >= my_box[2, 0]) & (z_pbc_shifted < my_box[2, 1])]
 
         Xm, Ym, Zm = torch.meshgrid([x_pbc, y_pbc, z_pbc])
 
-        Rm = torch.stack([Xm,
-                        Ym,
-                        Zm]).double()
+        Rm = torch.stack([Xm, Ym, Zm]).double()
 
         if scaled:
             R = contract('ij,jklm -> iklm', U, Rm)
             return R
         else:
             return Rm
+
 
 class RadialProjector(EuclideanProjector):
 
@@ -386,7 +383,7 @@ class RadialProjector(EuclideanProjector):
         self.grid_coords = torch.from_numpy(grid_coords)
         self.grid_weights = torch.from_numpy(grid_weights)
 
-        self.W = {w:torch.from_numpy(W[w]) for w in W}
+        self.W = {w: torch.from_numpy(W[w]) for w in W}
 
         for species in basis_instructions:
             if len(species) < 3:
@@ -401,15 +398,14 @@ class RadialProjector(EuclideanProjector):
         self.grid_weights = grid_weights
         self.V_cell = grid_weights
 
-
     def forward_fast(self, rho, positions, grid_coords, grid_weights, radials, angulars, my_box):
         Xm = my_box.long()
         grid_weights = grid_weights[Xm]
         self.set_cell_parameters(grid_coords, grid_weights)
         basis = self.basis[self.species]
-        return  self.project_onto(rho[Xm], radials, angulars, int(basis['l']))
+        return self.project_onto(rho[Xm], radials, angulars, int(basis['l']))
 
-    def box_around(self, pos, radius, my_box = None):
+    def box_around(self, pos, radius, my_box=None):
         '''
         Return dictionary containing box around an atom at position pos with
         given radius. Dictionary contains box in mesh, euclidean and spherical
@@ -428,8 +424,7 @@ class RadialProjector(EuclideanProjector):
 
         # Create box with max. distance = radius
         Xm = torch.arange(len(self.grid_weights))
-        X = (self.grid_coords - pos.view(-1,3)).T
-
+        X = (self.grid_coords - pos.view(-1, 3)).T
 
         R = torch.norm(X, dim=0)
 
@@ -442,8 +437,9 @@ class RadialProjector(EuclideanProjector):
 
         Theta = torch.acos(X[2] / R)
         Theta[R < 1e-15] = 0
-        return {'radial': [R, Theta, Phi], 'co': co}, Xm.view(1,-1)
+        return {'radial': [R, Theta, Phi], 'co': co}, Xm.view(1, -1)
+
 
 def shift(c, g):
-    c = torch.fmod(c + torch.ceil(torch.abs(torch.min(c)/g))*g, g)
+    c = torch.fmod(c + torch.ceil(torch.abs(torch.min(c) / g)) * g, g)
     return c

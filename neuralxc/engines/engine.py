@@ -64,6 +64,7 @@ class PySCFEngine(BaseEngine):
         atoms.calc.results = {'energy': e * Hartree}
         return atoms
 
+
 class PySCFEngine(PySCFEngine):
 
     _registry_name = 'pyscf_rad'
@@ -75,14 +76,15 @@ class ASECalcEngine(BaseEngine):
 
     def __init__(self, **kwargs):
         calc = calculators
-        for c in kwargs.pop('calculator','cp2k.CP2K').split('.'):
+        for c in kwargs.pop('calculator', 'cp2k.CP2K').split('.'):
             calc = getattr(calc, c)
         self.calc = calc(**kwargs)
 
     def compute(self, atoms):
-        atoms.calc  =self.calc
+        atoms.calc = self.calc
         atoms.get_potential_energy()
         return atoms
+
 
 class CP2KEngine(ASECalcEngine):
 
@@ -90,6 +92,7 @@ class CP2KEngine(ASECalcEngine):
 
     def __init__(self, **kwargs):
         self.calc = CustomCP2K(**kwargs)
+
 
 class SiestaEngine(ASECalcEngine):
 

@@ -10,13 +10,13 @@ from glob import glob
 import os
 import json
 
-class PySCFNXC(AtomicFunc):
 
+class PySCFNXC(AtomicFunc):
     def __init__(self, path):
         model_paths = glob(path + '/*')
         for mp in model_paths:
             if 'bas.json' == os.path.basename(mp):
-                self.basis = json.loads(open(mp,'r').read())
+                self.basis = json.loads(open(mp, 'r').read())
         super().__init__(path)
 
     def initialize(self, mol):
@@ -33,11 +33,11 @@ class PySCFNXC(AtomicFunc):
         V /= Hartree
         return E, V
 
-class NeuralXC(AtomicFunc):
 
+class NeuralXC(AtomicFunc):
     def get_V(self, rho, calc_forces=False):
         output = self.compute({'rho': rho}, do_forces=calc_forces, edens=False)
-        E, V = output['zk'],output['vrho']
+        E, V = output['zk'], output['vrho']
         if calc_forces:
             forces = output['forces']
             V = (V, forces)

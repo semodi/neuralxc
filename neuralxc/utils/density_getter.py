@@ -18,6 +18,7 @@ def get_dm(mo_coeff, mo_occ):
     """ Get density matrix"""
     return np.einsum('ij,j,jk -> ik', mo_coeff, mo_occ, mo_coeff.T)
 
+
 class DensityGetterRegistry(ABCRegistry):
     REGISTRY = {}
 
@@ -32,22 +33,23 @@ class BaseDensityGetter(metaclass=DensityGetterRegistry):
     def get_density(self, file_path):
         pass
 
+
 class CubeDensityGetter(BaseDensityGetter):
 
     _registry_name = 'cube'
 
-    def __init__(self,**kwargs):
+    def __init__(self, **kwargs):
         pass
 
     def get_density(self, file_path, return_dict=False):
 
-        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9,header = None)
+        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9, header=None)
         mask = (~rho.isna()).values.flatten()
         rho = rho.values.flatten()
         rho = rho[mask]
-        grid_dh = pd.read_csv(file_path, delim_whitespace=True,skiprows=3,header = None,nrows=3).values
+        grid_dh = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None, nrows=3).values
         grid = grid_dh[:, 0].astype(int)
-        unitcell = grid_dh[:,1:] * grid
+        unitcell = grid_dh[:, 1:] * grid
 
         rho = rho.reshape(*grid)
         res = [rho, unitcell, grid]
@@ -57,16 +59,18 @@ class CubeDensityGetter(BaseDensityGetter):
         else:
             return res
 
+
 class CP2KDensityGetter(CubeDensityGetter):
 
     _registry_name = 'cp2k'
+
 
 class PySCFDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf'
 
-    def __init__(self, binary=None, valence = False,**kwargs):
-        self.valence =valence
+    def __init__(self, binary=None, valence=False, **kwargs):
+        self.valence = valence
 
     def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
@@ -74,7 +78,7 @@ class PySCFDensityGetter(BaseDensityGetter):
         if self.valence:
             print('Using only valence density'.format(self.valence))
             core = 0
-            for aidx, _ in enumerate(mol.atom) :
+            for aidx, _ in enumerate(mol.atom):
                 charge = mol.atom_charge(aidx)
                 if charge > 10:
                     core += 2
@@ -86,6 +90,7 @@ class PySCFDensityGetter(BaseDensityGetter):
             return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
         else:
             return res
+
 
 class PySCFRadDensityGetter(BaseDensityGetter):
 
@@ -99,7 +104,7 @@ class PySCFRadDensityGetter(BaseDensityGetter):
         if self.valence:
             print('Using only valence density'.format(self.valence))
             core = 0
-            for aidx, _ in enumerate(mol.atom) :
+            for aidx, _ in enumerate(mol.atom):
                 charge = mol.atom_charge(aidx)
                 if charge > 10:
                     core += 2
@@ -107,7 +112,7 @@ class PySCFRadDensityGetter(BaseDensityGetter):
                     core += 1
             results['mo_occ'][:core] = 0
 
-        dm = get_dm(results['mo_coeff'],results['mo_occ'])
+        dm = get_dm(results['mo_coeff'], results['mo_occ'])
         mf = dft.RKS(mol)
         mf.xc = 'PBE'
         mf.grids.level = 4
@@ -120,6 +125,7 @@ class PySCFRadDensityGetter(BaseDensityGetter):
             return {'rho': res[0], 'grid_coords': res[1], 'grid_weights': res[2]}
         else:
             return res
+
 
 class SiestaDensityGetter(BaseDensityGetter):
 

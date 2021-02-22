@@ -122,8 +122,7 @@ def merge_sets(file, datasets, density_key=None, new_name='merged', E0={}):
     if density_key:
         densities = [file[data + '/density/' + density_key][:] for data in datasets]
 
-        densities_full = np.zeros(
-            [sum([len(d) for d in densities]), sum([d.shape[1] for d in densities])])
+        densities_full = np.zeros([sum([len(d) for d in densities]), sum([d.shape[1] for d in densities])])
         line_mark = 0
         col_mark = 0
         for d in densities:
