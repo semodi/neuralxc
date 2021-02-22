@@ -44,7 +44,7 @@ def test_radial_model():
     model = xc.NeuralXC(test_dir[:-len('neuralxc/tests/')] + '/examples/models/NXC-W01/nxc_w01_radial.jit')
     rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
 
-    model.initialize(unitcell = mf.grids.coords, grid = mf.grids.weights,
+    model.initialize(grid_coords = mf.grids.coords, grid_weights = mf.grids.weights,
                      positions = np.array([[0,0,0],[0,1,0],[0,0,1]])/Bohr,
                      species = ['O','H','H'])
 
