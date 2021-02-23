@@ -203,7 +203,7 @@ class GaussianProjector(EuclideanProjector):
             # filt = (box['radial'][0] <= 1000000)
             rad *= self.V_cell
             # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            coeff.append(contract('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
+            coeff.append(torch.einsum('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
 
         coeff = torch.cat(coeff)
 

@@ -106,8 +106,8 @@ def pyscf_to_gaussian_basis(basis):
     return basis
 
 
-def compile(in_path, jit_path, as_radial):
-    """ Compile/serialize torch model so that it can be used by libnxc
+def serialize(in_path, jit_path, as_radial):
+    """ serialize/serialize torch model so that it can be used by libnxc
     """
 
     model = xc.ml.network.load_pipeline(in_path)
@@ -128,7 +128,7 @@ def compile(in_path, jit_path, as_radial):
         if projector_type[-len('_radial'):] == '_radial':
             projector_type = projector_type[:-len('_radial')]
             model.basis_instructions.update({'projector_type': projector_type})
-    xc.ml.network.compile_model(model, jit_path, override=True)
+    xc.ml.network.serialize_pipeline(model, jit_path, override=True)
     if model.get_basis_instructions().get('spec_agnostic', 'False'):
         with open(jit_path + '/AGN', 'w') as file:
             file.write('# This model is species agnostic')
@@ -158,14 +158,14 @@ def sc_driver(xyz,
         sets = os.path.abspath(sets)
 
     # ============ Start from pre-trained model ================
-    # Compile it for self-consistent deployment but keep original version
+    # serialize it for self-consistent deployment but keep original version
     # to continue training it
     model0_orig = ''
     if model0:
         if model0 == 'model0.jit':
             raise Exception('Please choose a different name/path for model0 as it' +\
             ' model0.jit would be overwritten by this routine')
-        compile(in_path=model0, jit_path='model0.jit', as_radial=False)
+        serialize(in_path=model0, jit_path='model0.jit', as_radial=False)
 
         model0_orig = model0
         model0_orig = os.path.abspath(model0_orig)
@@ -245,8 +245,8 @@ def sc_driver(xyz,
         mkdir('workdir')
 
         shcopytreedel('best_model', 'model_it{}'.format(it_label))
-        compile('model_it{}'.format(it_label), 'model_it{}.jit'.format(it_label),
-                'radial' in pre['preprocessor'].get('projector_type', 'ortho'))
+        serialize('model_it{}'.format(it_label), 'model_it{}.jit'.format(it_label),
+                  'radial' in pre['preprocessor'].get('projector_type', 'ortho'))
 
         engine_kwargs = {'nxc': '../../model_it{}.jit'.format(it_label), 'skip_calculated': False}
         engine_kwargs.update(pre.get('engine_kwargs', {}))
@@ -366,7 +366,7 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
     if model:
         for set in apply_to:
             selection = (data[:, 0] == set)
-            prediction = new_model.predict(data)[set]
+            prediction = new_model.predict(data)[set][:, 0]
             print('Dataset {} old STD: {}'.format(set, np.std(data[selection][:, -1])))
             data[selection, -1] += prediction
             print('Dataset {} new STD: {}'.format(set, np.std(data[selection][:, -1])))

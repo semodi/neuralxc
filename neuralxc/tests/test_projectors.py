@@ -166,7 +166,7 @@ def test_gaussian_projector(torch=''):
 
 
 @pytest.mark.gaussian
-def test_gaussian_compiled():
+def test_gaussian_serialized():
     density_getter = xc.utils.SiestaDensityGetter(binary=True)
     rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
 
@@ -184,7 +184,7 @@ def test_gaussian_compiled():
                                                       grid=grid,
                                                       basis_instructions=basis_instructions)
 
-    basis_models, projector_models = xc.ml.network.compile_projector(density_projector)
+    basis_models, projector_models = xc.ml.network.serialize_projector(density_projector)
 
     my_box = torch.Tensor([[0, grid[i]] for i in range(3)])
     unitcell = torch.from_numpy(unitcell).double()

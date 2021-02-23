@@ -79,11 +79,11 @@ def test_pyscf_radial():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    compile('model', 'benzene.pyscf.jit', as_radial=False)
+    serialize('model', 'benzene.pyscf.jit', as_radial=False)
     engine = Engine('pyscf', nxc='benzene.pyscf.jit')
     atoms = engine.compute(read('benzene_small.traj', '0'))
 
-    compile('model', 'benzene.pyscf_radial.jit', as_radial=True)
+    serialize('model', 'benzene.pyscf_radial.jit', as_radial=True)
     engine = Engine('pyscf', nxc='benzene.pyscf_radial.jit')
     atoms_rad = engine.compute(read('benzene_small.traj', '0'))
 

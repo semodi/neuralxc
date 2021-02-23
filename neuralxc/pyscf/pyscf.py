@@ -57,6 +57,7 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='', **kw
     spec = atoms.get_chemical_symbols()
     mol_input = [[s, p] for s, p in zip(spec, pos)]
     mol = gto.M(atom=mol_input, basis=basis, **kwargs)
+    # mol.verbose= 4
     if nxc:
         model_paths = glob(nxc + '/*')
         if any(['projector' in path for path in model_paths]):

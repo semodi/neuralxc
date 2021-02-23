@@ -29,7 +29,7 @@ def get_eri3c(mol, auxmol, op):
     """ Returns three center-one electron intergrals need for basis
     set projection.
 
-    TODO: Name misleading as no electron repulsion integrals computed,
+    TODO: Name is misleading as no electron repulsion integrals computed,
      will be changed in future versions.
     """
     pmol = mol + auxmol
@@ -56,6 +56,29 @@ class PySCFProjector(BaseProjector):
     _registry_name = 'pyscf'
 
     def __init__(self, mol, basis_instructions, **kwargs):
+        """
+        Projector class specific to usage with PySCF. Instead of working with
+        electron density on real space grid, density matrix is projected using
+        analytical integrals.
+
+        Parameters
+        -----------
+        mol, pyscf.gto.M
+            Contains information about atoms and GTO basis
+
+        basis_instructions, dict
+            Basis instructions containing following values:
+                - spec_agnostic, bool (False)
+                    Use same basis for every atomic species?
+                - operator, {'delta', 'rij'} ('delta')
+                    Operator in overlap integral used for projection, delta
+                    means standard 3-center overalp, rij with coulomb kernel.
+                - delta, bool (False)
+                    Use delta density (atomic density subracted)
+                - basis, str
+                    Either name of PySCF basis (e.g. ccpvdz-jkfit) or file
+                    containing basis.
+        """
         self.basis = basis_instructions
         self.initialize(mol)
 
@@ -84,15 +107,22 @@ class PySCFProjector(BaseProjector):
         self.eri3c = get_eri3c(mol, auxmol, self.op)
         self.mol = mol
         self.auxmol = auxmol
+        self.S_aux = self.auxmol.intor('int1e_ovlp')
+        # self.Sinv = np.linalg.pinv(auxovlp)
 
     def get_basis_rep(self, dm, **kwargs):
+        """ Project density matrix dm onto set of basis functions and return
+        the projection coefficients (coeff)
+        """
         # if not mol is None and mol.atom != self.mol.atom:
         #     self.initialize(mol)
         if self.delta:
             dm = dm - self.dm_init
         coeff = get_coeff(dm, self.eri3c)
-        coeff = self.bp.pad_basis(coeff)
 
+        # coeff = self.Sinv.dot(coeff)
+        # coeff = np.linalg.solve(self.S_aux, coeff)
+        coeff = self.bp.pad_basis(coeff)
         if self.spec_agnostic:
             self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
             coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis=0)
@@ -101,21 +131,27 @@ class PySCFProjector(BaseProjector):
         return coeff
 
     def get_V(self, dEdC, **kwargs):
+        """ given dEnergy/dCoeff, returns the effective potential V in original
+        AO-basis
+        """
         if self.spec_agnostic:
             running_idx = 0
             for sym in self.spec_partition:
-                dEdC[sym] = dEdC['X'][:, running_idx:running_idx + self.spec_partition[sym]]
+                dEdC[sym] = dEdC['X'][running_idx:running_idx + self.spec_partition[sym]]
                 running_idx += self.spec_partition[sym]
 
             dEdC.pop('X')
         dEdC = self.bp.unpad_basis(dEdC)
+        # dEdC = self.Sinv.dot(dEdC)
         V = contract('ijk, k', self.eri3c, dEdC)
         return V
 
 
 class BasisPadder():
     def __init__(self, mol):
-
+        """ Translates between PySCF basis sets and their ordering and the
+        NeuralXC internal representation for projection coefficients.
+        """
         self.mol = mol
 
         max_l = {}
@@ -179,6 +215,8 @@ class BasisPadder():
         return basis
 
     def pad_basis(self, coeff):
+        """ Go from PySCF to NeuralXC representation
+        """
         # Mimu = None
         coeff_out = {
             sym: np.zeros([self.sym_cnt[sym], self.max_n[sym] * (self.max_l[sym] + 1)**2])
@@ -196,7 +234,8 @@ class BasisPadder():
         return coeff_out
 
     def unpad_basis(self, coeff):
-
+        """ Go from NeuralXC to PySCF representation 
+        """
         cnt = {sym: 0 for sym in self.indexing_l}
         coeff_out = np.zeros(len(self.mol.ao_labels()))
         for aidx, slice in enumerate(self.mol.aoslice_by_atom()):

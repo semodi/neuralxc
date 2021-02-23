@@ -93,13 +93,13 @@ def test_data():
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
 
-def test_compile():
+def test_serialize():
 
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    compile('model', 'model.jit', False)
+    serialize('model', 'model.jit', False)
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')

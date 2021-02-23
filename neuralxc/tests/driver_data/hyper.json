@@ -7,13 +7,9 @@
         "estimator__b": [1e-2,1e-4],
         "estimator__alpha": 0.001,
         "estimator__max_steps": 201,
-        "estimator__test_size": 0.0,
         "estimator__valid_size": 0,
-        "estimator__random_seed": null,
         "estimator__batch_size": 0,
-        "estimator__activation": "sigmoid",
-        "estimator__optimizer": null,
-        "estimator__target_loss": 0.002
+        "estimator__activation": "sigmoid"
     },
     "cv": 2,
     "n_workers": 1,
