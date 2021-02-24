@@ -2,11 +2,9 @@
 # Spherical harmonics utility functions
 import numpy as np
 import math
-# from numba import jit
 import torch
 
 
-# @jit(nopython=True)
 def associated_legendre_polynomial(l, m, x, pmm, pll):
     if m > 0:
         somx2 = torch.sqrt((1 - x) * (1 + x))
@@ -26,13 +24,11 @@ def associated_legendre_polynomial(l, m, x, pmm, pll):
     return pll
 
 
-# @jit
 def SH_renormalization(l, m):
     return math.sqrt((2.0 * l + 1.0) * math.factorial(l - m) / \
         (4 * math.pi * math.factorial(l + m)))
 
 
-# @jit
 def SH(l, m, theta, phi):
     pmm = torch.ones_like(theta)
     pll = torch.zeros_like(theta)

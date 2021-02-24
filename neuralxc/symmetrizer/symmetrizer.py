@@ -8,8 +8,6 @@ from abc import ABC, abstractmethod
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from ..doc_inherit import doc_inherit
-from sympy.physics.quantum.cg import CG
-from sympy import N
 import numpy as np
 from ..formatter import expand
 from ..base import ABCRegistry

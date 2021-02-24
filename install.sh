@@ -21,24 +21,20 @@ conda install -y  -c conda-forge -c defaults  \
    ipyparallel \
    ipython \
    jupyter \
-   keras \
    matplotlib \
-   numba \
    numpy\
    pandas \
    periodictable \
    scikit-learn=0.20.3 \
    scipy \
-   seaborn \
-   statsmodels \
-   sympy \
-   tensorflow=1.1.0 \
    pytest \
    pytest-cov \
+   dill=0.3.2
 
+conda install -y pytorch=1.4 torchvision torchaudio cpuonly -c pytorch
+yes |  pip install opt_einsum 
 yes |  pip install codecov
-#yes |  pip install pyscf
+yes |  pip install pyscf
 yes |  pip install tabulate
-export NPY_DISTUTILS_APPEND_FLAGS=1
 pip install -e .
 

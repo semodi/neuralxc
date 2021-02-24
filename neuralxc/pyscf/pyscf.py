@@ -16,14 +16,12 @@ from pyscf.lib.numpy_helper import NPArrayWithTag
 import numpy as np
 from scipy.special import sph_harm
 import scipy.linalg
-from sympy import N
+# from sympy import N
 from functools import reduce
 import time
 import math
 from ..doc_inherit import doc_inherit
-from spher_grad import grlylm
 from ..base import ABCRegistry
-from numba import jit
 from ..timer import timer
 from ..projector import BaseProjector
 import neuralxc
