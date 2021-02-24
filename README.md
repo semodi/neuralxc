@@ -12,91 +12,64 @@ Implementation of a machine learned density functional as presented [here](https
 
 ### Installation
 
-Installation of NeuralXC requires anaconda. 
-NeuralXC has only been tested on Linux and Mac OS X.
-To install NeuralXC, navigate into the root directory of the repository and run 
+
+To install NeuralXC, navigate into the root directory of the repository and run
 ```
-sh install.sh 
+sh install.sh
 ```
-The installation can be tested by running
+This assumes that anaconda is available, alternatively the packages listed in `install.sh` can be manually installed with pip .
+So far, NeuralXC has only been tested on Linux and Mac OS X.
+
+To check the integrity of your installation, you can run unite tests with
 ```
 pytest -v
-``` 
-in the same directory. Once all dependencies are downloaded and installed, the installation of NeuralXC should not take more than one minute.
-
-#### Electronic structure code installation
-
-At the moment, NeuralXC has been implemented to work with SIESTA (Spanish Initiative for Electronic Simulations with Thousands of Atoms).
-So far, the only way to install the NeuralXC extension is by applying a patch that can be found in `src/siesta_patch.tar`. 
-
-- To install please download the 4.1-b4 version of SIESTA [here](https://launchpad.net/siesta) and unpack it at a location of your preference.
-
-- Proceed by copying [`src/siesta_patch.tar`](src) into the `Src/` directory inside your SIESTA installation.
-
-- Unpack the patch by running `tar -xf siesta_patch.tar` (inside `Src/`) and run `sh apply_patch.sh`. This will apply the patch file and download [Forpy](https://github.com/ylikx/forpy), a library that is needed for SIESTA to access Python code. During compilation, Forpy requires the flags
 ```
--fno-lto `python3-config --ldflags`
-```
-   If you are using one of SIESTA's arch.make files simply add the above line to `LIBS=`.
+in the same directory.
 
-- SIESTA can now be compiled as usual (MPI is still supported). Please refer to their manual regarding details about the installation.
+### Libnxc and pylibnxc
+
+The new version of NeuralXC only implement routines to **train** functionals. To actually use these functionals in
+self-consistent electronic structure calculations, [Libnxc](https://github.com/semodi/libnxc) (for C++ and Fortran support) or pylibnxc (for Python support) is required.
+pylibnxc is installed automatically by `sh install.sh` whereas Libnxc has to be downloaded and compiled manually.
 
 ### How-to
 
+Out of the box, NeuralXC works with PySCF. This means  
 Examples on how to train and deploy a machine learned functional can be found in [examples/example_scripts/](examples/example_scripts).
 
 #### Model training
 
-To train/fit a functional a set of structures and their associated reference energies is required. These structures need to be provided in an [ASE](https://wiki.fysik.dtu.dk/ase/) formatted `.xyz` or `.traj` file (in this example `training_structures.xyz`). Assuming that Siesta along with its NeuralXC extension was installed, iterative training can be performed by running
+To train/fit a functional a set of structures and their associated reference energies is required. These structures need to be provided in an [ASE](https://wiki.fysik.dtu.dk/ase/) formatted `.xyz` or `.traj` file (in this example `training_structures.xyz`). Self-consistent training can be performed by running
 
-`neuralxc iterative training_structures.xyz basis.json hyperparameters.json`
+`neuralxc sc training_structures.xyz basis.json hyperparameters.json`
 
 - `basis.json` contains information regarding the basis set as well as the 'driver' program (SIESTA), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
 
 - `hyperparameters.json` contains the machine learning hyperparameters, examples can be found in [examples/inputs/hyper](examples/inputs/hyper).
 
-- For more options please refer to `neuralxc iterative --help`
+- For more options please refer to the documentation and `neuralxc sc --help`
 
 
 #### Model deployment
 
-To deploy a trained model in SIESTA simply add the line `neuralxc $PATH_TO_NXC_MODEL` (replace with actual path!) to your `.fdf` input file. 
+After installing Libnxc and patching SIESTA (see instructions in [Libnxc manual](https://libnxc.readthedocs.io/en/latest/), NeuralXC can be used from within
+SIESTA in self-consistent calculations.
+To deploy a trained model in SIESTA simply add the line `neuralxc $PATH_TO_NXC_MODEL` to your `.fdf` input file.
 
-SIESTA can be used with MPI (if compiled accordingly) but the NeuralXC part will be computed in serial. To enable multi-threading in NeuralXC, the option `neuralxc.threads $N_THREADS` can be added to the `.fdf` input file.
+### Reproducibility
 
- 
-
-### Reproducibility 
-
-Data (raw data, input files, trained models) needed to reproduce the results presented in \[2\] can be found in [examples/](examples).
-
-Data that has been obtained from other sources and which has been published in the past is not provided. However, where possible, we have included scripts to download data from the respective repositories.
-
-
-### Troubleshooting
-
-If the model fails during deployment (i.e. SIESTA crashes when using NeuralXC) try the following steps:
-
-- Run `siesta < $INPUT_FILE_FDF`, i.e. run your calculation while printing the ouput to your screen in real time. When piping the output to a file, siesta does not print python exceptions which makes debugging harder.
-
-- If the model crashes right after `Initializing NeuralXC from Fortran`, make sure you have activated the anaconda environment that contains your NeuralXC installation (if applicable).
-If error persists, try to recompile SIESTA while being in the same anaconda environment in which you installed NeuralXC. Compiling SIESTA with different libraries/compilers than are accessible to NeuralXC can cause compatibilty issues.
-
-- If the model crashes after `NeuralXC: Load pipeline from `, double check to make sure the path to the NeuralXC model you provided is correct.
-
-- If problems persist, please create an Issue on GitHub or contact me directly.
-
+To reproduce the results presented in \[2\] please refer to our release v0.2 of this repository.
 
 ### Reference
 
-If you use this code in your work, please cite it as 
+If you use this code in your work, please cite it as
 
 [1] *Dick, Sebastian, and Marivi Fernandez-Serra. "Learning from the density to correct total energy and forces in first principle simulations." The Journal of Chemical Physics 151.14 (2019): 144102.*
 
 and
 
 
-[2] *Dick, Sebastian, and Marivi Fernandez-Serra. "Machine Learning a Highly Accurate Exchange and Correlation Functional of the Electronic Density". ChemRxiv 9947312 (preprint), doi:10.26434/chemrxiv.9947312.v1*
+[2] *Dick, S., Fernandez-Serra, M. Machine learning accurate exchange and correlation functionals of the electronic density. Nat Commun 11, 3509 (2020). https://doi.org/10.1038/s41467-020-17265-7*
 
 ### Copyright
 
@@ -104,7 +77,6 @@ Copyright (c) 2019, Sebastian Dick
 
 
 #### Acknowledgements
- 
-Project based on the 
-[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.0. 
-This project uses an implementation of the gradient of spherical harmonics created by the SIESTA group. [Forpy](https://github.com/ylikx/forpy) is used in the NeuralXC compatible SIESTA implementation.
+
+Project based on the
+[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.0.
