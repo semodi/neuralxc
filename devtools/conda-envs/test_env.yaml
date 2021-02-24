@@ -2,6 +2,7 @@ name: test
 channels:
   - conda-forge
   - defaults
+  - pytorch
 dependencies:
   - ase=3.17
   - pip
@@ -20,6 +21,10 @@ dependencies:
   - pytest
   - pytest-cov
   - dill=0.3.2
+  - pytorch=1.4
+  - torchvision
+  - torchaudio
+  - cpuonly
   - pip:
     - opt_einsum
     - codecov
