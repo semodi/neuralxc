@@ -291,6 +291,8 @@ def sc_driver(xyz,
 
         shcopy('sc/data.hdf5'.format(iteration), 'testing/data.hdf5')
         shcopytree('sc/model_it{}.jit'.format(it_label), 'testing/nxc.jit')
+        shcopytree('sc/model_it{}'.format(it_label), 'final_model/')
+        shcopytree('sc/model_it{}.jit'.format(it_label), 'final_model.jit/')
         os.chdir('testing')
         mkdir('workdir')
         engine_kwargs = {'nxc': '../../nxc.jit'}

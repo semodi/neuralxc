@@ -22,9 +22,6 @@ dependencies:
   - pytest-cov
   - dill=0.3.2
   - pytorch=1.4
-  - torchvision
-  - torchaudio
-  - cpuonly
   - pip:
     - opt_einsum
     - codecov
