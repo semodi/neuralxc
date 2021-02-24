@@ -1,3 +1,9 @@
+"""
+siesta.py
+Extends the ASE Siesta calculator, by letting it read in custom .fdf (input) files
+Some code in this file was adapted from the original ASE implementation.
+"""
+
 from ase.calculators.siesta.siesta import Siesta
 from ase.calculators.calculator import Calculator, all_changes
 import shutil
@@ -9,7 +15,10 @@ class CustomSiesta(Siesta):
     def __init__(self, fdf_path=None, **kwargs):
         self.fdf_path = fdf_path
         self.nxc = kwargs.pop('nxc', '')
-        kwargs.pop('mbe','')
+        self.skip_calculated = kwargs.pop('skip_calculated', True)
+        if not self.skip_calculated:
+            print('Siesta Caculator is not re-uisng results')
+        kwargs.pop('mbe', '')
         if 'label' in kwargs:
             kwargs['label'] = kwargs['label'].lower()
         super().__init__(**kwargs)
@@ -195,21 +204,9 @@ class CustomSiesta(Siesta):
 
     def calculate(self, atoms=None, properties=['energy'], system_changes=all_changes):
 
-        if '0_NORMAL_EXIT' in os.listdir('.'):
+        if '0_NORMAL_EXIT' in os.listdir('.') and self.skip_calculated:
             Calculator.calculate(self, atoms, properties, system_changes)
             self.write_input(self.atoms, properties, system_changes)
-            # if self.command is None:
-            # raise CalculatorSetupError(
-            # 'Please set ${} environment variable '
-            # .format('ASE_' + self.name.upper() + '_COMMAND') +
-            # 'or supply the command keyword')
-            # command = self.command.replace('PREFIX', self.prefix)
-            # errorcode = subprocess.call(command, shell=True, cwd=self.directory)
-
-            # if errorcode:
-            #     raise CalculationFailed('{} in {} returned an error: {}'
-            #                             .format(self.name, self.directory,
-            #                                     errorcode))
             self.read_results()
         else:
             super().calculate(atoms, properties, system_changes)

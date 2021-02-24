@@ -4,12 +4,11 @@ import h5py
 from ase.io import read
 from neuralxc.symmetrizer import symmetrizer_factory
 from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
-from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
+from neuralxc.ml.network import load_pipeline
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
@@ -18,8 +17,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import clone
 import pandas as pd
 from pprint import pprint
-from dask.distributed import Client, LocalCluster
-from sklearn.externals.joblib import parallel_backend
 import time
 import os
 import shutil
@@ -31,17 +28,17 @@ import numpy as np
 import neuralxc as xc
 import sys
 import copy
-import pickle
+import dill as pickle
 from types import SimpleNamespace as SN
 from .other import *
-
+from ..formatter import make_nested_absolute
 bi_slice = slice
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 
 
-def add_data_driver(hdf5, system, method, add, traj='', density='', override=False, slice=':', zero=None):
+def add_data_driver(hdf5, system, method, add, traj='', density='', override=False, slice=':', zero=None, addto=''):
     """ Adds data to hdf5 file"""
     try:
         file = h5py.File(hdf5, 'r+')
@@ -52,19 +49,30 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
         [None]*(3-len(slice.split(':')))
 
     ijk = bi_slice(i, j, k)
+
     def obs(which, zero):
         if which == 'energy':
             if traj:
-                add_species(file, system, traj)
-                if zero is not None:
-                    energies = np.array([a.get_potential_energy()\
-                     for a in read(traj,':')])[ijk]
-                else:
-                    energies = E_from_atoms(read(traj, ':'))
-                    zero = 0
+                try:
+                    read(traj)
+                    is_trajectory = True
+                    add_species(file, system, traj)
+                    if zero is not None:
+                        energies = np.array([a.get_potential_energy()\
+                         for a in read(traj,':')])[ijk]
+                    else:
+                        energies = E_from_atoms(read(traj, ':'))
+                        zero = 0
+                except ValueError:
+                    is_trajectory = False
+                    energies = np.load(traj)
+
+                if addto:
+                    energies0 = file[addto][:]
+                    energies += energies0
                 add_energy(file, energies, system, method, override, E0=zero)
             else:
-                raise Exception('Must provide a trajectory file')
+                raise Exception('Must provide a either trajectory file or .npy file containing energies')
                 file.close()
         elif which == 'forces':
             if traj:
@@ -187,19 +195,23 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     preprocessor = preprocessor
     hdf5 = hdf5
 
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     datafile = h5py.File(hdf5[0], 'r')
     basis = pre['preprocessor']
     basis_key = basis_to_hash(basis)
     data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)
-    symmetrizer_instructions = {'symmetrizer_type': 'casimir'}
+    symmetrizer_instructions = {'symmetrizer_type': pre.get('symmetrizer_type', 'casimir')}
     symmetrizer_instructions.update({'basis': basis})
     species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
     spec_group = SpeciesGrouper(basis, species)
     symmetrizer = symmetrizer_factory(symmetrizer_instructions)
 
-    sampler_pipeline = get_default_pipeline(basis, species, pca_threshold=1)
+    sampler_pipeline = get_default_pipeline(basis,
+                                            species,
+                                            symmetrizer_type=symmetrizer_instructions['symmetrizer_type'],
+                                            pca_threshold=1)
+
     sampler_pipeline = Pipeline(sampler_pipeline.steps)
     sampler_pipeline.steps[-1] = ('sampler', SampleSelector(size))
     sampler_pipeline.fit(data)

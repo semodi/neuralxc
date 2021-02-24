@@ -12,17 +12,16 @@ python ../../../scripts/apply_subset.py benzene_ccsd_t-train.xyz ../../../config
 python ../../../scripts/apply_subset.py benzene_ccsd_t-test.xyz test_subset.csv testing.traj
 
 # Copy relevant files to work directory
-cp ../../../inputs/ml_basis/basis_sgdml_benzene.json .
+cp ../basis_sgdml_benzene.json .
 cp ../hyperparameters.json .
-cp ../sgdml.fdf .
-cp ../../../inputs/psf/*.psf .
 
 # basis_sgdml_benzene.json must contain absolute paths for now -> temporary fix:
 python ../../../scripts/fix_paths.py
 
 # Run iterative training
-neuralxc iterative train.traj basis_sgdml_benzene.json hyperparameters.json --maxit 5 --tol 0.0005
+neuralxc sc train.traj basis_sgdml_benzene.json hyperparameters.json --maxit 5 --tol 0.0005
 cd -
 cp -r workdir/final_model . 
+cp -r workdir/final_model.jit . 
 
 

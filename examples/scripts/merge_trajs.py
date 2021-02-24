@@ -4,6 +4,6 @@ import sys
 all_sys = []
 
 for path in sys.argv[1:]:
-    all_sys += read(path,':')
+    all_sys += read(path, ':')
 
-write('merged.traj',all_sys)
+write('merged.traj', all_sys)

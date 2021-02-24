@@ -1,7 +1,8 @@
 name: test
 channels:
-  - defaults
   - conda-forge
+  - defaults
+  - pytorch
 dependencies:
   - ase=3.17
   - pip
@@ -11,23 +12,18 @@ dependencies:
   - ipyparallel
   - ipython
   - jupyter
-  - keras
   - matplotlib
-  - numba
   - numpy
   - pandas
   - periodictable
   - scikit-learn=0.20.3
   - scipy
-  - seaborn
-  - statsmodels
-  - sympy
-  - tensorflow=1.1.0
   - pytest
   - pytest-cov
+  - dill=0.3.2
+  - pytorch=1.4
   - pip:
-    - codecov 
+    - opt_einsum
+    - codecov
     - tabulate
     - pyscf
-
-

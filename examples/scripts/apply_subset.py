@@ -29,8 +29,8 @@ if __name__ == '__main__':
         unit = float(sys.argv[4])
     else:
         unit = kcalpmol
-    
-    print("using unit" , unit)
+
+    print("using unit", unit)
     atoms = get_structures_energies(sys.argv[1], unit=unit)
     if not sys.argv[2] == 'all':
         subset = np.genfromtxt(sys.argv[2]).astype(int)

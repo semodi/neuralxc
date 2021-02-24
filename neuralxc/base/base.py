@@ -12,6 +12,8 @@ class ABCRegistry(ABCMeta):
             raise Exception('Any class with ABCRegistry as metaclass has to\
              define the class attribute _registry_name')
         cls.REGISTRY[new_cls._registry_name] = new_cls
+        if not hasattr(new_cls, '_unit_test'):
+            new_cls._unit_test = True
         return ABCMeta.__new__(cls, name, bases, attrs)
 
     @classmethod

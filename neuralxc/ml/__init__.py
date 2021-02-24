@@ -1,5 +1,4 @@
 from . import transformer
 from .network import NetworkEstimator
-from .network import NXCPipeline
+from .pipeline import NXCPipeline
 from . import utils
-from . import ensemble

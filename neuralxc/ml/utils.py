@@ -1,11 +1,10 @@
 from ..formatter import expand, atomic_shape, system_shape
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator
 from neuralxc.symmetrizer import symmetrizer_factory
 from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
@@ -18,30 +17,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.neighbors import NearestNeighbors
 from sklearn.linear_model import LinearRegression
 import h5py
-
-
-def opt_E0(file, baselines, references):
-
-    e_base = [file[data + '/energy'][:] for data in baselines]
-    species = [find_attr_in_tree(file, data, 'species') for data in baselines]
-    e_ref = [file[data + '/energy'][:] for data in references]
-    species2 = [find_attr_in_tree(file, data, 'species') for data in references]
-    for s, s2 in zip(species, species2):
-        assert s == s2
-
-    allspecies = np.unique([s for s in ''.join(species)])
-    X = np.zeros([len(baselines), len(allspecies)])
-    y = np.zeros(len(baselines))
-    for sysidx, sys in enumerate(species):
-        for sidx, spec in enumerate(allspecies):
-            X[sysidx, sidx] = sys.count(spec)
-        y[sysidx] = np.mean(e_ref[sysidx] - e_base[sysidx])
-    lr = LinearRegression(fit_intercept=False)
-    lr.fit(X, y)
-    E0 = {}
-    for spec, coeff in zip(allspecies, lr.coef_):
-        E0[spec] = -coeff
-    return E0
 
 
 def E_from_atoms(traj):
@@ -186,9 +161,15 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         provide a energy value to subtract from the targets.
         If None tries to find this value as an attribute inside datafile
     """
+    no_energy = False
+    if baseline + '/energy' in datafile:
+        data_base = datafile[baseline + '/energy']
+        data_ref = datafile[reference + '/energy']
+    else:
+        data_base = np.array([0])
+        data_ref = np.array([0])
+        no_energy = True
 
-    data_base = datafile[baseline + '/energy']
-    data_ref = datafile[reference + '/energy']
     if E0 == None:
         E0_base = find_attr_in_tree(datafile, baseline, 'E0')
         E0_ref = find_attr_in_tree(datafile, reference, 'E0')
@@ -203,12 +184,15 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         print('Warning: E0 for reference data not found, setting to 0')
         E0_ref = 0
 
-    print('E0 base', E0_base)
-    print('E0 ref', E0_ref)
     tar = (data_ref[:] - E0_ref) - (data_base[:] - E0_base)
-    #    if baseline == reference:
-    # tar = data_ref[:] - E0_ref
     tar = tar.real
+
+    if basis_key == '':
+        data_base = np.zeros([len(tar), 0])
+    else:
+        data_base = datafile[baseline + '/density/' + basis_key][:, :]
+    if no_energy:
+        tar = np.zeros(len(data_base))
 
     if percentile_cutoff > 0:
         lim1 = np.percentile(tar, percentile_cutoff * 100)
@@ -217,37 +201,9 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         filter = (tar > min_lim) & (tar < max_lim)
     else:
         filter = [True] * len(tar)
-    if basis_key == '':
-        data_base = np.zeros([len(tar), 0])
-    else:
-        data_base = datafile[baseline + '/density/' + basis_key][:, :]
+
     data_base = data_base[filter]
     tar = tar[filter]
-    # feat = {}
-    # all_species = find_attr_in_tree(datafile, baseline, 'species')
-    # all_species = [c for c in all_species]
-    # unique_species = np.unique(all_species)
-    # attrs = {}
-
-    # for spec in unique_species:
-    # attrs.update({spec: {'_'.join(attr.split('_')[:-1]): find_attr_in_tree(datafile, baseline, attr)\
-    # for attr in ['n_' + spec,'l_' + spec, 'r_o_' + spec]}})
-
-    # if grouped:
-    #     for spec in unique_species:
-    #         feat[spec] = []
-    #
-    #     current_loc = 0
-    #     for spec in all_species:
-    #         len_descr = attrs[spec]['n'] * sum([2 * l + 1 for l in range(attrs[spec]['l'])])
-    #         feat[spec].append(data_base[:, current_loc:current_loc + len_descr])
-    #         current_loc += len_descr
-    #
-    #     for spec in unique_species:
-    #         feat[spec] = np.array(feat[spec]).swapaxes(0, 1)
-    #
-    #     return feat, tar, attrs, ''.join(all_species)
-    # else:
     return data_base, tar
 
 
@@ -295,16 +251,58 @@ def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_thresho
 
     pipeline_list.append(('scaler', GroupedStandardScaler()))
 
-    pca = GroupedPCA(n_components=pca_threshold, svd_solver='full')
-    pipeline_list.append(('pca', pca))
-
     pipeline_list.append(('estimator', estimator))
 
     basis_instructions = basis
     symmetrizer_instructions = {'symmetrizer_type': symmetrizer_type}
 
-    return NXCPipeline(
-        pipeline_list, basis_instructions=basis_instructions, symmetrize_instructions=symmetrizer_instructions)
+    return NXCPipeline(pipeline_list,
+                       basis_instructions=basis_instructions,
+                       symmetrize_instructions=symmetrizer_instructions)
+
+
+def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
+    if isinstance(preprocessor, str):
+        pre = json.loads(open(preprocessor, 'r').read())
+    else:
+        pre = preprocessor
+    inp = json.loads(open(inputfile, 'r').read())
+
+    with h5py.File(hdf5[0], 'r') as datafile:
+        if not isinstance(hdf5[1], list):
+            hdf5[1] = [hdf5[1]]
+
+        all_species = []
+        for set in hdf5[1]:
+            all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
+
+    if pre:
+        basis = pre['preprocessor']
+    else:
+        basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
+        basis.update({'extension': 'RHOXC'})
+
+    pipeline = get_default_pipeline(basis,
+                                    all_species,
+                                    symmetrizer_type=pre.get('symmetrizer_type', 'casimir'),
+                                    spec_agnostic=spec_agnostic)
+
+    if 'hyperparameters' in inp:
+        hyper = inp['hyperparameters']
+    else:
+        print('No hyperparameters specified, fitting default pipeline to data')
+
+    hyper = to_full_hyperparameters(hyper, pipeline.get_params())
+
+    cv = inp.get('cv', 2)
+    n_workers = inp.get('n_workers', 1)
+    n_jobs = inp.get('n_jobs', 1)
+    n_threads = inp.get('threads_per_worker', 1)
+    verbose = inp.get('verbose', 1)
+
+    pipe = Pipeline([('ml', pipeline)])
+    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=verbose, return_train_score=True)
+    return grid_cv
 
 
 def get_basis_grid(preprocessor):
@@ -354,62 +352,16 @@ def get_basis_grid(preprocessor):
     return basis_grid
 
 
-def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
-    inp = json.loads(open(inputfile, 'r').read())
-    pre = json.loads(open(preprocessor, 'r').read())
-
-    datafile = h5py.File(hdf5[0], 'r')
-
-    if not isinstance(hdf5[1], list):
-        hdf5[1] = [hdf5[1]]
-
-    all_species = []
-    for set in hdf5[1]:
-        all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
-
-    datafile.close()
-    if pre:
-        basis = pre['preprocessor']
-    else:
-        basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
-        basis.update({'extension': 'DRHO'})
-    pipeline = get_default_pipeline(basis, all_species, spec_agnostic=spec_agnostic)
-
-    if 'hyperparameters' in inp:
-        hyper = inp['hyperparameters']
-    else:
-        print('No hyperparameters specified, fitting default pipeline to data')
-        pipeline.fit(data)
-        sys.exit()
-
-    hyper = to_full_hyperparameters(hyper, pipeline.get_params())
-
-    cv = inp.get('cv', 2)
-    n_workers = inp.get('n_workers', 1)
-    n_jobs = inp.get('n_jobs', 1)
-    n_threads = inp.get('threads_per_worker', 1)
-    verbose = inp.get('verbose', 10)
-
-    pipe = Pipeline([('ml', pipeline)])
-    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=4)
-    return grid_cv
-
-
-def get_preprocessor(preprocessor, atoms, src_path):
-    pre = json.loads(open(preprocessor, 'r').read())
-
+def get_preprocessor(pre, atoms, src_path):
     species = ''.join(atoms[0].get_chemical_symbols())
-
     for a in atoms:
         species2 = ''.join(a.get_chemical_symbols())
         if not species2 == species:
             print('Warning (in get_preprocessor): Dataset not homogeneous')
 
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
-
-    basis_grid = get_basis_grid(pre)
-
-    preprocessor = Preprocessor(basis, src_path, atoms, pre.get('n_workers', 1))
+    basis.update(pre['preprocessor'])
+    preprocessor = Preprocessor(basis, src_path, atoms, num_workers=pre.get('n_workers', 1))
     return preprocessor
 
 
@@ -432,12 +384,11 @@ class SampleSelector(BaseEstimator):
             data = data[0]
             indices = np.zeros(data.shape[:-1], dtype=int)
             indices[:] = np.arange(len(data)).reshape(-1, 1)
-            picks[idx] += self.sample_clusters(
-                atomic_shape(data),
-                indices.flatten(),
-                self._n_instances,
-                picked=picks[idx],
-                random_state=self._random_state)
+            picks[idx] += self.sample_clusters(atomic_shape(data),
+                                               indices.flatten(),
+                                               self._n_instances,
+                                               picked=picks[idx],
+                                               random_state=self._random_state)
         picks = picks[0]
         np.random.shuffle(picks)
         return picks[:self._n_instances]

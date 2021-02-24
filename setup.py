@@ -6,10 +6,6 @@ Implementation of a machine learned density functional
 from numpy.distutils.core import setup, Extension
 import versioneer
 
-spher_grad = Extension('spher_grad', [
-    'src/spher_harm.F',
-])
-
 short_description = __doc__.split("\n")
 
 try:
@@ -38,7 +34,7 @@ setup(
     # Extend/modify the list to include/exclude other items as need be
     package_data={'neuralxc': ["data/*.dat"]},
     scripts=['./bin/neuralxc'],
-    ext_modules=[spher_grad],
+    ext_modules=[],
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # author_email='me@place.org',      # Author email
     # url='http://www.my_package.com',  # Website

@@ -4,12 +4,11 @@ import h5py
 from ase.io import read
 from neuralxc.symmetrizer import symmetrizer_factory
 from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedPCA, GroupedVarianceThreshold
+from neuralxc.ml.transformer import GroupedVarianceThreshold
 from neuralxc.ml.transformer import GroupedStandardScaler
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.ensemble import StackedEstimator, ChainedEstimator
-from neuralxc.ml.network import load_pipeline, NumpyNetworkEstimator
+from neuralxc.ml.network import load_pipeline
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
@@ -18,8 +17,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import clone
 import pandas as pd
 from pprint import pprint
-from dask.distributed import Client, LocalCluster
-from sklearn.externals.joblib import parallel_backend
 import time
 import os
 import shutil
@@ -31,8 +28,9 @@ import numpy as np
 import neuralxc as xc
 import sys
 import copy
-import pickle
+import dill as pickle
 from types import SimpleNamespace as SN
+from ..formatter import make_nested_absolute
 from .data import *
 from neuralxc.preprocessor import driver
 os.environ['KMP_AFFINITY'] = 'none'
@@ -44,55 +42,83 @@ def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
     basis_instructions = json.loads(open(basis, 'r').read())
-    projector = xc.projector.DensityProjector(np.eye(3), np.ones(3), basis_instructions['preprocessor'])
+    projector = xc.projector.DensityProjector(unitcell=np.eye(3),
+                                              grid=np.ones(3),
+                                              basis_instructions=basis_instructions['preprocessor'])
 
-    for spec in basis_instructions['preprocessor']:
+    for spec in projector.basis:
         if not len(spec) == 1: continue
-        basis = basis_instructions['preprocessor'][spec]
-        n = basis_instructions['preprocessor'][spec]['n']
+        basis = projector.basis[spec]
+        if isinstance(basis, list):
+            r = np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500)
+        else:
+            r = np.linspace(0, np.max(basis['r_o']), 500)
         W = projector.get_W(basis)
-        r = np.linspace(0, basis['r_o'], 500)
-        radials = projector.radials(r, basis, W)
-        for rad in radials:
-            plt.plot(r, rad)
+        radials = projector.radials(r, basis, W=W)
+        for l, rad in enumerate(radials):
+            if not isinstance(rad, list):
+                rad = [rad]
+            for ir, rl in enumerate(rad):
+                if ir == 0:
+                    plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
+                else:
+                    plt.plot(r, rl, color='C{}'.format(l))
+        # plt.ylim(0,1)
+        plt.legend()
         plt.show()
 
 
-def get_real_basis(atoms, basis):
+def get_real_basis(atoms, basis, spec_agnostic=False):
     from pyscf import gto
     from ..pyscf import BasisPadder
     real_basis = {}
-    for a in atoms:
-        symbols = a.get_chemical_symbols()
-        atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
+    is_file = os.path.isfile(basis)
+    # if spec_agnostic: atoms = atoms[0:1]
+    if is_file:
+        parsed_basis = gto.basis.parse(open(basis, 'r').read())
+    if spec_agnostic:
+        symbols = np.array(['O'])
+    else:
+        symbols = np.unique(np.array([sym for a in atoms for sym in a.get_chemical_symbols()]))
+
+    if is_file:
+        basis = {s: parsed_basis for s in symbols}
+    atom = [[s, np.array([2 * j, 0, 0])] for j, s in enumerate(symbols)]
+
+    try:
         auxmol = gto.M(atom=atom, basis=basis)
-        bp = BasisPadder(auxmol)
-        padded_basis = bp.get_basis_json()
-        for sym in padded_basis:
-            if sym in real_basis:
-                if real_basis[sym] != padded_basis[sym]:
-                    raise Exception('Different basis sets across systems currently not supported')
+    except RuntimeError:  # If spin != 0 compensate with Hydrogen
+        atom += [['H', np.array([2 * len(symbols) + 1, 0, 0])]]
+        auxmol = gto.M(atom=atom, basis=basis)
 
-            real_basis[sym] = padded_basis[sym]
+    bp = BasisPadder(auxmol)
+    padded_basis = bp.get_basis_json()
+    for sym in padded_basis:
+        if sym in real_basis:
+            if real_basis[sym] != padded_basis[sym]:
+                raise Exception('Different basis sets across systems currently not supported')
 
+        real_basis[sym] = padded_basis[sym]
+
+    if spec_agnostic: real_basis = {'X': real_basis['X']}
     return real_basis
 
 
 def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
 
-    pre = json.load(open(preprocessor, 'r'))
+    pre = make_nested_absolute(json.load(open(preprocessor, 'r')))
     try:
         os.mkdir(workdir)
     except FileExistsError:
         pass
 
-    driver(
-        read(xyz, ':'),
-        pre['preprocessor'].get('application', 'siesta'),
-        workdir=workdir,
-        nworkers=pre.get('n_workers', 1),
-        kwargs=pre.get('engine_kwargs', {}))
-    shutil.move(workdir + '/results.traj', './results.traj')
+    driver(read(xyz, ':'),
+           pre['preprocessor'].get('application', 'siesta'),
+           workdir=workdir,
+           nworkers=pre.get('n_workers', 1),
+           kwargs=pre.get('engine_kwargs', {}))
+    # shutil.move(workdir + '/results.traj', './results.traj')
+    shutil.copy(workdir + '/results.traj', './results.traj')
     if workdir == '.tmp/':
         shutil.rmtree(workdir)
 
@@ -102,6 +128,8 @@ def fetch_default_driver(kind, hint='', out=''):
     from collections import abc
     if hint:
         hint_cont = json.load(open(hint, 'r'))
+    else:
+        hint_cont = {}
 
     def nested_dict_iter(nested):
         for key, value in nested.items():
@@ -118,9 +146,6 @@ def fetch_default_driver(kind, hint='', out=''):
 
     def make_absolute(val):
         if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
-            print(os.path.isfile(val))
-            print(os.path.isdir(val))
-            print('DIR', val)
             val = os.path.abspath(val)
         return val
 
@@ -133,22 +158,17 @@ def fetch_default_driver(kind, hint='', out=''):
     else:
         df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json', 'r'))
 
-    print(df_cont)
     if hint:
         for key1 in df_cont:
             if isinstance(df_cont[key1], dict):
                 for key2 in df_cont[key1]:
                     found = find_value_in_nested(hint_cont, key2)
                     if found:
-                        df_cont[key1][key2] = make_absolute(found)
-                    elif isinstance(df_cont[key1][key2], str):
-                        df_cont[key1][key2] = make_absolute(df_cont[key1][key2])
+                        df_cont[key1][key2] = found
             else:
                 found = find_value_in_nested(hint_cont, key1)
                 if found:
-                    df_cont[key1] = make_absolute(found)
-                else:
-                    df_cont[key1] = make_absolute(df_cont[key1])
+                    df_cont[key1] = found
 
     if out == '':
         out = kind + '.json'
@@ -162,11 +182,11 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     """
     preprocessor_path = preprocessor
 
-    pre = json.loads(open(preprocessor, 'r').read())
+    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     atoms = read(xyz, ':')
 
-    preprocessor = get_preprocessor(preprocessor, atoms, srcdir)
+    preprocessor = get_preprocessor(pre, atoms, srcdir)
     start = time.time()
 
     if 'hdf5' in dest:
@@ -191,7 +211,9 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
         print('BI', basis_instr)
 
         if basis_instr.get('application', 'siesta') == 'pyscf':
-            real_basis = get_real_basis(atoms, basis_instr['basis'])
+            real_basis = get_real_basis(atoms,
+                                        basis_instr['basis'],
+                                        spec_agnostic=basis_instr.get('spec_agnostic', False))
             for key in real_basis:
                 basis_instr[key] = real_basis[key]
             pre.update({'preprocessor': basis_instr})

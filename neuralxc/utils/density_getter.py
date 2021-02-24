@@ -1,16 +1,22 @@
 """Utility functions for real-space grid properties
 """
 import numpy as np
+import pandas as pd
 import struct
 from abc import ABC, abstractmethod
 from ..base import ABCRegistry
-from ..pyscf.pyscf import get_dm
 import re
 try:
     from pyscf.scf.chkfile import load_scf
+    from pyscf import dft
     pyscf_found = True
 except ModuleNotFoundError:
     pyscf_found = False
+
+
+def get_dm(mo_coeff, mo_occ):
+    """ Get density matrix"""
+    return np.einsum('ij,j,jk -> ik', mo_coeff, mo_occ, mo_coeff.T)
 
 
 class DensityGetterRegistry(ABCRegistry):
@@ -28,30 +34,116 @@ class BaseDensityGetter(metaclass=DensityGetterRegistry):
         pass
 
 
+class CubeDensityGetter(BaseDensityGetter):
+
+    _registry_name = 'cube'
+
+    def __init__(self, **kwargs):
+        pass
+
+    def get_density(self, file_path, return_dict=False):
+
+        rho = pd.read_csv(file_path, delim_whitespace=True, skiprows=9, header=None)
+        mask = (~rho.isna()).values.flatten()
+        rho = rho.values.flatten()
+        rho = rho[mask]
+        grid_dh = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None, nrows=3).values
+        grid = grid_dh[:, 0].astype(int)
+        unitcell = grid_dh[:, 1:] * grid
+
+        rho = rho.reshape(*grid)
+        res = [rho, unitcell, grid]
+
+        if return_dict:
+            return {'rho': res[0], 'unitcell': res[1], 'grid': res[2]}
+        else:
+            return res
+
+
+class CP2KDensityGetter(CubeDensityGetter):
+
+    _registry_name = 'cp2k'
+
+
 class PySCFDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf'
 
-    def __init__(self, binary=None):
-        pass
+    def __init__(self, binary=None, valence=False, **kwargs):
+        self.valence = valence
 
-    def get_density(self, file_path):
+    def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
-        return get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
+        res = get_dm(results['mo_coeff'], results['mo_occ']), mol, (results['mo_coeff'], results['mo_occ'])
+        if self.valence:
+            print('Using only valence density'.format(self.valence))
+            core = 0
+            for aidx, _ in enumerate(mol.atom):
+                charge = mol.atom_charge(aidx)
+                if charge > 10:
+                    core += 2
+                elif charge > 2:
+                    core += 1
+            results['mo_occ'][:core] = 0
+
+        if return_dict:
+            return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
+        else:
+            return res
+
+
+class PySCFRadDensityGetter(BaseDensityGetter):
+
+    _registry_name = 'pyscf_rad'
+
+    def __init__(self, binary=None, valence=False, **kwargs):
+        self.valence = valence
+
+    def get_density(self, file_path, return_dict=False):
+        mol, results = load_scf(file_path)
+        if self.valence:
+            print('Using only valence density'.format(self.valence))
+            core = 0
+            for aidx, _ in enumerate(mol.atom):
+                charge = mol.atom_charge(aidx)
+                if charge > 10:
+                    core += 2
+                elif charge > 2:
+                    core += 1
+            results['mo_occ'][:core] = 0
+
+        dm = get_dm(results['mo_coeff'], results['mo_occ'])
+        mf = dft.RKS(mol)
+        mf.xc = 'PBE'
+        mf.grids.level = 4
+        mf.grids.build()
+        rho = dft.numint.get_rho(mf._numint, mol, dm, mf.grids)
+        grid_coords = mf.grids.coords
+        grid_weights = mf.grids.weights
+        res = rho, grid_coords, grid_weights
+        if return_dict:
+            return {'rho': res[0], 'grid_coords': res[1], 'grid_weights': res[2]}
+        else:
+            return res
 
 
 class SiestaDensityGetter(BaseDensityGetter):
 
     _registry_name = 'siesta'
 
-    def __init__(self, binary):
+    def __init__(self, binary, **kwargs):
         self._binary = binary
 
-    def get_density(self, file_path):
+    def get_density(self, file_path, return_dict=False):
         if self._binary:
-            return SiestaDensityGetter.get_density_bin(file_path)
+            res = SiestaDensityGetter.get_density_bin(file_path)
         else:
-            return SiestaDensityGetter.get_density(file_path)
+            res = SiestaDensityGetter.get_density(file_path)
+
+        if return_dict:
+            return {'rho': res[0], 'unitcell': res[1], 'grid': res[2]}
+        else:
+            return res
 
     @staticmethod
     def get_density_bin(file_path):

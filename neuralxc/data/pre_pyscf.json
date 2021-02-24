@@ -1,11 +1,12 @@
 {
 "preprocessor":
 {
-     "basis": "ccpvtz-jkfit",
+     "basis": "sto-3g",
      "extension": "chkpt",
      "application": "pyscf"
 },
 "n_workers" : 1,
 "engine_kwargs": {"xc": "PBE",
-                  "basis" : "ccpvdz"}
+                  "basis" : "3-21g"}
+
 }

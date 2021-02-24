@@ -1,1 +1,2 @@
-from .pyscf import BasisPadder, get_eri3c, get_coeff
+from .pyscf import RKS
+from ..projector.pyscf import BasisPadder

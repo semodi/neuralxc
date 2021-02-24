@@ -1,3 +1,10 @@
+"""
+driver.py
+Contains driver functions that 'applies' an Engine (see ../engines/), i.e.
+an electronic structure code that computes energy-density pairs, to a dataset
+of structures. If desired this can be done in a distributed fashion using Dask.
+"""
+
 import dask
 import dask.distributed
 from dask.distributed import Client, LocalCluster
@@ -48,21 +55,16 @@ def mbe_driver(atoms, app, workdir, kwargs, nworkers):
             print(s)
             raise Exception('Trajectory file must contain atoms in the oder OHHOHH...')
 
-
-# if workdir:
-#     mbe_root = dir[:-len(workdir)]
-# else:
     mbe_root = workdir
 
     lower_results = []
 
     for n in range(1, n_mol):
         new_atoms = [
-            Atoms(
-                building_block * n,
-                positions=a.get_positions().reshape(-1, n_block, 3)[np.array(comb)].reshape(-1, 3),
-                pbc=a.get_pbc(),
-                cell=a.get_cell()) for a in atoms for comb in itertools.combinations(range(n_mol), n)
+            Atoms(building_block * n,
+                  positions=a.get_positions().reshape(-1, n_block, 3)[np.array(comb)].reshape(-1, 3),
+                  pbc=a.get_pbc(),
+                  cell=a.get_cell()) for a in atoms for comb in itertools.combinations(range(n_mol), n)
         ]
         try:
             os.mkdir(mbe_root + '/mbe_{}'.format(n))
@@ -107,6 +109,28 @@ def calculate_distributed(atoms, app, workdir, kwargs, n_workers=-1):
 
 
 def driver(atoms, app, workdir, nworkers, kwargs):
+    """
+    Applies app (Engine) across dataset of structures.
+
+    Parameters
+    -----------
+    atoms, list of ase.Atoms
+        Dataset containing structures
+    app, Engine
+        Engine (see ../engines/) controlling the elecronic structure code
+    wordir, str
+        Name of work directory
+    nworkers, int
+        Number of workers for Dask cluster
+
+    Returns
+    --------
+    results, list of ase.Atoms
+        Original dataset passed as "atoms" but with total energy saved
+        as single point calculator attribute (can be
+        accessed as atoms.get_potential_energy())
+    """
+
     dir = os.path.abspath(workdir)
     # results = calculate_distributed(atoms, app, dir, kwargs, nworkers)
     if kwargs.get('mbe', False):

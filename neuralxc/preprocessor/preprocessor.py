@@ -1,7 +1,15 @@
+"""
+preprocessor.py
+
+Preprocess electron density (either represented on grid or through density matrix with GTO) and
+into projected descriptors used to fit NeuralXC models. Part of training pipeline but not
+relevant for deployed models.
+
+"""
 from sklearn.base import TransformerMixin
 from sklearn.base import BaseEstimator
 from ..utils.density_getter import density_getter_factory
-from ..projector import DensityProjector, BehlerProjector, NonOrthoProjector
+from ..projector import DensityProjector
 from ..formatter import atomic_shape, system_shape
 from dask import delayed
 from ase.io import read
@@ -15,7 +23,11 @@ from dask.distributed import Client, LocalCluster
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):
-    def __init__(self, basis_instructions, src_path, atoms, target_path, num_workers=1):
+    def __init__(self, basis_instructions, src_path, atoms, target_path='', num_workers=1):
+        """
+        Following basis_instructions, applies a suitable DensityProjector to electron
+        densities stored to disk
+        """
         self.basis_instructions = basis_instructions
         self.src_path = src_path
         self.atoms = atoms
@@ -30,10 +42,14 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         basis_rep = self.get_basis_rep()
         self.data = basis_rep
         self.computed_basis = self.basis_instructions
+        spec_agn = self.basis_instructions.get('spec_agnostic', False)
 
         unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis=0)
-        self.species_string = ''.join([s for s in unique_systems])
+        if spec_agn:
+            self.species_string = unique_systems[0][0] * max([len(s) for s in unique_systems])
+        else:
+            self.species_string = ''.join([s for s in unique_systems])
         # === Padding ===
 
         #Find padded width of data
@@ -42,14 +58,21 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             width[''.join(self.get_chemical_symbols(atoms))] = len(dat)
         #Sanity check
         assert len(unique_systems) == len(width)
-        paddedwidth = sum([width[key] for key in width])
+        if spec_agn:
+            paddedwidth = max([width[key] for key in width])
+        else:
+            paddedwidth = sum([width[key] for key in width])
+
         paddedoffset = {}
         cnt = 0
         for key in width:
-            paddedoffset[key] = cnt
-            cnt += width[key]
+            if spec_agn:
+                paddedoffset[key] = 0
+            else:
+                paddedoffset[key] = cnt
+                cnt += width[key]
 
-        padded_data = np.zeros([len(self.data), paddedwidth], dtype='complex')
+        padded_data = np.zeros([len(self.data), paddedwidth])
 
         for lidx, (dat, atoms) in enumerate(zip(self.data, self.atoms)):
             syskey = ''.join(self.get_chemical_symbols(atoms))
@@ -68,9 +91,10 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             self.get_chemical_symbols = (lambda x: x.get_chemical_symbols())
 
         if self.num_workers > 1:
-            cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
-            print(cluster)
-            client = Client(cluster)
+            # cluster = LocalCluster(n_workers=1, threads_per_worker=self.num_workers)
+            # print(cluster)
+            # client = Client(cluster)
+            client = Client()
 
         class FakeClient():
             def map(self, *args):
@@ -101,7 +125,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
                 self.get_chemical_symbols(system)
             ])
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
-        futures = client.map(self.transform_one, *[[j[i] for j in jobs] for i in range(3)],
+        futures = client.map(transform_one, *[[j[i] for j in jobs] for i in range(3)],
                              len(jobs) * [self.basis_instructions])
         if self.num_workers == 1:
             results = list(futures)
@@ -115,23 +139,27 @@ class Preprocessor(TransformerMixin, BaseEstimator):
     def id(self, *args):
         return 1
 
-    def transform_one(self, path, pos, species, basis_instructions):
 
-        density_getter = density_getter_factory(\
-            basis_instructions.get('application', 'siesta'),
-            binary = basis_instructions.get('binary', True))
+def transform_one(path, pos, species, basis_instructions):
 
-        rho, unitcell, grid = density_getter.get_density(path)
-        projector = DensityProjector(unitcell, grid, basis_instructions)
-        basis_rep = projector.get_basis_rep(rho, pos, species)
-        del rho
-        results = []
+    density_getter = density_getter_factory(\
+        basis_instructions.get('application', 'siesta'),
+        binary = basis_instructions.get('binary', True),
+        valence = basis_instructions.get('valence', False))
 
-        scnt = {spec: 0 for spec in species}
-        for spec in species:
-            results.append(basis_rep[spec][scnt[spec]])
-            scnt[spec] += 1
+    density_dict = density_getter.get_density(path, return_dict=True)
+    density_dict.update({'positions': pos, 'species': species})
+    projector = DensityProjector(**density_dict, basis_instructions=basis_instructions)
+    rho = density_dict.pop('rho')
+    basis_rep = projector.get_basis_rep(rho, **density_dict)
+    del density_dict
+    results = []
 
-        results = np.concatenate(results)
-        print(path)
-        return results
+    scnt = {spec: 0 for spec in species}
+    for spec in species:
+        results.append(basis_rep[spec][scnt[spec]])
+        scnt[spec] += 1
+
+    results = np.concatenate(results)
+    print(path)
+    return results
