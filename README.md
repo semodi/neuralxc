@@ -5,10 +5,9 @@ NeuralXC
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
 
-<img src="https://github.com/semodi/neuralxc/blob/master/NeuralXC.png" width="700" height="450" />
+<img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="700" height="450" />
 
-Implementation of a machine learned density functional as presented [here](https://chemrxiv.org/articles/Machine_Learning_a_Highly_Accurate_Exchange_and_Correlation_Functional_of_the_Electronic_Density/9947312)
-
+Implementation of a machine learned density functional as presented [here](https://www.nature.com/articles/s41467-020-17265-7)
 
 ### Installation
 
@@ -17,29 +16,29 @@ To install NeuralXC, navigate into the root directory of the repository and run
 ```
 sh install.sh
 ```
-This assumes that anaconda is available, alternatively the packages listed in `install.sh` can be manually installed with pip .
+This assumes that anaconda is available. Alternatively, the packages listed in `install.sh` can be manually installed with pip .
 So far, NeuralXC has only been tested on Linux and Mac OS X.
 
-To check the integrity of your installation, you can run unite tests with
+To check the integrity of your installation, you can run unit tests with
 ```
 pytest -v
 ```
-in the same directory.
+in the root directory.
 
 ### Libnxc and pylibnxc
 
-The new version of NeuralXC only implement routines to **train** functionals. To actually use these functionals in
-self-consistent electronic structure calculations, [Libnxc](https://github.com/semodi/libnxc) (for C++ and Fortran support) or pylibnxc (for Python support) is required.
-pylibnxc is installed automatically by `sh install.sh` whereas Libnxc has to be downloaded and compiled manually.
+The new version of NeuralXC only implements the neural network architecture along with routines to **train** and test functionals. As neural networks are
+trained self-consistently, an electronic structure code to drive these calculations is needed. For this purpose, we have developed [Libnxc](https://github.com/semodi/libnxc), which allows for easy interfacing with electronic structure codes such as SIESTA and CP2K. Its python version,
+pylibnxc is installed automatically by `sh install.sh` and works with PySCF out-of-the-box.
 
 ### How-to
 
-Out of the box, NeuralXC works with PySCF. This means  
+To get accustomed with NeuralXC, we recommend that PySCF is used as the driver code.
 Examples on how to train and deploy a machine learned functional can be found in [examples/example_scripts/](examples/example_scripts).
 
 #### Model training
 
-To train/fit a functional a set of structures and their associated reference energies is required. These structures need to be provided in an [ASE](https://wiki.fysik.dtu.dk/ase/) formatted `.xyz` or `.traj` file (in this example `training_structures.xyz`). Self-consistent training can be performed by running
+To train/fit a functional a set of structures and their associated reference energies is required. These structures need to be provided in an [ASE](https://wiki.fysik.dtu.dk/ase/) formatted `.xyz` or `.traj` file (in this example `training_structures.xyz`). Self-consistent training can then be performed by running
 
 `neuralxc sc training_structures.xyz basis.json hyperparameters.json`
 
@@ -52,8 +51,7 @@ To train/fit a functional a set of structures and their associated reference ene
 
 #### Model deployment
 
-After installing Libnxc and patching SIESTA (see instructions in [Libnxc manual](https://libnxc.readthedocs.io/en/latest/), NeuralXC can be used from within
-SIESTA in self-consistent calculations.
+After installing Libnxc and patching SIESTA (see instructions in [Libnxc manual](https://libnxc.readthedocs.io/en/latest/), the trained NeuralXC functionals can be used from within SIESTA in self-consistent calculations.
 To deploy a trained model in SIESTA simply add the line `neuralxc $PATH_TO_NXC_MODEL` to your `.fdf` input file.
 
 ### Reproducibility

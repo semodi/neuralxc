@@ -31,10 +31,11 @@ conda install -y  -c conda-forge -c defaults  \
    pytest-cov \
    dill=0.3.2
 
-conda install -y pytorch=1.4 torchvision torchaudio cpuonly -c pytorch
+conda install -y pytorch cpuonly -c pytorch
 yes |  pip install opt_einsum 
 yes |  pip install codecov
 yes |  pip install pyscf
 yes |  pip install tabulate
+yes |  pip install https://github.com/semodi/libnxc/archive/v0.1-alpha.tar.gz
 pip install -e .
 
