@@ -3,23 +3,26 @@ polynomial.py
 Implements density projection basis with radial functions based on polynomials.
 """
 
-from abc import ABC, abstractmethod
-import numpy as np
-from functools import reduce
-import time
 import math
-from ..base import ABCRegistry
-from ..timer import timer
-import neuralxc.config as config
-from ..utils import geom
-import scipy.linalg
-from periodictable import elements as element_dict
+import time
+from abc import ABC, abstractmethod
+from functools import reduce
+
+import numpy as np
 import periodictable
+import scipy.linalg
 import torch
-from torch.nn import Module as TorchModule
-torch.set_default_dtype(torch.float64)
-from .projector import EuclideanProjector, RadialProjector
 from opt_einsum import contract
+from periodictable import elements as element_dict
+from torch.nn import Module as TorchModule
+
+import neuralxc.config as config
+from neuralxc.base import ABCRegistry
+from neuralxc.projector import EuclideanProjector, RadialProjector
+from neuralxc.timer import timer
+from neuralxc.utils import geom
+
+torch.set_default_dtype(torch.float64)
 
 
 class OrthoProjector(EuclideanProjector):

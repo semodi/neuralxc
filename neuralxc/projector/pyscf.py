@@ -6,20 +6,21 @@ no grid operations are necessary.
 BasisPadder translates between NeuralXC and PySCF internal basis set orderings.
 """
 
-import neuralxc
+import math
+import os
 from abc import ABC, abstractmethod
+from functools import reduce
+
 import numpy as np
 import pyscf
-from pyscf import gto, dft
+from opt_einsum import contract
+from pyscf import dft, gto
 from pyscf.dft import RKS
 from pyscf.scf.chkfile import load_scf
-from functools import reduce
-import math
-from ..doc_inherit import doc_inherit
-from ..base import ABCRegistry
-from ..projector import BaseProjector
-import os
-from opt_einsum import contract
+
+import neuralxc
+from neuralxc.base import ABCRegistry
+from neuralxc.projector import BaseProjector
 
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
@@ -234,7 +235,7 @@ class BasisPadder():
         return coeff_out
 
     def unpad_basis(self, coeff):
-        """ Go from NeuralXC to PySCF representation 
+        """ Go from NeuralXC to PySCF representation
         """
         cnt = {sym: 0 for sym in self.indexing_l}
         coeff_out = np.zeros(len(self.mol.ao_labels()))

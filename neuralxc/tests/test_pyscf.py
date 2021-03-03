@@ -1,17 +1,19 @@
-import neuralxc as xc
-import pytest
-import sys
-import numpy as np
-import os
-from neuralxc.doc_inherit import doc_inherit
-from abc import ABC, abstractmethod
-import dill as pickle
 import copy
+import os
+import shutil
+import sys
+from abc import ABC, abstractmethod
+
+import dill as pickle
 import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
+import neuralxc as xc
 from neuralxc.constants import Bohr, Hartree
 from neuralxc.drivers import *
 from neuralxc.engines import Engine
-import shutil
+
 try:
     import pyscf
     pyscf_found = True
@@ -34,7 +36,7 @@ def shcopytree(src, dest):
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 def test_radial_model():
-    from pyscf import gto, dft
+    from pyscf import dft, gto
     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
     mf = dft.RKS(mol)
     mf.xc = 'PBE'

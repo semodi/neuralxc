@@ -6,20 +6,21 @@ into projected descriptors used to fit NeuralXC models. Part of training pipelin
 relevant for deployed models.
 
 """
-from sklearn.base import TransformerMixin
-from sklearn.base import BaseEstimator
-from ..utils.density_getter import density_getter_factory
-from ..projector import DensityProjector
-from ..formatter import atomic_shape, system_shape
-from dask import delayed
-from ase.io import read
-import os
-from os.path import join as pjoin
-from ..constants import Bohr
-import numpy as np
 import hashlib
 import json
+import os
+from os.path import join as pjoin
+
+import numpy as np
+from ase.io import read
+from dask import delayed
 from dask.distributed import Client, LocalCluster
+from sklearn.base import BaseEstimator, TransformerMixin
+
+from neuralxc.constants import Bohr
+from neuralxc.formatter import atomic_shape, system_shape
+from neuralxc.projector import DensityProjector
+from neuralxc.utils.density_getter import density_getter_factory
 
 
 class Preprocessor(TransformerMixin, BaseEstimator):

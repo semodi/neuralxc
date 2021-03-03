@@ -1,1 +1,1 @@
-from .symmetrizer import BaseSymmetrizer, symmetrizer_factory, Symmetrizer
+from .symmetrizer import BaseSymmetrizer, Symmetrizer, symmetrizer_factory

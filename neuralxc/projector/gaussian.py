@@ -3,26 +3,26 @@ gaussian.py
 Implements density projection basis with radial functions based on Gaussians.
 Gaussians can be dampened (gamma) and truncated (r_o) for integration on numerical grids.
 """
-import numpy as np
-from functools import reduce
-import time
 import math
-from ..base import ABCRegistry
-from ..timer import timer
-import neuralxc.config as config
-from ..utils import geom
-from periodictable import elements as element_dict
-import periodictable
-import neuralxc.config as config
-import pyscf.gto.basis as gtobasis
-import pyscf.gto as gto
-import torch
-from torch.nn import Module as TorchModule
-from .projector import EuclideanProjector, BaseProjector
-from .polynomial import RadialProjector
-import neuralxc
 import os
+import time
+from functools import reduce
+
+import numpy as np
+import periodictable
+import pyscf.gto as gto
+import pyscf.gto.basis as gtobasis
+import torch
 from opt_einsum import contract
+from periodictable import elements as element_dict
+from torch.nn import Module as TorchModule
+
+import neuralxc
+from neuralxc import config
+from neuralxc.base import ABCRegistry
+from neuralxc.projector import (BaseProjector, EuclideanProjector, RadialProjector)
+from neuralxc.timer import timer
+from neuralxc.utils import geom
 
 # Normalization factors
 GAMMA = torch.from_numpy(

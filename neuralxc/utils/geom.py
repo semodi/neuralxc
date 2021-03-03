@@ -1,7 +1,8 @@
 # Code adapted from https://github.com/BachiLi/redner/blob/master/pyredner/utils.py #
 # Spherical harmonics utility functions
-import numpy as np
 import math
+
+import numpy as np
 import torch
 
 

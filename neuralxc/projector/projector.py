@@ -5,20 +5,22 @@ EuclideanProjector for euclidean grids with periodic boundary conditions and
 RadialProjector for generalized grids without PBCs.
 """
 
-from abc import ABC, abstractmethod
-import numpy as np
-from functools import reduce
-import time
 import math
-from ..base import ABCRegistry
-from ..timer import timer
-import neuralxc.config as config
-from ..utils import geom
-from periodictable import elements as element_dict
+import time
+from abc import ABC, abstractmethod
+from functools import reduce
+
+import numpy as np
 import periodictable
 import torch
-from torch.nn import Module as TorchModule
 from opt_einsum import contract
+from periodictable import elements as element_dict
+from torch.nn import Module as TorchModule
+
+import neuralxc.config as config
+from neuralxc.base import ABCRegistry
+from neuralxc.timer import timer
+from neuralxc.utils import geom
 
 
 class ProjectorRegistry(ABCRegistry):

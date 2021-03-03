@@ -1,40 +1,40 @@
-import json
+import copy
 import glob
+import hashlib
+import json
+import os
+# import dill as pickle
+import pickle
+import shutil
+import subprocess
+import sys
+import time
+from collections import namedtuple
+from glob import glob
+from pprint import pprint
+
 import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from ase.io import read
-from neuralxc.symmetrizer import symmetrizer_factory
-from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedVarianceThreshold
-from neuralxc.ml.transformer import GroupedStandardScaler
+from sklearn.base import clone
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+
+import neuralxc as xc
+from neuralxc.datastructures.hdf5 import *
+from neuralxc.drivers.data import *
+from neuralxc.drivers.other import *
+from neuralxc.formatter import (SpeciesGrouper, atomic_shape, make_nested_absolute, system_shape)
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
 from neuralxc.ml.network import load_pipeline
-from neuralxc.preprocessor import Preprocessor
-from neuralxc.datastructures.hdf5 import *
+from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
 from neuralxc.ml.utils import *
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.base import clone
-import pandas as pd
-from pprint import pprint
-import time
-import os
-import shutil
-from collections import namedtuple
-import hashlib
-import subprocess
-import matplotlib.pyplot as plt
-import numpy as np
-import neuralxc as xc
-import sys
-import copy
-# import dill as pickle
-import pickle
-from .data import *
-from .other import *
-from neuralxc.preprocessor import driver
-from ..formatter import make_nested_absolute
-from glob import glob
+from neuralxc.preprocessor import Preprocessor, driver
+from neuralxc.symmetrizer import symmetrizer_factory
+
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 
@@ -128,7 +128,7 @@ def serialize(in_path, jit_path, as_radial):
         if projector_type[-len('_radial'):] == '_radial':
             projector_type = projector_type[:-len('_radial')]
             model.basis_instructions.update({'projector_type': projector_type})
-    xc.ml.network.serialize_pipeline(model, jit_path, override=True)
+    xc.ml.pipeline.serialize_pipeline(model, jit_path, override=True)
     if model.get_basis_instructions().get('spec_agnostic', 'False'):
         with open(jit_path + '/AGN', 'w') as file:
             file.write('# This model is species agnostic')

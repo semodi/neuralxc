@@ -2,18 +2,20 @@
 Unit and regression test for the neuralxc package.
 """
 
+import copy
+import os
+import sys
+from abc import ABC, abstractmethod
+
+import dill as pickle
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
+
 # Import package, test suite, and other packages as needed
 import neuralxc as xc
-import pytest
-import sys
-import numpy as np
-import os
-from neuralxc.doc_inherit import doc_inherit
-from abc import ABC, abstractmethod
-import dill as pickle
-import copy
-import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
+
 try:
     import ase
     ase_found = True
@@ -70,7 +72,7 @@ def test_density_projector(projector_type):
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.parametrize('projector_type', ['ortho_radial'])
 def test_radial_projector(projector_type):
-    from pyscf import gto, dft
+    from pyscf import dft, gto
     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
     mf = dft.RKS(mol)
     mf.xc = 'PBE'
@@ -103,7 +105,7 @@ def test_radial_projector(projector_type):
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.gaussian
 def test_radial_gaussian():
-    from pyscf import gto, dft
+    from pyscf import dft, gto
     mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g')
     mf = dft.RKS(mol)
     # mf.xc = 'LDA'
@@ -184,7 +186,7 @@ def test_gaussian_serialized():
                                                       grid=grid,
                                                       basis_instructions=basis_instructions)
 
-    basis_models, projector_models = xc.ml.network.serialize_projector(density_projector)
+    basis_models, projector_models = xc.ml.pipeline.serialize_projector(density_projector)
 
     my_box = torch.Tensor([[0, grid[i]] for i in range(3)])
     unitcell = torch.from_numpy(unitcell).double()

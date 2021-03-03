@@ -2,22 +2,23 @@
 Unit and regression test for the neuralxc package.
 """
 
+import copy
+import os
+import sys
+from abc import ABC, abstractmethod
+from time import time
+
+import ase
+import dill as pickle
+import matplotlib.pyplot as plt
+import numpy as np
+import periodictable
+import pytest
+import torch
+
 # Import package, test suite, and other packages as needed
 import neuralxc as xc
-import pytest
-import sys
-import numpy as np
-import os
-from neuralxc.doc_inherit import doc_inherit
-from abc import ABC, abstractmethod
-import dill as pickle
-import copy
-import matplotlib.pyplot as plt
 from neuralxc.constants import Bohr, Hartree
-import periodictable
-from time import time
-import ase
-import torch
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 

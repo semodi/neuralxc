@@ -1,14 +1,17 @@
 """Utility functions for real-space grid properties
 """
-import numpy as np
-import pandas as pd
+import re
 import struct
 from abc import ABC, abstractmethod
-from ..base import ABCRegistry
-import re
+
+import numpy as np
+import pandas as pd
+
+from neuralxc.base import ABCRegistry
+
 try:
-    from pyscf.scf.chkfile import load_scf
     from pyscf import dft
+    from pyscf.scf.chkfile import load_scf
     pyscf_found = True
 except ModuleNotFoundError:
     pyscf_found = False

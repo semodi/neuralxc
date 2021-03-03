@@ -5,18 +5,20 @@ an electronic structure code that computes energy-density pairs, to a dataset
 of structures. If desired this can be done in a distributed fashion using Dask.
 """
 
+import argparse
+import itertools
+import json
+import os
+import sys
+
 import dask
 import dask.distributed
-from dask.distributed import Client, LocalCluster
-import sys
-import argparse
-import os
-from ase.io import read, write
-import json
-import itertools
-from ase import Atoms
 import numpy as np
-from ..engines import Engine
+from ase import Atoms
+from ase.io import read, write
+from dask.distributed import Client, LocalCluster
+
+from neuralxc.engines import Engine
 
 
 def in_private_dir(method):

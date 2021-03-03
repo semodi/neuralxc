@@ -4,19 +4,24 @@ Engines that act as adapters between NeuralXC and electronic structure codes (or
 ASE calculator class if it exists). Used for dataset creation and passed to driver.
 """
 from abc import ABC, abstractmethod
+
 from ..base import ABCRegistry
+
 try:
-    from ..pyscf.pyscf import compute_KS
     from pyscf.scf.chkfile import load_scf
+
+    from neuralxc.pyscf.pyscf import compute_KS
 except ModuleNotFoundError:
     compute_KS = None
-from ase.calculators.singlepoint import SinglePointCalculator
-from .siesta import CustomSiesta
-from .cp2k import CustomCP2K
 import os
-from ase.units import Hartree
+
 import ase.calculators as calculators
 import ase.calculators.cp2k
+from ase.calculators.singlepoint import SinglePointCalculator
+from ase.units import Hartree
+
+from neuralxc.engines.cp2k import CustomCP2K
+from neuralxc.engines.siesta import CustomSiesta
 
 
 class EngineRegistry(ABCRegistry):

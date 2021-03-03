@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import argparse
+
 from neuralxc.drivers import *
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Add data to hdf5 file')

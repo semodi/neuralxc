@@ -1,38 +1,40 @@
-import json
+import copy
 import glob
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from collections import namedtuple
+from pprint import pprint
+from types import SimpleNamespace as SN
+
+import dill as pickle
 import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from ase.io import read
-from neuralxc.symmetrizer import symmetrizer_factory
-from neuralxc.formatter import atomic_shape, system_shape, SpeciesGrouper
-from neuralxc.ml.transformer import GroupedVarianceThreshold
-from neuralxc.ml.transformer import GroupedStandardScaler
+from sklearn.base import clone
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+
+import neuralxc as xc
+from neuralxc.datastructures.hdf5 import *
+from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
 from neuralxc.ml.network import load_pipeline
-from neuralxc.preprocessor import Preprocessor
-from neuralxc.datastructures.hdf5 import *
+from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
 from neuralxc.ml.utils import *
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.base import clone
-import pandas as pd
-from pprint import pprint
-import time
-import os
-import shutil
-from collections import namedtuple
-import hashlib
-import subprocess
-import matplotlib.pyplot as plt
-import numpy as np
-import neuralxc as xc
-import sys
-import copy
-import dill as pickle
-from types import SimpleNamespace as SN
+from neuralxc.preprocessor import Preprocessor, driver
+from neuralxc.symmetrizer import symmetrizer_factory
+
 from ..formatter import make_nested_absolute
-from .data import *
-from neuralxc.preprocessor import driver
+from .data import add_data_driver, sample_driver
+
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -70,6 +72,7 @@ def plot_basis(basis):
 
 def get_real_basis(atoms, basis, spec_agnostic=False):
     from pyscf import gto
+
     from ..pyscf import BasisPadder
     real_basis = {}
     is_file = os.path.isfile(basis)

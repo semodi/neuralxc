@@ -4,11 +4,12 @@ Extends the ASE Siesta calculator, by letting it read in custom .fdf (input) fil
 Some code in this file was adapted from the original ASE implementation.
 """
 
-from ase.calculators.siesta.siesta import Siesta
-from ase.calculators.calculator import Calculator, all_changes
-import shutil
 import os
+import shutil
+
+from ase.calculators.calculator import Calculator, all_changes
 from ase.calculators.siesta.base_siesta import *
+from ase.calculators.siesta.siesta import Siesta
 
 
 class CustomSiesta(Siesta):

@@ -3,12 +3,14 @@ neuralxc.py
 Implementation of a machine learned density functional
 Interfaces to pyblibnxc classes. Here for compatibility reasons
 """
+import json
+import os
+from glob import glob
+
 from pylibnxc import AtomicFunc
 from pylibnxc.adapters import Hartree
-from .projector import DensityProjector
-from glob import glob
-import os
-import json
+
+from neuralxc.projector import DensityProjector
 
 
 class PySCFNXC(AtomicFunc):
