@@ -2,8 +2,7 @@
 neuralxc
 Implementation of a machine learned density functional
 """
-#from setuptools import setup
-from numpy.distutils.core import setup, Extension
+from setuptools import setup, find_packages
 import versioneer
 
 short_description = __doc__.split("\n")
@@ -27,7 +26,7 @@ setup(
     license='BSD-3-Clause',
 
     # Which Python importable modules should be included when your package is installed
-    packages=['neuralxc', "neuralxc.tests"],
+    packages=find_packages(),
 
     # Optional include package data to ship with your package
     # Comment out this line to prevent the files from being packaged with your software

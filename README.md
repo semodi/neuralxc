@@ -1,7 +1,7 @@
 NeuralXC
 ==============================
 [//]: # (Badges)
-[![Build Status](https://travis-ci.org/semodi/neuralxc.svg?branch=master)](https://travis-ci.org/semodi/neuralxc)
+![Python Unit Testing](https://github.com/semodi/neuralxc/actions/workflows/unittest.yml/badge.svg)
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
 
