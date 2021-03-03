@@ -5,18 +5,17 @@ NeuralXC
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
 
-<img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="700" height="450" />
+<img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="500" height="280" />
 
 Implementation of a machine learned density functional as presented [here](https://www.nature.com/articles/s41467-020-17265-7)
+This project only includes routines to fit and test neural network based density functionals. To actually use these functionals within electronic structure codes please refer to [**Libnxc**](https://github.com/semodi/libnxc/)
 
 ### Installation
 
-
-To install NeuralXC, navigate into the root directory of the repository and run
+To install NeuralXC using pip, navigate into the root directory of the repository and run
 ```
 sh install.sh
 ```
-This assumes that anaconda is available. Alternatively, the packages listed in `install.sh` can be manually installed with pip .
 So far, NeuralXC has only been tested on Linux and Mac OS X.
 
 To check the integrity of your installation, you can run unit tests with
@@ -29,7 +28,7 @@ in the root directory.
 
 The new version of NeuralXC only implements the neural network architecture along with routines to **train** and test functionals. As neural networks are
 trained self-consistently, an electronic structure code to drive these calculations is needed. For this purpose, we have developed [Libnxc](https://github.com/semodi/libnxc), which allows for easy interfacing with electronic structure codes such as SIESTA and CP2K. Its python version,
-pylibnxc is installed automatically by `sh install.sh` and works with PySCF out-of-the-box.
+pylibnxc is installed automatically together with this package and works with PySCF out-of-the-box.
 
 ### How-to
 
