@@ -4,6 +4,7 @@ NeuralXC
 ![Python Unit Testing](https://github.com/semodi/neuralxc/actions/workflows/unittest.yml/badge.svg)
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
+[![Documentation Status](https://readthedocs.org/projects/neuralxc/badge/?version=latest)](https://neuralxc.readthedocs.io/en/latest/?badge=latest)
 
 <img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="500" height="280" />
 
