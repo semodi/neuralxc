@@ -104,12 +104,12 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
 
         Parameters
         ----------------
-        C , dict of numpy.ndarrays or list of dict of numpy.ndarrays
+        C : dict of numpy.ndarrays or list of dict of numpy.ndarrays
             Electronic descriptors
 
         Returns
         ------------
-        D, dict of numpy.ndarrays
+        D: dict of numpy.ndarrays
             Symmetrized descriptors
         """
         self.C = C
@@ -128,7 +128,7 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
 
 class TraceSymmetrizer(BaseSymmetrizer):
     """ Symmetrizes density projections with respect to global rotations.
-    
+
     :_registry_name: 'trace'
     """
     _registry_name = 'trace'
@@ -145,16 +145,12 @@ class TraceSymmetrizer(BaseSymmetrizer):
     def _symmetrize_function(c, n_l, n, *args):
         """ Returns the symmetrized version of c
 
-        Parameters:
+        Parameters
         -----------
-
-        c: np.ndarray of floats/complex
+        c: np.ndarray of floats
             Stores the tensor elements in the order (n,l,m)
-
         n_l: int
-            number of angular momenta (not equal to maximum ang. momentum!
-                example: if only s-orbitals n_l would be 1)
-
+            number of angular momenta (not equal to maximum ang. momentum! example: if only s-orbitals n_l would be 1)
         n: int
             number of radial functions
 
@@ -197,16 +193,12 @@ class MixedTraceSymmetrizer(BaseSymmetrizer):
         """ Return trace of c_m c_m' with mixed radial channels
         of the tensors stored in c
 
-        Parameters:
+        Parameters
         -----------
-
         c: np.ndarray of floats/complex
             Stores the tensor elements in the order (n,l,m)
-
         n_l: int
-            number of angular momenta (not equal to maximum ang. momentum!
-                example: if only s-orbitals n_l would be 1)
-
+            number of angular momenta (not equal to maximum ang. momentum! example: if only s-orbitals n_l would be 1)
         n: int
             number of radial functions
 
@@ -234,7 +226,10 @@ class MixedTraceSymmetrizer(BaseSymmetrizer):
 
         return traces.view(*c_shape[:-1], -1)
 
-
+class CasimirSymmetrizer(TraceSymmetrizer): #Alias for backwards compatibility
+    _registry_name = 'casimir'
+    _unit_test = False
+    
 def symmetrizer_factory(symmetrize_instructions):
     """
     Factory for various Symmetrizers (Casimir, Bispectrum etc.).
