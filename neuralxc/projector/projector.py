@@ -43,7 +43,6 @@ def DensityProjector(**kwargs):
 
 
 class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
-
     _registry_name = 'base'
     _unit_test = False
 
@@ -210,7 +209,7 @@ class EuclideanProjector(BaseProjector):
 
     def __init__(self, unitcell, grid, basis_instructions, **kwargs):
         """
-        Projector on euclidean grid
+        Projector on euclidean grid with periodic bounday conditions
 
         Parameters
         ------------------

@@ -59,7 +59,7 @@ class NXCPipeline(Pipeline):
             Example {'C':{'n' : 4, 'l' : 2, 'r_o' : 3}}
         symmetrize_instructions: dict
             Instructions for symmetrizer.
-            Example {symmetrizer_type: 'casimir'}
+            Example {symmetrizer_type: 'trace'}
         """
         # torch.nn.Module.__init__(self)
         self.basis_instructions = basis_instructions

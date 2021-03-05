@@ -126,9 +126,12 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
             return results
 
 
-class CasimirSymmetrizer(BaseSymmetrizer):
-
-    _registry_name = 'casimir'
+class TraceSymmetrizer(BaseSymmetrizer):
+    """ Symmetrizes density projections with respect to global rotations.
+    
+    :_registry_name: 'trace'
+    """
+    _registry_name = 'trace'
 
     def __init__(self, *args, **kwargs):
 
@@ -140,7 +143,7 @@ class CasimirSymmetrizer(BaseSymmetrizer):
 
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
-        """ Returns the casimir invariants of the tensors stored in c
+        """ Returns the symmetrized version of c
 
         Parameters:
         -----------
@@ -163,21 +166,24 @@ class CasimirSymmetrizer(BaseSymmetrizer):
         c_shape = c.size()
 
         c = c.view(-1, c_shape[-1])
-        casimirs = []
+        traces = []
         idx = 0
 
         for n_ in range(0, n):
             for l in range(n_l):
-                casimirs.append(torch.norm(c[:, idx:idx + (2 * l + 1)], dim=1)**2)
+                traces.append(torch.norm(c[:, idx:idx + (2 * l + 1)], dim=1)**2)
                 idx += 2 * l + 1
-        casimirs = torch.stack(casimirs).T
+        traces = torch.stack(traces).T
 
-        return casimirs.view(*c_shape[:-1], -1)
+        return traces.view(*c_shape[:-1], -1)
 
 
-class MixedCasimirSymmetrizer(BaseSymmetrizer):
+class MixedTraceSymmetrizer(BaseSymmetrizer):
+    """
+    :_registry_name: 'mixed_trace'
+    """
 
-    _registry_name = 'mixed_casimir'
+    _registry_name = 'mixed_trace'
 
     def __init__(self, *args, **kwargs):
         BaseSymmetrizer.__init__(self, *args, **kwargs)
@@ -188,7 +194,7 @@ class MixedCasimirSymmetrizer(BaseSymmetrizer):
 
     @staticmethod
     def _symmetrize_function(c, n_l, n, *args):
-        """ Returns the casimir invariants with mixed radial channels
+        """ Return trace of c_m c_m' with mixed radial channels
         of the tensors stored in c
 
         Parameters:
@@ -213,20 +219,20 @@ class MixedCasimirSymmetrizer(BaseSymmetrizer):
 
         c = c.view(-1, c_shape[-1])
         c = c.view(len(c), n, -1)
-        casimirs = []
+        traces = []
 
         for n1 in range(0, n):
             for n2 in range(n1, n):
                 idx = 0
                 for l in range(n_l):
-                    casimirs.append(torch.sum(c[:,n1,idx:idx+(2*l+1)]*\
+                    traces.append(torch.sum(c[:,n1,idx:idx+(2*l+1)]*\
                                            c[:,n2,idx:idx+(2*l+1)],
                                             dim = -1))
                     idx += 2 * l + 1
 
-        casimirs = torch.stack(casimirs).T
+        traces = torch.stack(traces).T
 
-        return casimirs.view(*c_shape[:-1], -1)
+        return traces.view(*c_shape[:-1], -1)
 
 
 def symmetrizer_factory(symmetrize_instructions):
@@ -236,7 +242,7 @@ def symmetrizer_factory(symmetrize_instructions):
     Parameters:
     ------------
     symmetrize_instructions : dict
-        Should specify 'symmetrizer_type' ('casimir','bispectrum') and
+        Should specify 'symmetrizer_type' ('trace','mixed_trace') and
         basis set information (angular momentum, no. radial basis functions)
 
     Returns:

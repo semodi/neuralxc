@@ -53,7 +53,10 @@ def get_coeff(dm, eri3c):
 
 
 class PySCFProjector(BaseProjector):
-
+    """
+    :_registry_name: 'pyscf'
+    """
+    
     _registry_name = 'pyscf'
 
     def __init__(self, mol, basis_instructions, **kwargs):

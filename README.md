@@ -41,7 +41,7 @@ To train/fit a functional a set of structures and their associated reference ene
 
 `neuralxc sc training_structures.xyz basis.json hyperparameters.json`
 
-- `basis.json` contains information regarding the basis set as well as the 'driver' program (SIESTA), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
+- `basis.json` contains information regarding the basis set as well as the 'driver' program (PySCF), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
 
 - `hyperparameters.json` contains the machine learning hyperparameters, examples can be found in [examples/inputs/hyper](examples/inputs/hyper).
 

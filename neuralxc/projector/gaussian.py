@@ -72,6 +72,10 @@ def parse_basis(basis_instructions):
 
 
 class GaussianProjector(EuclideanProjector):
+    """Implements GTO basis
+
+    :_registry_name: 'gaussian'
+    """
 
     _registry_name = 'gaussian'
     _unit_test = True
@@ -259,8 +263,10 @@ class GaussianProjector(EuclideanProjector):
         return result
 
 
-class RadialGaussianProjector(GaussianProjector, RadialProjector):
-
+class GaussianRadialProjector(GaussianProjector, RadialProjector):
+    """
+    :_registry_name: 'gaussian_radial'
+    """
     _registry_name = 'gaussian_radial'
     _unit_test = False
 
