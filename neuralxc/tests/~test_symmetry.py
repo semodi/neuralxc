@@ -52,7 +52,7 @@ def test_density_projector():
     for rad in radials:
         plt.plot(r, rad)
     plt.show()
-    symmetrize_instructions = {'basis': basis_set, 'symmetrizer_type': 'casimir'}
+    symmetrize_instructions = {'basis': basis_set, 'symmetrizer_type': 'trace'}
     symmetrizer = xc.symmetrizer.symmetrizer_factory(symmetrize_instructions)
     basis_rep = symmetrizer.fit_transform(basis_rep)
     # print(basis_rep)

@@ -259,7 +259,6 @@ def density_getter_factory(application, *args, **kwargs):
     """
 
     registry = BaseDensityGetter.get_registry()
-    # symmetrizer_dict = dict(casimir = CasimirSymmetrizer)
 
     if not application in registry:
         raise Exception('DensityGetter: {} not registered'.format(application))

@@ -53,6 +53,9 @@ def get_coeff(dm, eri3c):
 
 
 class PySCFProjector(BaseProjector):
+    """
+    :_registry_name: 'pyscf'
+    """
 
     _registry_name = 'pyscf'
 
@@ -64,10 +67,10 @@ class PySCFProjector(BaseProjector):
 
         Parameters
         -----------
-        mol, pyscf.gto.M
+        mol: pyscf.gto.M
             Contains information about atoms and GTO basis
 
-        basis_instructions, dict
+        basis_instructions: dict
             Basis instructions containing following values:
                 - spec_agnostic, bool (False)
                     Use same basis for every atomic species?

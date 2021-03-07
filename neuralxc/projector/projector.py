@@ -43,7 +43,6 @@ def DensityProjector(**kwargs):
 
 
 class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
-
     _registry_name = 'base'
     _unit_test = False
 
@@ -59,16 +58,16 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
 
         Parameters
         ------------------
-        rho, np.ndarray, float (npoints) or (xpoints, ypoints, zpoints)
+        rho: np.ndarray float (npoints) or (xpoints, ypoints, zpoints)
         	Electron density in real space
-        positions, np.ndarray float (natoms, 3)
+        positions: np.ndarray float (natoms, 3)
         	atomic positions
-        species, list string
+        species: list string
         	atomic species (chem. symbols)
 
         Returns
         ------------
-        c, dict of np.ndarrays
+        c: dict of np.ndarrays
         	Basis representation, dict keys correspond to atomic species.
         """
         rho = torch.from_numpy(rho)
@@ -210,15 +209,15 @@ class EuclideanProjector(BaseProjector):
 
     def __init__(self, unitcell, grid, basis_instructions, **kwargs):
         """
-        Projector on euclidean grid
+        Projector on euclidean grid with periodic bounday conditions
 
         Parameters
         ------------------
-        unitcell, numpy.ndarray float (3,3)
+        unitcell: numpy.ndarray float (3,3)
         	Unitcell in bohr
-        grid, numpy.ndarray float (3)
+        grid: numpy.ndarray float (3)
         	Grid points per unitcell
-        basis_instructions, dict
+        basis_instructions: dict
         	Instructions that define basis
         """
         super().__init__()
@@ -379,11 +378,11 @@ class RadialProjector(EuclideanProjector):
 
         Parameters
         ------------------
-        grid_coords, numpy.ndarray (npoints, 3)
+        grid_coords: numpy.ndarray (npoints, 3)
         	Coordinates of radial grid points
-        grid_weights, numpy.ndarray (npoints)
+        grid_weights: numpy.ndarray (npoints)
         	Grid weights for integration
-        basis_instructions, dict
+        basis_instructions: dict
         	Instructions that defines basis
         """
         TorchModule.__init__(self)

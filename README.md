@@ -4,6 +4,7 @@ NeuralXC
 ![Python Unit Testing](https://github.com/semodi/neuralxc/actions/workflows/unittest.yml/badge.svg)
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
+[![Documentation Status](https://readthedocs.org/projects/neuralxc/badge/?version=latest)](https://neuralxc.readthedocs.io/en/latest/?badge=latest)
 
 <img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="500" height="280" />
 
@@ -41,7 +42,7 @@ To train/fit a functional a set of structures and their associated reference ene
 
 `neuralxc sc training_structures.xyz basis.json hyperparameters.json`
 
-- `basis.json` contains information regarding the basis set as well as the 'driver' program (SIESTA), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
+- `basis.json` contains information regarding the basis set as well as the 'driver' program (PySCF), examples can be found in [examples/inputs/ml_basis/](examples/inputs/ml_basis).   
 
 - `hyperparameters.json` contains the machine learning hyperparameters, examples can be found in [examples/inputs/hyper](examples/inputs/hyper).
 

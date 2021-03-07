@@ -26,8 +26,9 @@ torch.set_default_dtype(torch.float64)
 
 
 class OrthoProjector(EuclideanProjector):
-    """ Implements orthonormal basis functions on a euclidean grid.
-    Radial basis is based on polynomials.
+    """ Implements orthonormal basis functions
+
+        :_registry_name: 'ortho'
     """
     _registry_name = 'ortho'
     _unit_test = True
@@ -100,7 +101,7 @@ class OrthoProjector(EuclideanProjector):
 
 
 class OrthoRadialProjector(RadialProjector, OrthoProjector):
-    """ Implements orthonormal basis functions on a radial grid.
-    Radial basis is based on polynomials.
+    """
+    :_registry_name: 'ortho_radial'
     """
     _registry_name = 'ortho_radial'

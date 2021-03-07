@@ -234,7 +234,7 @@ def to_full_hyperparameters(hp, parameters):
     return full
 
 
-def get_default_pipeline(basis, species, symmetrizer_type='casimir', pca_threshold=1, spec_agnostic=False):
+def get_default_pipeline(basis, species, symmetrizer_type='trace', pca_threshold=1, spec_agnostic=False):
     """
     Get the default pipeline containing symmetrizer, variance selector, pca, and
     the final NetworkEstimator
@@ -284,7 +284,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
 
     pipeline = get_default_pipeline(basis,
                                     all_species,
-                                    symmetrizer_type=pre.get('symmetrizer_type', 'casimir'),
+                                    symmetrizer_type=pre.get('symmetrizer_type', 'trace'),
                                     spec_agnostic=spec_agnostic)
 
     if 'hyperparameters' in inp:
