@@ -103,7 +103,10 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
 
         real_basis[sym] = padded_basis[sym]
 
-    if spec_agnostic: real_basis = {'X': real_basis['X']}
+    if spec_agnostic:
+        real_basis = {'X': real_basis['X']}
+    else:
+        real_basis.pop('X', None)
     return real_basis
 
 
