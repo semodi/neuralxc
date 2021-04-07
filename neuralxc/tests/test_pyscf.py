@@ -56,7 +56,7 @@ def test_radial_model():
     assert np.allclose(res, np.load(test_dir + '/rad_energy.npy'))
 
 
-@pytest.mark.skipif(True, reason="too expensive")
+# @pytest.mark.skipif(True, reason="too expensive")
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_sc():
