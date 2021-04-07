@@ -4,7 +4,7 @@ symmetrizer.py
 Implements different symmetrizers. Symmetrizers ensure that descriptors are
 invariant with respect to global rotations.
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 import torch
@@ -226,10 +226,12 @@ class MixedTraceSymmetrizer(BaseSymmetrizer):
 
         return traces.view(*c_shape[:-1], -1)
 
-class CasimirSymmetrizer(TraceSymmetrizer): #Alias for backwards compatibility
+
+class CasimirSymmetrizer(TraceSymmetrizer):  #Alias for backwards compatibility
     _registry_name = 'casimir'
     _unit_test = False
-    
+
+
 def symmetrizer_factory(symmetrize_instructions):
     """
     Factory for various Symmetrizers (Casimir, Bispectrum etc.).

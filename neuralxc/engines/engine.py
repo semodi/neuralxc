@@ -3,7 +3,7 @@ engines.py
 Engines that act as adapters between NeuralXC and electronic structure codes (or their
 ASE calculator class if it exists). Used for dataset creation and passed to driver.
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from ..base import ABCRegistry
 
@@ -33,11 +33,7 @@ class BaseEngine(metaclass=EngineRegistry):
     _registry_name = 'base'
 
     @abstractmethod
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def compute(self):
+    def compute(self, atoms):
         pass
 
 

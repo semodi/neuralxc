@@ -58,7 +58,7 @@ class Timer():
                 raise ValueError('Timer with name {} was never started'.format(name))
 
     def create_report(self, path=None):
-        keys = list(self.start_dict.keys())
+        # keys = list(self.start_dict.keys())
         # for key in keys:
         #     if not key in self.accum_dict:
         #         self.stop(key)

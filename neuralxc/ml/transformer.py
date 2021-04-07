@@ -5,13 +5,11 @@ A typical dataset looks like this:
 [{'spec1': features,'spec2' : features}, {'spec1': features, 'spec3': features}]
 where the outer list runs over independent systems.
 """
-from abc import ABC, abstractmethod
-
 import numpy as np
 import torch
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler
+from abc import ABC
 
 from ..formatter import atomic_shape, system_shape
 
@@ -39,9 +37,6 @@ class GroupedTransformer(ABC):
     of sklearn Transformers to neuralxc specific grouped data. Further, they
     implement a get_gradient method.
     """
-
-    #TODO: make _get_gradient abstractmethod and _before_fit an abstractparameter
-
     def __init__(self, *args, **kwargs):
 
         TorchModule.__init__(self)
@@ -147,6 +142,12 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModul
     def get_kwargs(self):
         return dict(threshold=self.treshold)
 
+    def transform(self, X, y=None, **fit_params):
+        return GroupedTransformer.transform(self, X, y, **fit_params)
+
+    def fit_transform(self, X, y=None, **fit_params):
+        return GroupedTransformer.fit_transform(self, X, y, **fit_params)
+
     def torch_transform(self, X):
         X_shape = X.size()
         if not len(X_shape) == 2:
@@ -175,6 +176,12 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
             X = X.view(-1, X_shape[-1])
         X = (X - torch.from_numpy(self.mean_)) / torch.sqrt(torch.from_numpy(self.var_))
         return X
+
+    def transform(self, X, y=None, **fit_params):
+        return GroupedTransformer.transform(self, X, y, **fit_params)
+
+    def fit_transform(self, X, y=None, **fit_params):
+        return GroupedTransformer.fit_transform(self, X, y, **fit_params)
 
 
 def identity(x):

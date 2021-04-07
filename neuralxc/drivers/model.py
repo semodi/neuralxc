@@ -1,16 +1,6 @@
-import copy
-import glob
-import hashlib
 import json
 import os
-# import dill as pickle
-import pickle
 import shutil
-import subprocess
-import sys
-import time
-from collections import namedtuple
-from glob import glob
 from pprint import pprint
 
 import h5py
@@ -18,23 +8,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from ase.io import read
-from sklearn.base import clone
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
 
 import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
 from neuralxc.drivers.data import *
 from neuralxc.drivers.other import *
-from neuralxc.formatter import (SpeciesGrouper, atomic_shape, make_nested_absolute, system_shape)
+from neuralxc.formatter import (SpeciesGrouper, make_nested_absolute)
 from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
-from neuralxc.ml.network import load_pipeline
-from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
 from neuralxc.ml.utils import *
-from neuralxc.preprocessor import Preprocessor, driver
+from neuralxc.preprocessor import driver
 from neuralxc.symmetrizer import symmetrizer_factory
 
+__all__ = ['serialize', 'sc_driver', 'fit_driver', 'eval_driver']
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 
@@ -150,7 +136,6 @@ def sc_driver(xyz,
               hyperopt=False,
               keep_itdata=False):
 
-    statistics_sc = {'mae': 1000}
     xyz = os.path.abspath(xyz)
     pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
     engine_kwargs = pre.get('engine_kwargs', {})
@@ -266,7 +251,6 @@ def sc_driver(xyz,
                         traj='workdir/results.traj',
                         override=True,
                         zero=E0)
-        old_statistics = dict(statistics_sc)
         statistics_sc = \
         eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
                 'system/ref'])
@@ -275,8 +259,6 @@ def sc_driver(xyz,
         open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
         statistics_fit = fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp')
         open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
-    else:
-        print('Maximum number of iterations reached. Proceeding to test set...')
 
     os.chdir('..')
     print('====== Testing ======')
@@ -331,7 +313,6 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
     if sets != '':
         hdf5 = parse_sets_input(sets)
 
-    inp = json.loads(open(inputfile, 'r').read())
     pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
     basis_key = basis_to_hash(pre['preprocessor'])
     if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
@@ -400,7 +381,6 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
         bp = {key[len('ml__'):]: bp[key] for key in bp}
         open('best_params.json', 'w').write(json.dumps({'hyperparameters': bp}, indent=4))
         pd.DataFrame(estimator.cv_results_).to_csv('cv_results.csv')
-        best_params_ = estimator.best_params_
         best_estimator = estimator.best_estimator_.steps[-1][1].start_at(2)
         best_estimator.save('best_model', True)
     else:
@@ -426,7 +406,7 @@ def eval_driver(hdf5,
     if predict:
         hdf5.append(hdf5[1])
         cutoff = 0
-        
+
     datafile = h5py.File(hdf5[0], 'r')
 
     if not model == '':

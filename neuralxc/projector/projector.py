@@ -5,21 +5,14 @@ EuclideanProjector for euclidean grids with periodic boundary conditions and
 RadialProjector for generalized grids without PBCs.
 """
 
-import math
-import time
-from abc import ABC, abstractmethod
-from functools import reduce
+from abc import abstractmethod
 
 import numpy as np
-import periodictable
 import torch
 from opt_einsum import contract
-from periodictable import elements as element_dict
 from torch.nn import Module as TorchModule
 
-import neuralxc.config as config
 from neuralxc.base import ABCRegistry
-from neuralxc.timer import timer
 from neuralxc.utils import geom
 
 
@@ -78,7 +71,6 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
 
     def set_species(self, species):
         self.species = species
-
 
     def forward(self, rho, positions, species, unitcell, grid, my_box):
         """ Combines basis set creation (done in forward_basis) and projection

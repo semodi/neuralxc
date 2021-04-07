@@ -3,26 +3,17 @@ gaussian.py
 Implements density projection basis with radial functions based on Gaussians.
 Gaussians can be dampened (gamma) and truncated (r_o) for integration on numerical grids.
 """
-import math
 import os
-import time
-from functools import reduce
 
 import numpy as np
-import periodictable
 import pyscf.gto as gto
 import pyscf.gto.basis as gtobasis
 import torch
 from opt_einsum import contract
-from periodictable import elements as element_dict
 from torch.nn import Module as TorchModule
 
-import neuralxc
-from neuralxc import config
-from neuralxc.base import ABCRegistry
 from neuralxc.projector import (BaseProjector, EuclideanProjector, RadialProjector)
-from neuralxc.timer import timer
-from neuralxc.utils import geom
+from neuralxc.pyscf import BasisPadder
 
 # Normalization factors
 GAMMA = torch.from_numpy(
@@ -44,7 +35,7 @@ def parse_basis(basis_instructions):
             spec = 'O' if species == 'X' else species
             try:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
-            except:
+            except RuntimeError:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
             sigma = basis_instructions[species].get('sigma', 2.0)
             gamma = basis_instructions[species].get('gamma', 1.0)
@@ -74,7 +65,6 @@ def parse_basis(basis_instructions):
 class GaussianProjectorMixin():
     """Implements GTO basis
     """
-
     def forward_basis(self, positions, unitcell, grid, my_box):
         """Creates basis set (for projection) for a single atom, on grid points
 
@@ -113,14 +103,13 @@ class GaussianProjectorMixin():
         box['radial'] = torch.stack(box['radial'])
         for ib, basis in enumerate(basis_instructions):
             l = basis['l']
-            r_o_max = np.max(basis['r_o'])
+            # r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             filt = (box['radial'][0] <= 1000000)
             box_rad = box['radial'][:, filt]
-            # box_m = box['mesh'][:,filt]
-            box_m = box['mesh'][:, filt]
-            ang = torch.zeros([2 * l + 1, filt.size()[0]], dtype=torch.double)
-            rad = torch.zeros([len(basis['r_o']), filt.size()[0]], dtype=torch.double)
+            # box_m = box['mesh'][:, filt]
+            # ang = torch.zeros([2 * l + 1, filt.size()[0]], dtype=torch.double)
+            # rad = torch.zeros([len(basis['r_o']), filt.size()[0]], dtype=torch.double)
             # ang[:,filt] = torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])) # shape (m, x, y, z)
             # rad[:,filt] = torch.stack(self.radials(box_rad[0], [basis])[0]) # shape (n, x, y, z)
             # rads.append(rad)
@@ -144,7 +133,7 @@ class GaussianProjectorMixin():
             rad_cnt += len_rad
             ang_cnt += 2 * l + 1
             r_o_max = np.max(basis['r_o'])
-            filt = (box['radial'][0] <= r_o_max)
+            # filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
             rad *= self.V_cell
             # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
@@ -168,9 +157,9 @@ class GaussianProjectorMixin():
                 spec = 'O' if species == 'X' else species
                 try:
                     mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
-                except:
+                except RuntimeError:
                     mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
-                bp = neuralxc.pyscf.BasisPadder(mol)
+                bp = BasisPadder(mol)
                 il = bp.indexing_l[spec][0]
                 ir = bp.indexing_r[spec][0]
                 M = np.zeros([len(il), len(ir)])
@@ -202,6 +191,7 @@ class GaussianProjectorMixin():
         elif isinstance(basis, dict):
             result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'], basis['gamma'])])
         return result
+
 
 class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
     """Implements GTO basis
@@ -285,8 +275,7 @@ class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
         basis_instructions, dict
         	Instructions that defines basis
         """
-        RadialProjector.__init__(self, grid_coords, grid_weights,
-            basis_instructions,**kwargs)
+        RadialProjector.__init__(self, grid_coords, grid_weights, basis_instructions, **kwargs)
 
         self.grid_coords = torch.from_numpy(grid_coords)
         self.grid_weights = torch.from_numpy(grid_weights)

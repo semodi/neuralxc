@@ -193,7 +193,6 @@ class SiestaDensityGetter(BaseDensityGetter):
         --------
             Density
         """
-        rhopath = file_path
         unitcell = np.zeros([3, 3])
         grid = np.zeros([4])
 
@@ -205,7 +204,6 @@ class SiestaDensityGetter(BaseDensityGetter):
 
             grid[:] = rhofile.readline().split()
             grid = grid.astype(int)
-            n_el = grid[0] * grid[1] * grid[2] * grid[3]
 
             # initiatialize density with right shape
             rho = np.zeros(grid)

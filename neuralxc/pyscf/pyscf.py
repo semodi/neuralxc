@@ -5,29 +5,18 @@ Defines the modified effective potential veff_mod that allows the integration
 of NeuralXC models in PySCF calculations. Provides utility functions for NeuralXC
 PySCF interoperability.
 """
-import math
-import os
-import time
-from abc import ABC, abstractmethod
 # from sympy import N
-from functools import reduce
 from glob import glob
 
-import numpy as np
 import pyscf
-import scipy.linalg
 from pylibnxc import get_nxc_adapter
 from pyscf import dft, gto
 from pyscf.dft import RKS
 from pyscf.lib.numpy_helper import NPArrayWithTag
-from pyscf.scf import RHF, RKS, hf
-from pyscf.scf.chkfile import load_scf
+from pyscf.scf import RKS
 from scipy.special import sph_harm
 
 import neuralxc
-from neuralxc.base import ABCRegistry
-from neuralxc.projector import BaseProjector
-from neuralxc.timer import timer
 
 LAMBDA = 0.1
 

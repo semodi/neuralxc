@@ -4,23 +4,13 @@ Implements density projection basis with radial functions based on polynomials.
 """
 
 import math
-import time
-from abc import ABC, abstractmethod
-from functools import reduce
 
 import numpy as np
-import periodictable
 import scipy.linalg
 import torch
 from opt_einsum import contract
-from periodictable import elements as element_dict
-from torch.nn import Module as TorchModule
 
-import neuralxc.config as config
-from neuralxc.base import ABCRegistry
 from neuralxc.projector import EuclideanProjector, RadialProjector
-from neuralxc.timer import timer
-from neuralxc.utils import geom
 
 torch.set_default_dtype(torch.float64)
 
@@ -28,7 +18,6 @@ torch.set_default_dtype(torch.float64)
 class OrthoProjectorMixin():
     """ Implements orthonormal basis functions
     """
-
     def forward_basis(self, positions, unitcell, grid, my_box):
         """Creates basis set (for projection) for a single atom, on grid points
 
@@ -69,9 +58,7 @@ class OrthoProjectorMixin():
 
     def get_basis_on_mesh(self, box, basis, W):
 
-        n_rad = basis['n']
         n_l = basis['l']
-        r_o = basis['r_o']
         R, Theta, Phi = box['radial']
 
         #Build angular part of basis functions
@@ -156,6 +143,7 @@ class OrthoEuclideanProjector(EuclideanProjector, OrthoProjectorMixin):
     :_registry_name: 'ortho'
     """
     _registry_name = 'ortho'
+
 
 class OrthoRadialProjector(RadialProjector, OrthoProjectorMixin):
     """

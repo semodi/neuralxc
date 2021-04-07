@@ -6,20 +6,12 @@ no grid operations are necessary.
 BasisPadder translates between NeuralXC and PySCF internal basis set orderings.
 """
 
-import math
 import os
-from abc import ABC, abstractmethod
-from functools import reduce
 
 import numpy as np
-import pyscf
 from opt_einsum import contract
-from pyscf import dft, gto
+from pyscf import gto
 from pyscf.dft import RKS
-from pyscf.scf.chkfile import load_scf
-
-import neuralxc
-from neuralxc.base import ABCRegistry
 
 from .projector import ProjectorRegistry
 
@@ -35,8 +27,6 @@ def get_eri3c(mol, auxmol, op):
      will be changed in future versions.
     """
     pmol = mol + auxmol
-    nao = mol.nao_nr()
-    naux = auxmol.nao_nr()
     if op == 'rij':
         eri3c = pmol.intor('int3c2e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
     elif op == 'delta':

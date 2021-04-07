@@ -2,7 +2,6 @@
 # Spherical harmonics utility functions
 import math
 
-import numpy as np
 import torch
 
 
