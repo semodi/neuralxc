@@ -330,8 +330,6 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
     inputfile = hyper
     if sets != '':
         hdf5 = parse_sets_input(sets)
-    else:
-        hdf5 = hdf5
 
     inp = json.loads(open(inputfile, 'r').read())
     pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
@@ -424,13 +422,11 @@ def eval_driver(hdf5,
                 hashkey=''):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
-    hdf5 = hdf5
 
     if predict:
         hdf5.append(hdf5[1])
         cutoff = 0
-    else:
-        cutoff = cutoff
+        
     datafile = h5py.File(hdf5[0], 'r')
 
     if not model == '':

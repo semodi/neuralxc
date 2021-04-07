@@ -20,7 +20,8 @@ from pyscf.scf.chkfile import load_scf
 
 import neuralxc
 from neuralxc.base import ABCRegistry
-from neuralxc.projector import BaseProjector
+
+from .projector import ProjectorRegistry
 
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
@@ -52,7 +53,7 @@ def get_coeff(dm, eri3c):
     return contract('ijk, ij -> k', eri3c, dm)
 
 
-class PySCFProjector(BaseProjector):
+class PySCFProjector(metaclass=ProjectorRegistry):
     """
     :_registry_name: 'pyscf'
     """

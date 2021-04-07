@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     compute_KS = None
 import os
 
-import ase.calculators as calculators
+import ase.calculators as ase_calculators
 import ase.calculators.cp2k
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.units import Hartree
@@ -83,12 +83,6 @@ class PySCFEngine(PySCFEngine):
 class ASECalcEngine(BaseEngine):
 
     _registry_name = 'ase'
-
-    def __init__(self, **kwargs):
-        calc = calculators
-        for c in kwargs.pop('calculator', 'cp2k.CP2K').split('.'):
-            calc = getattr(calc, c)
-        self.calc = calc(**kwargs)
 
     def compute(self, atoms):
         atoms.calc = self.calc

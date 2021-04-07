@@ -71,34 +71,9 @@ def parse_basis(basis_instructions):
     return full_basis, basis_strings
 
 
-class GaussianProjector(EuclideanProjector):
+class GaussianProjectorMixin():
     """Implements GTO basis
-
-    :_registry_name: 'gaussian'
     """
-
-    _registry_name = 'gaussian'
-    _unit_test = True
-
-    def __init__(self, unitcell, grid, basis_instructions, **kwargs):
-        """Implements GTO basis on euclidean grid
-
-        Parameters
-        ------------------
-        unitcell, numpy.ndarray float (3,3)
-        	Unitcell in bohr
-        grid, numpy.ndarray float (3)
-        	Grid points per unitcell
-        basis_instructions, dict
-        	Instructions that define basis
-        """
-        TorchModule.__init__(self)
-        full_basis, basis_strings = parse_basis(basis_instructions)
-        basis = {key: val for key, val in basis_instructions.items()}
-        basis.update(full_basis)
-        self.basis_strings = basis_strings
-        EuclideanProjector.__init__(self, unitcell, grid, basis, **kwargs)
-        self.init_padder(basis_instructions)
 
     def forward_basis(self, positions, unitcell, grid, my_box):
         """Creates basis set (for projection) for a single atom, on grid points
@@ -129,40 +104,6 @@ class GaussianProjector(EuclideanProjector):
         box['mesh'] = mesh
         rad, ang = self.get_basis_on_mesh(box, basis)
         return rad, ang, torch.cat([mesh.double(), box['radial']])
-
-    def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, my_box):
-        """Creates basis set (for projection) for a single atom, on grid points
-
-        Parameters
-        ----------
-        rho, Tensor (npoints) or (xpoints, ypoints, zpoints)
-            electron density on grid
-        positions, Tensor (1, 3) or (3)
-        	atomic position
-        unitcell, Tensor (3,3)
-        	Unitcell in bohr
-        grid, Tensor (3)
-        	Grid points per unitcell
-        radials, Tensor ()
-            Radial functions on grid, stacked
-        angulars, Tensor ()
-            Angular functions on grid, stacked
-        my_box, Tensor (6, npoints)
-            (:3,:) 3d meshgrid
-            (3:,:) 3d spherical grid
-
-        Returns
-        --------
-        rad, ang, mesh
-            Stacked radial and angular functions as well as meshgrid
-        """
-        self.set_cell_parameters(unitcell, grid)
-        basis = self.basis[self.species]
-        box = {}
-        box['mesh'] = my_box[:3]
-        box['radial'] = my_box[3:]
-        Xm, Ym, Zm = box['mesh'].long()
-        return self.project_onto(rho[Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
 
     def get_basis_on_mesh(self, box, basis_instructions):
 
@@ -262,8 +203,70 @@ class GaussianProjector(EuclideanProjector):
             result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'], basis['gamma'])])
         return result
 
+class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
+    """Implements GTO basis
 
-class GaussianRadialProjector(GaussianProjector, RadialProjector):
+    :_registry_name: 'gaussian'
+    """
+
+    _registry_name = 'gaussian'
+    _unit_test = True
+
+    def __init__(self, unitcell, grid, basis_instructions, **kwargs):
+        """Implements GTO basis on euclidean grid
+
+        Parameters
+        ------------------
+        unitcell, numpy.ndarray float (3,3)
+        	Unitcell in bohr
+        grid, numpy.ndarray float (3)
+        	Grid points per unitcell
+        basis_instructions, dict
+        	Instructions that define basis
+        """
+        full_basis, basis_strings = parse_basis(basis_instructions)
+        basis = {key: val for key, val in basis_instructions.items()}
+        basis.update(full_basis)
+        self.basis_strings = basis_strings
+        EuclideanProjector.__init__(self, unitcell, grid, basis, **kwargs)
+        self.init_padder(basis_instructions)
+
+    def forward_fast(self, rho, positions, unitcell, grid, radials, angulars, my_box):
+        """Creates basis set (for projection) for a single atom, on grid points
+
+        Parameters
+        ----------
+        rho, Tensor (npoints) or (xpoints, ypoints, zpoints)
+            electron density on grid
+        positions, Tensor (1, 3) or (3)
+        	atomic position
+        unitcell, Tensor (3,3)
+        	Unitcell in bohr
+        grid, Tensor (3)
+        	Grid points per unitcell
+        radials, Tensor ()
+            Radial functions on grid, stacked
+        angulars, Tensor ()
+            Angular functions on grid, stacked
+        my_box, Tensor (6, npoints)
+            (:3,:) 3d meshgrid
+            (3:,:) 3d spherical grid
+
+        Returns
+        --------
+        rad, ang, mesh
+            Stacked radial and angular functions as well as meshgrid
+        """
+        self.set_cell_parameters(unitcell, grid)
+        basis = self.basis[self.species]
+        box = {}
+        box['mesh'] = my_box[:3]
+        box['radial'] = my_box[3:]
+        Xm, Ym, Zm = box['mesh'].long()
+        return self.project_onto(rho[Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
+
+
+class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
     """
     :_registry_name: 'gaussian_radial'
     """
@@ -282,7 +285,9 @@ class GaussianRadialProjector(GaussianProjector, RadialProjector):
         basis_instructions, dict
         	Instructions that defines basis
         """
-        BaseProjector.__init__(self)
+        RadialProjector.__init__(self, grid_coords, grid_weights,
+            basis_instructions,**kwargs)
+
         self.grid_coords = torch.from_numpy(grid_coords)
         self.grid_weights = torch.from_numpy(grid_weights)
         self.V_cell = self.grid_weights

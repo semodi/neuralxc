@@ -194,9 +194,6 @@ def delete_data_driver(hdf5, group):
 def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     """ Given a dataset, perform sampling in feature space"""
 
-    preprocessor = preprocessor
-    hdf5 = hdf5
-
     pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     datafile = h5py.File(hdf5[0], 'r')
