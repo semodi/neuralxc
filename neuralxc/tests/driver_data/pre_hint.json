@@ -4,6 +4,7 @@
      "basis": "sto3g",
      "application": "pyscf"
 },
+"n_workers" : 2,
 "engine_kwargs": {"xc": "PBE",
-                  "basis" : "ccpvdz"}
+                  "basis" : "sto3g"}
 }

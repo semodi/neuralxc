@@ -21,20 +21,23 @@ from dask.distributed import Client, LocalCluster
 from neuralxc.engines import Engine
 
 
-def in_private_dir(method):
-    def wrapper_private_dir(dir, *args, **kwargs):
-        try:
-            os.chdir(dir)
-        except FileNotFoundError:
-            os.mkdir(dir)
-            os.chdir(dir)
-        return method(*args, **kwargs)
+# def in_private_dir(method):
+#     def wrapper_private_dir(dir, *args, **kwargs):
+#         try:
+#             os.chdir(dir)
+#         except FileNotFoundError:
+#             os.mkdir(dir)
+#             os.chdir(dir)
+#         return method(*args, **kwargs)
+#
+#     return wrapper_private_dir
 
-    return wrapper_private_dir
-
-
-@in_private_dir
-def calculate_system(atoms, app, kwargs):
+def calculate_system(dir, atoms, app, kwargs):
+    try:
+        os.chdir(dir)
+    except FileNotFoundError:
+        os.mkdir(dir)
+        os.chdir(dir)
     eng = Engine(app, **kwargs)
     atoms = eng.compute(atoms)
     return atoms
