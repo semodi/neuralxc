@@ -1,31 +1,10 @@
 """ Module that implements a Behler-Parinello type neural network
 """
 
-import copy
-import json
-import math
-import os
-import shutil
-import sys
-from collections import namedtuple
-
-import dill as pickle
-import h5py
 import numpy as np
-import pandas as pd
 import torch
-from ase.io import read
-from matplotlib import pyplot as plt
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.utils.metaestimators import if_delegate_has_method
-
-from neuralxc.formatter import atomic_shape
-from neuralxc.ml.pipeline import NXCPipeline, load_pipeline
-from neuralxc.projector import DensityProjector
-from neuralxc.symmetrizer import Symmetrizer
+from .pipeline import load_pipeline  #Keep for backwards compatibility of API
 
 
 class NetworkEstimator(BaseEstimator):

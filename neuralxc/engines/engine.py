@@ -3,7 +3,7 @@ engines.py
 Engines that act as adapters between NeuralXC and electronic structure codes (or their
 ASE calculator class if it exists). Used for dataset creation and passed to driver.
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from ..base import ABCRegistry
 
@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     compute_KS = None
 import os
 
-import ase.calculators as calculators
+import ase.calculators as ase_calculators
 import ase.calculators.cp2k
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.units import Hartree
@@ -33,11 +33,7 @@ class BaseEngine(metaclass=EngineRegistry):
     _registry_name = 'base'
 
     @abstractmethod
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def compute(self):
+    def compute(self, atoms):
         pass
 
 
@@ -83,12 +79,6 @@ class PySCFEngine(PySCFEngine):
 class ASECalcEngine(BaseEngine):
 
     _registry_name = 'ase'
-
-    def __init__(self, **kwargs):
-        calc = calculators
-        for c in kwargs.pop('calculator', 'cp2k.CP2K').split('.'):
-            calc = getattr(calc, c)
-        self.calc = calc(**kwargs)
 
     def compute(self, atoms):
         atoms.calc = self.calc

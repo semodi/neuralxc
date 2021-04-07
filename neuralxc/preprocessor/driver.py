@@ -5,21 +5,15 @@ an electronic structure code that computes energy-density pairs, to a dataset
 of structures. If desired this can be done in a distributed fashion using Dask.
 """
 
-import argparse
 import itertools
-import json
 import os
-import sys
 
-import dask
-import dask.distributed
 import numpy as np
 from ase import Atoms
-from ase.io import read, write
+from ase.io import write
 from dask.distributed import Client, LocalCluster
 
 from neuralxc.engines import Engine
-
 
 # def in_private_dir(method):
 #     def wrapper_private_dir(dir, *args, **kwargs):
@@ -31,6 +25,7 @@ from neuralxc.engines import Engine
 #         return method(*args, **kwargs)
 #
 #     return wrapper_private_dir
+
 
 def calculate_system(dir, atoms, app, kwargs):
     try:

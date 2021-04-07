@@ -8,6 +8,7 @@ import dill as pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from ase.io import read
 
 import neuralxc as xc
 from neuralxc.constants import Bohr, Hartree
@@ -55,6 +56,7 @@ def test_radial_model():
     assert np.allclose(res, np.load(test_dir + '/rad_energy.npy'))
 
 
+# @pytest.mark.skipif(True, reason="too expensive")
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_sc():

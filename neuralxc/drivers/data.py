@@ -1,38 +1,18 @@
-import copy
-import glob
-import hashlib
 import json
 import os
-import shutil
-import subprocess
-import sys
-import time
-from collections import namedtuple
-from pprint import pprint
-from types import SimpleNamespace as SN
 
-import dill as pickle
 import h5py
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from ase.io import read
-from sklearn.base import clone
-from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
-import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import (SpeciesGrouper, atomic_shape, make_nested_absolute, system_shape)
-from neuralxc.ml import NetworkEstimator as NetworkWrapper
-from neuralxc.ml import NXCPipeline
-from neuralxc.ml.network import load_pipeline
-from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
+from neuralxc.formatter import (SpeciesGrouper, make_nested_absolute)
 from neuralxc.ml.utils import *
-from neuralxc.preprocessor import Preprocessor
 from neuralxc.symmetrizer import symmetrizer_factory
 
 # from .other import *
+__all__ = ['add_data_driver', 'merge_data_driver', 'split_data_driver', 'delete_data_driver', 'sample_driver']
 
 bi_slice = slice
 os.environ['KMP_AFFINITY'] = 'none'
@@ -44,67 +24,63 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
     """ Adds data to hdf5 file"""
     try:
         file = h5py.File(hdf5, 'r+')
+        file.close()
     except OSError:
         file = h5py.File(hdf5, 'w')
+        file.close()
 
-    i,j,k = [(None if a == '' else int(a)) for a in slice.split(':')] +\
-        [None]*(3-len(slice.split(':')))
+    with h5py.File(hdf5, 'r+') as file:
+        i,j,k = [(None if a == '' else int(a)) for a in slice.split(':')] +\
+            [None]*(3-len(slice.split(':')))
 
-    ijk = bi_slice(i, j, k)
+        ijk = bi_slice(i, j, k)
 
-    def obs(which, zero):
-        if which == 'energy':
-            if traj:
-                try:
-                    read(traj)
-                    is_trajectory = True
+        def obs(which, zero):
+            if which == 'energy':
+                if traj:
+                    try:
+                        read(traj)
+                        add_species(file, system, traj)
+                        if zero is not None:
+                            energies = np.array([a.get_potential_energy()\
+                             for a in read(traj,':')])[ijk]
+                        else:
+                            energies = E_from_atoms(read(traj, ':'))
+                            zero = 0
+                    except ValueError:
+                        energies = np.load(traj)
+
+                    if addto:
+                        energies0 = file[addto][:]
+                        energies += energies0
+                    add_energy(file, energies, system, method, override, E0=zero)
+                else:
+                    raise Exception('Must provide a either trajectory file or .npy file containing energies')
+            elif which == 'forces':
+                if traj:
                     add_species(file, system, traj)
-                    if zero is not None:
-                        energies = np.array([a.get_potential_energy()\
-                         for a in read(traj,':')])[ijk]
-                    else:
-                        energies = E_from_atoms(read(traj, ':'))
-                        zero = 0
-                except ValueError:
-                    is_trajectory = False
-                    energies = np.load(traj)
+                    forces = [a.get_forces()\
+                     for a in read(traj,':')]
+                    max_na = max([len(f) for f in forces])
+                    forces_padded = np.zeros([len(forces), max_na, 3])
+                    for idx, f in enumerate(forces):
+                        forces_padded[idx, :len(f)] = f
+                    forces = forces_padded[ijk]
 
-                if addto:
-                    energies0 = file[addto][:]
-                    energies += energies0
-                add_energy(file, energies, system, method, override, E0=zero)
-            else:
-                raise Exception('Must provide a either trajectory file or .npy file containing energies')
-                file.close()
-        elif which == 'forces':
-            if traj:
+                    add_forces(file, forces, system, method, override)
+                else:
+                    raise Exception('Must provide a trajectory file')
+            elif which == 'density':
                 add_species(file, system, traj)
-                forces = [a.get_forces()\
-                 for a in read(traj,':')]
-                max_na = max([len(f) for f in forces])
-                forces_padded = np.zeros([len(forces), max_na, 3])
-                for idx, f in enumerate(forces):
-                    forces_padded[idx, :len(f)] = f
-                forces = forces_padded[ijk]
-
-                add_forces(file, forces, system, method, override)
+                data = np.load(density)[ijk]
+                add_density((density.split('/')[-1]).split('.')[0], file, data, system, method, override)
             else:
-                raise Exception('Must provide a trajectory file')
-                file.close()
-        elif which == 'density':
-            add_species(file, system, traj)
-            species = file[system].attrs['species']
-            data = np.load(density)[ijk]
-            add_density((density.split('/')[-1]).split('.')[0], file, data, system, method, override)
-        else:
-            raise Exception('Option {} not recognized'.format(which))
+                raise Exception('Option {} not recognized'.format(which))
 
-    if density and not 'density' in add:
-        add.append('density')
-    for observable in add:
-        obs(observable, zero)
-
-    file.close()
+        if density and not 'density' in add:
+            add.append('density')
+        for observable in add:
+            obs(observable, zero)
 
 
 def merge_data_driver(file, base, ref, out, optE0=False, pre=''):
@@ -194,9 +170,6 @@ def delete_data_driver(hdf5, group):
 def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     """ Given a dataset, perform sampling in feature space"""
 
-    preprocessor = preprocessor
-    hdf5 = hdf5
-
     pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
 
     datafile = h5py.File(hdf5[0], 'r')
@@ -206,8 +179,6 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     symmetrizer_instructions = {'symmetrizer_type': pre.get('symmetrizer_type', 'trace')}
     symmetrizer_instructions.update({'basis': basis})
     species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
-    spec_group = SpeciesGrouper(basis, species)
-    symmetrizer = symmetrizer_factory(symmetrizer_instructions)
 
     sampler_pipeline = get_default_pipeline(basis,
                                             species,

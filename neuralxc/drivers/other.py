@@ -1,40 +1,22 @@
-import copy
-import glob
-import hashlib
 import json
 import os
 import shutil
-import subprocess
-import sys
 import time
-from collections import namedtuple
-from pprint import pprint
-from types import SimpleNamespace as SN
 
-import dill as pickle
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from ase.io import read
-from sklearn.base import clone
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
 
 import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
-from neuralxc.ml import NetworkEstimator as NetworkWrapper
-from neuralxc.ml import NXCPipeline
-from neuralxc.ml.network import load_pipeline
-from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
 from neuralxc.ml.utils import *
-from neuralxc.preprocessor import Preprocessor, driver
-from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.preprocessor import driver
 
 from ..formatter import make_nested_absolute
-from .data import add_data_driver, sample_driver
+from .data import add_data_driver
 
+__all__ = ['plot_basis', 'run_engine_driver', 'fetch_default_driver', 'pre_driver']
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
@@ -150,11 +132,6 @@ def fetch_default_driver(kind, hint='', out=''):
                 return value
         return None
 
-    def make_absolute(val):
-        if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
-            val = os.path.abspath(val)
-        return val
-
     if kind == 'pre':
         app = 'siesta'
         for key, value in nested_dict_iter(hint_cont):
@@ -193,7 +170,6 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     atoms = read(xyz, ':')
 
     preprocessor = get_preprocessor(pre, atoms, srcdir)
-    start = time.time()
 
     if 'hdf5' in dest:
         dest_split = dest.split('/')
@@ -208,7 +184,7 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
         os.mkdir(workdir)
     except FileExistsError:
         delete_workdir = False
-        pass
+
     print('======Projecting onto basis sets======')
     basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
 

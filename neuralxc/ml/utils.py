@@ -8,15 +8,19 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.pipeline import Pipeline
 
 from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import SpeciesGrouper, atomic_shape, system_shape
+from neuralxc.formatter import SpeciesGrouper, atomic_shape
 from neuralxc.ml.network import NetworkEstimator as NetworkWrapper
-from neuralxc.ml.pipeline import NXCPipeline, load_pipeline
+from neuralxc.ml.pipeline import NXCPipeline
 from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
-from neuralxc.ml.utils import *
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.symmetrizer import symmetrizer_factory
 
-from ..formatter import atomic_shape, expand, system_shape
+from ..formatter import atomic_shape, expand
+
+__all__ = [
+    'E_from_atoms', 'find_attr_in_tree', 'load_sets', 'get_default_pipeline', 'get_grid_cv', 'get_basis_grid',
+    'get_preprocessor', 'SampleSelector'
+]
 
 
 def E_from_atoms(traj):
@@ -170,17 +174,17 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         data_ref = np.array([0])
         no_energy = True
 
-    if E0 == None:
+    if E0 is None:
         E0_base = find_attr_in_tree(datafile, baseline, 'E0')
         E0_ref = find_attr_in_tree(datafile, reference, 'E0')
     else:
         E0_base = E0
         E0_ref = 0
 
-    if E0_base == None:
+    if E0_base is None:
         print('Warning: E0 for baseline data not found, setting to 0')
         E0_base = 0
-    if E0_ref == None:
+    if E0_ref is None:
         print('Warning: E0 for reference data not found, setting to 0')
         E0_ref = 0
 
@@ -295,9 +299,7 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
     hyper = to_full_hyperparameters(hyper, pipeline.get_params())
 
     cv = inp.get('cv', 2)
-    n_workers = inp.get('n_workers', 1)
     n_jobs = inp.get('n_jobs', 1)
-    n_threads = inp.get('threads_per_worker', 1)
     verbose = inp.get('verbose', 1)
 
     pipe = Pipeline([('ml', pipeline)])
@@ -335,7 +337,6 @@ def get_basis_grid(preprocessor):
 
     max_len = 0
 
-    dict_mask = {}
     #Check for consistency and build dict mask
     for key, value in nested_dict_iter(basis):
         if isinstance(value, list):

@@ -4,34 +4,72 @@ Implements density projection basis with radial functions based on polynomials.
 """
 
 import math
-import time
-from abc import ABC, abstractmethod
-from functools import reduce
 
 import numpy as np
-import periodictable
 import scipy.linalg
 import torch
 from opt_einsum import contract
-from periodictable import elements as element_dict
-from torch.nn import Module as TorchModule
 
-import neuralxc.config as config
-from neuralxc.base import ABCRegistry
 from neuralxc.projector import EuclideanProjector, RadialProjector
-from neuralxc.timer import timer
-from neuralxc.utils import geom
 
 torch.set_default_dtype(torch.float64)
 
 
-class OrthoProjector(EuclideanProjector):
+class OrthoProjectorMixin():
     """ Implements orthonormal basis functions
-
-        :_registry_name: 'ortho'
     """
-    _registry_name = 'ortho'
-    _unit_test = True
+    def forward_basis(self, positions, unitcell, grid, my_box):
+        """Creates basis set (for projection) for a single atom, on grid points
+
+        Parameters
+        ----------
+        positions, Tensor (1, 3) or (3)
+        	atomic position
+        unitcell, Tensor (3,3)
+        	Unitcell in bohr
+        grid, Tensor (3)
+        	Grid points per unitcell
+        my_box, Tensor (3: euclid. directions, 2: upper and lower limits)
+            Limiting box local gridpoints. Relevant if global grid is decomposed
+            with MPI or similar.
+
+        Returns
+        --------
+        rad, ang, mesh
+            Stacked radial and angular functions as well as meshgrid
+        """
+
+        self.set_cell_parameters(unitcell, grid)
+        basis = self.basis[self.species]
+        box, mesh = self.box_around(positions, basis['r_o'], my_box)
+        rad, ang = self.get_basis_on_mesh(box, basis, self.W[self.species])
+        return rad, ang, mesh
+
+    def project_onto(self, rho, rads, angs, n_l):
+        rho = rho.squeeze()
+        rho = rho * self.V_cell.squeeze()
+        print(rho.size())
+        if rho.ndim == 1:
+            coeff_array = contract('li,ni,i -> nl', angs, rads, rho)
+        else:
+            coeff_array = contract('lmijk,nijk,ijk -> nlm', angs, rads, rho)
+
+        return coeff_array.view(-1)
+
+    def get_basis_on_mesh(self, box, basis, W):
+
+        n_l = basis['l']
+        R, Theta, Phi = box['radial']
+
+        #Build angular part of basis functions
+        angs = []
+        for l in range(n_l):
+            angs += self.angulars_real(l, Theta, Phi)
+
+        angs = torch.stack(angs)
+        rads = self.radials(R, basis, W)
+
+        return rads, angs
 
     @classmethod
     def g(cls, r, basis, a):
@@ -100,7 +138,14 @@ class OrthoProjector(EuclideanProjector):
         return S_matrix
 
 
-class OrthoRadialProjector(RadialProjector, OrthoProjector):
+class OrthoEuclideanProjector(EuclideanProjector, OrthoProjectorMixin):
+    """
+    :_registry_name: 'ortho'
+    """
+    _registry_name = 'ortho'
+
+
+class OrthoRadialProjector(RadialProjector, OrthoProjectorMixin):
     """
     :_registry_name: 'ortho_radial'
     """

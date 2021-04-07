@@ -5,28 +5,14 @@ differentiable.
 Contains routines to serialize functionals into TorchScript models.
 """
 
-import copy
 import json
-import math
 import os
 import shutil
-import sys
-from collections import namedtuple
 
 import dill as pickle
-import h5py
 import numpy as np
-import pandas as pd
 import torch
-from ase.io import read
-from matplotlib import pyplot as plt
-from sklearn.base import BaseEstimator
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.utils.metaestimators import if_delegate_has_method
-
-from neuralxc.formatter import atomic_shape
 
 from ..projector import DensityProjector
 from ..symmetrizer import Symmetrizer
@@ -190,7 +176,6 @@ def serialize_projector(projector):
     unitcell_c = np.eye(3) * 5.0
     grid_c = np.array([9, 9, 9])
     my_box = np.array([[0, 9]] * 3)
-    a_c = np.linalg.norm(unitcell_c, axis=1) / grid_c
     pos_c = np.array([[0, 0, 0]])
     if 'radial' in projector._registry_name:
         rho_c = np.array([1, 2, 3])
@@ -204,7 +189,6 @@ def serialize_projector(projector):
 
     unitcell_c = torch.from_numpy(unitcell_c).double()
     grid_c = torch.from_numpy(grid_c).double()
-    a_c = torch.from_numpy(a_c).double()
     pos_c = torch.from_numpy(pos_c).double()
     rho_c = torch.from_numpy(rho_c).double()
     my_box = torch.from_numpy(my_box).double()
@@ -231,7 +215,6 @@ def serialize_pipeline(model, outpath, override=False):
     unitcell_c = np.eye(3) * 5.0
     grid_c = np.array([9, 9, 9])
     my_box = np.array([[0, 9]] * 3)
-    a_c = np.linalg.norm(unitcell_c, axis=1) / grid_c
     pos_c = np.array([[0, 0, 0]])
     basis_instructions = model.basis_instructions
     species = []
@@ -262,7 +245,6 @@ def serialize_pipeline(model, outpath, override=False):
 
     unitcell_c = torch.from_numpy(unitcell_c).double()
     grid_c = torch.from_numpy(grid_c).double()
-    a_c = torch.from_numpy(a_c).double()
     pos_c = torch.from_numpy(pos_c).double()
     rho_c = torch.from_numpy(rho_c).double()
     my_box = torch.from_numpy(my_box).double()

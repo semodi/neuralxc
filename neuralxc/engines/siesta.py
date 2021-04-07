@@ -99,8 +99,6 @@ class CustomSiesta(Siesta):
                 pseudopotential = label + '.psf'
             else:
                 pseudopotential = spec['pseudopotential']
-                label = os.path.basename(pseudopotential)
-                label = '.'.join(label.split('.')[:-1])
 
             if not os.path.isabs(pseudopotential):
                 pseudopotential = join(pseudo_path, pseudopotential)
@@ -182,18 +180,14 @@ class CustomSiesta(Siesta):
             atomic_number = atomic_numbers[symbol]
 
             if spec['pseudopotential'] is None:
-                label = symbol
                 pseudopotential = self.getpath(label, 'psf')
             else:
                 pseudopotential = spec['pseudopotential']
-                label = os.path.basename(pseudopotential)
-                label = '.'.join(label.split('.')[:-1])
 
             name = os.path.basename(pseudopotential)
             name = name.split('.')
             if spec['ghost']:
                 name.insert(-1, 'ghost')
-                atomic_number = -atomic_number
             name = '.'.join(name)
 
             label = '.'.join(np.array(name.split('.'))[:-1])

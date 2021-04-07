@@ -6,21 +6,14 @@ no grid operations are necessary.
 BasisPadder translates between NeuralXC and PySCF internal basis set orderings.
 """
 
-import math
 import os
-from abc import ABC, abstractmethod
-from functools import reduce
 
 import numpy as np
-import pyscf
 from opt_einsum import contract
-from pyscf import dft, gto
+from pyscf import gto
 from pyscf.dft import RKS
-from pyscf.scf.chkfile import load_scf
 
-import neuralxc
-from neuralxc.base import ABCRegistry
-from neuralxc.projector import BaseProjector
+from .projector import ProjectorRegistry
 
 l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'j': 7}
 l_dict_inv = {l_dict[key]: key for key in l_dict}
@@ -34,8 +27,6 @@ def get_eri3c(mol, auxmol, op):
      will be changed in future versions.
     """
     pmol = mol + auxmol
-    nao = mol.nao_nr()
-    naux = auxmol.nao_nr()
     if op == 'rij':
         eri3c = pmol.intor('int3c2e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
     elif op == 'delta':
@@ -52,7 +43,7 @@ def get_coeff(dm, eri3c):
     return contract('ijk, ij -> k', eri3c, dm)
 
 
-class PySCFProjector(BaseProjector):
+class PySCFProjector(metaclass=ProjectorRegistry):
     """
     :_registry_name: 'pyscf'
     """

@@ -2,9 +2,11 @@ import hashlib
 import json
 
 import numpy as np
-from ase.io import read, write
+from ase.io import read
 
 import neuralxc.ml.utils
+
+__all__ = ['add_data', 'merge_sets', 'basis_to_hash', 'add_species', 'add_energy', 'add_forces', 'add_density']
 
 
 def add_energy(*args, **kwargs):
@@ -89,7 +91,7 @@ def add_data(which, file, data, system, method, override=False, E0=None):
             cg = cg[o]
 
     if which == 'energy':
-        if E0 == None:
+        if E0 is None:
             cg.attrs.update({'E0': min(data)})
         else:
             cg.attrs.update({'E0': E0})
