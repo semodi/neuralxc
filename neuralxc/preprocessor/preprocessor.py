@@ -141,7 +141,8 @@ def transform_one(path, pos, species, basis_instructions):
     density_getter = density_getter_factory(\
         basis_instructions.get('application', 'siesta'),
         binary = basis_instructions.get('binary', True),
-        valence = basis_instructions.get('valence', False))
+        valence = basis_instructions.get('valence', False),
+        grad = basis_instructions.get('grad', 0))
 
     density_dict = density_getter.get_density(path, return_dict=True)
     density_dict.update({'positions': pos, 'species': species})

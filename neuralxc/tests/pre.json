@@ -1,0 +1,1 @@
+{"preprocessor": {"basis": "sto3g", "extension": "chkpt", "application": "pyscf", "C": {"n": 2, "l": 2}, "H": {"n": 1, "l": 1}, "grad": 1}, "n_workers": 2, "engine_kwargs": {"xc": "PBE", "basis": "sto3g"}}

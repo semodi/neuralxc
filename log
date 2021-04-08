@@ -1,0 +1,115 @@
+============================= test session starts ==============================
+platform linux -- Python 3.6.10, pytest-5.4.3, py-1.8.1, pluggy-0.12.0 -- /home/sebastian/miniconda3/envs/neuralxc_torch/bin/python
+cachedir: .pytest_cache
+rootdir: /home/sebastian/Research/neuralxc
+plugins: cov-2.10.0
+collecting ... collected 24 items
+
+neuralxc/tests/test_drivers.py::test_fit PASSED                          [  4%]
+neuralxc/tests/test_drivers.py::test_eval PASSED                         [  8%]
+neuralxc/tests/test_drivers.py::test_data PASSED                         [ 12%]
+neuralxc/tests/test_drivers.py::test_serialize PASSED                    [ 16%]
+neuralxc/tests/test_neuralxc.py::test_siesta_density_getter PASSED       [ 20%]
+neuralxc/tests/test_neuralxc.py::test_formatter PASSED                   [ 25%]
+neuralxc/tests/test_neuralxc.py::test_grouped_transformers[transformer0-/home/sebastian/Research/neuralxc/neuralxc/tests/scaler.pckl] PASSED [ 29%]
+neuralxc/tests/test_neuralxc.py::test_grouped_transformers[transformer1-/home/sebastian/Research/neuralxc/neuralxc/tests/var09.pckl] PASSED [ 33%]
+neuralxc/tests/test_neuralxc.py::test_species_grouper PASSED             [ 37%]
+neuralxc/tests/test_neuralxc.py::test_neuralxc_benzene PASSED            [ 41%]
+neuralxc/tests/test_projectors.py::test_density_projector[ortho] PASSED  [ 45%]
+neuralxc/tests/test_projectors.py::test_jacobs_projector[ortho-] PASSED  [ 50%]
+neuralxc/tests/test_projectors.py::test_jacobs_projector[ortho-_radial] PASSED [ 54%]
+neuralxc/tests/test_projectors.py::test_jacobs_projector[gaussian-] PASSED [ 58%]
+neuralxc/tests/test_projectors.py::test_jacobs_projector[gaussian-_radial] PASSED [ 62%]
+neuralxc/tests/test_projectors.py::test_radial_projector[ortho_radial] PASSED [ 66%]
+neuralxc/tests/test_projectors.py::test_radial_gaussian PASSED           [ 70%]
+neuralxc/tests/test_projectors.py::test_gaussian_projector PASSED        [ 75%]
+neuralxc/tests/test_projectors.py::test_gaussian_serialized PASSED       [ 79%]
+neuralxc/tests/test_pyscf.py::test_radial_model PASSED                   [ 83%]
+neuralxc/tests/test_pyscf.py::test_sc PASSED                             [ 87%]
+neuralxc/tests/test_pyscf.py::test_pyscf_radial PASSED                   [ 91%]
+neuralxc/tests/test_torch_comp.py::test_mybox PASSED                     [ 95%]
+neuralxc/tests/test_torch_comp.py::test_stress PASSED                    [100%]
+
+=============================== warnings summary ===============================
+neuralxc/tests/test_drivers.py::test_serialize
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/ml/transformer.py:150: TracerWarning: torch.from_numpy results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+
+neuralxc/tests/test_drivers.py::test_serialize
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/ml/transformer.py:172: TracerWarning: torch.from_numpy results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/opt_einsum/contract.py:231: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    dim = int(sh[cnum])
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/opt_einsum/parser.py:155: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    max(shape[loc] for shape, loc in zip(shapes, [x.find(c) for x in inputs]) if loc >= 0) for c in output)
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/opt_einsum/blas.py:76: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    if shapes[0][input_left.find(c)] != shapes[1][input_right.find(c)]:
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/torch/tensor.py:486: TracerWarning: Converting a tensor to a NumPy array might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    return self.numpy()
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/torch/tensor.py:496: TracerWarning: torch.from_numpy results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+    return torch.from_numpy(array)
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/torch/tensor.py:461: RuntimeWarning: Iterating over a tensor might cause the trace to be incorrect. Passing a tensor of different shape won't change the number of iterations executed (and might lead to errors or silently give incorrect results).
+    'incorrect results).', category=RuntimeWarning)
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/torch/tensor.py:462: TracerWarning: Converting a tensor to a Python index might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    return iter(imap(lambda i: self[i], range(self.size(0))))
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/projector/gaussian.py:138: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    print(rad.size())
+
+neuralxc/tests/test_projectors.py::test_gaussian_serialized
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/projector/gaussian.py:140: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    print(rho.size())
+
+neuralxc/tests/test_pyscf.py::test_sc
+neuralxc/tests/test_pyscf.py::test_sc
+neuralxc/tests/test_pyscf.py::test_sc
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/distributed/dashboard/core.py:79: UserWarning: 
+  Port 8787 is already in use. 
+  Perhaps you already have a cluster running?
+  Hosting the diagnostics dashboard on a random port instead.
+    warnings.warn("\n" + msg)
+
+neuralxc/tests/test_pyscf.py::test_sc
+  /home/sebastian/Research/neuralxc/neuralxc/ml/transformer.py:155: TracerWarning: torch.from_numpy results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+    support = torch.from_numpy(self.get_support()).bool()
+
+neuralxc/tests/test_pyscf.py::test_sc
+  /home/sebastian/Research/neuralxc/neuralxc/ml/transformer.py:177: TracerWarning: torch.from_numpy results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+    X = (X - torch.from_numpy(self.mean_)) / torch.sqrt(torch.from_numpy(self.var_))
+
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/projector/projector.py:381: TracerWarning: Converting a tensor to a Python index might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    Xm = torch.arange(len(self.grid_weights))
+
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/Research/neuralxc/neuralxc/projector/gaussian.py:139: TracerWarning: Converting a tensor to a Python integer might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+    print(self.V_cell.size())
+
+neuralxc/tests/test_pyscf.py::test_pyscf_radial
+  /home/sebastian/miniconda3/envs/neuralxc_torch/lib/python3.6/site-packages/h5py/_hl/dataset.py:313: H5pyDeprecationWarning: dataset.value has been deprecated. Use dataset[()] instead.
+    "Use dataset[()] instead.", H5pyDeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/latest/warnings.html
+================= 24 passed, 28 warnings in 186.68s (0:03:06) ==================

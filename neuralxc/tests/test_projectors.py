@@ -77,7 +77,8 @@ def test_jacobs_projector(rad_type, grid_type):
                           ]) / xc.constants.Bohr
 
     if rad_type == 'ortho':
-        basis_instructions = {'X': {'n': 2, 'l': 3, 'r_o': 1},  'projector_type': projector_type}
+        basis_instructions = {'X': {'n': 2, 'l': 3, 'r_o': 1},  'projector_type': projector_type,
+            'grad' : 1}
     else:
         basis_instructions = {
             "application": "siesta",
@@ -86,7 +87,8 @@ def test_jacobs_projector(rad_type, grid_type):
             "X": {
                 "basis": os.path.join(test_dir, "basis-test"),
                 "sigma": 2
-            }
+            },
+            'grad': 1
         }
 
     if grid_type == '_radial':
@@ -107,14 +109,19 @@ def test_jacobs_projector(rad_type, grid_type):
         rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
         density_projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_instructions)
 
-    rho = np.stack([rho, 2*rho])
+    rho = np.stack([rho, rho])
 
     basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['X', 'X', 'X'])
-
     for key, val in basis_rep.items():
         l = val.shape[-1]//2
-        assert np.allclose(2*val[...,:l],val[...,l:])
+        assert np.allclose(val[...,:l],val[...,l:])
 
+    if rad_type == 'ortho':
+        symmetrize_instructions = {'symmetrizer_type':'trace','basis': basis_instructions}
+        sym =  xc.symmetrizer.Symmetrizer(symmetrize_instructions)
+        D = sym.get_symmetrized(basis_rep)['X']
+        l = D.shape[-1]//2
+        assert np.allclose(D[:,:l],D[:,l:])
 
 @pytest.mark.fast
 @pytest.mark.radial

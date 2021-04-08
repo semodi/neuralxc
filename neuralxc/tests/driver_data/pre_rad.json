@@ -1,0 +1,12 @@
+{"preprocessor": {
+        "application": "pyscf_rad",
+        "spec_agnostic": true,
+        "projector_type": "gaussian_radial",
+        "extension":".chkpt",
+        "X": {
+            "basis": "sto3g",
+            "sigma": 2
+        }
+    }
+,
+"n_workers": 1, "engine_kwargs": {"xc": "PBE", "basis": "sto3g"}}

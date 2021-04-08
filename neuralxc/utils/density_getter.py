@@ -99,8 +99,10 @@ class PySCFRadDensityGetter(BaseDensityGetter):
 
     _registry_name = 'pyscf_rad'
 
-    def __init__(self, binary=None, valence=False, **kwargs):
+    def __init__(self, binary=None, valence=False, grad=0, **kwargs):
         self.valence = valence
+        self.deriv = grad
+        self.xctype = {0:'LDA',1:'GGA',2:'MGGA'}[grad]
 
     def get_density(self, file_path, return_dict=False):
         mol, results = load_scf(file_path)
@@ -120,7 +122,12 @@ class PySCFRadDensityGetter(BaseDensityGetter):
         mf.xc = 'PBE'
         mf.grids.level = 4
         mf.grids.build()
-        rho = dft.numint.get_rho(mf._numint, mol, dm, mf.grids)
+        ao_eval = mf._numint.eval_ao(mol, mf.grids.coords, deriv=self.deriv)
+        rho = mf._numint.eval_rho(mol, ao_eval, dm, xctype=self.xctype)
+        if self.xctype == 'GGA':
+            rho = np.stack([rho[0],np.linalg.norm(rho[1:4], axis=0)])
+        elif self.xctype == 'MGGA':
+            rho = np.stack([rho[0],np.linalg.norm(rho[1:4], axis=0),rho[4],rho[5]])
         grid_coords = mf.grids.coords
         grid_weights = mf.grids.weights
         res = rho, grid_coords, grid_weights

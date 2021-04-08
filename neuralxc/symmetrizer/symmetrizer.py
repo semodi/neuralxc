@@ -115,10 +115,13 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
         self.C = C
         basis = self._attrs['basis']
         results = []
+        grad_mult = {0:1,1:2,2:4}[basis.get('grad',0)]
+        print(grad_mult)
 
         for idx, key, data in expand(C):
             results.append({})
-            results[idx][key] = self._symmetrize_function(*data, basis[key]['l'], basis[key]['n'], self._cgs)
+            results[idx][key] = self._symmetrize_function(*data, basis[key]['l'],
+                basis[key]['n']*grad_mult, self._cgs)
 
         if not isinstance(C, list):
             return results[0]
