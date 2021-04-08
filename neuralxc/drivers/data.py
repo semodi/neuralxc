@@ -7,9 +7,8 @@ from ase.io import read
 from sklearn.pipeline import Pipeline
 
 from neuralxc.datastructures.hdf5 import *
-from neuralxc.formatter import (SpeciesGrouper, make_nested_absolute)
+from neuralxc.formatter import make_nested_absolute
 from neuralxc.ml.utils import *
-from neuralxc.symmetrizer import symmetrizer_factory
 
 # from .other import *
 __all__ = ['add_data_driver', 'merge_data_driver', 'split_data_driver', 'delete_data_driver', 'sample_driver']

@@ -10,9 +10,8 @@ import pyscf.gto as gto
 import pyscf.gto.basis as gtobasis
 import torch
 from opt_einsum import contract
-from torch.nn import Module as TorchModule
 
-from neuralxc.projector import (BaseProjector, EuclideanProjector, RadialProjector)
+from neuralxc.projector import (EuclideanProjector, RadialProjector)
 from neuralxc.pyscf import BasisPadder
 
 # Normalization factors
@@ -132,7 +131,7 @@ class GaussianProjectorMixin():
             ang = angs[ang_cnt:ang_cnt + (2 * l + 1)]
             rad_cnt += len_rad
             ang_cnt += 2 * l + 1
-            r_o_max = np.max(basis['r_o'])
+            # r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
             print(rad.size())

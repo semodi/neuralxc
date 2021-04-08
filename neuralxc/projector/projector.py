@@ -217,7 +217,7 @@ class EuclideanProjector(BaseProjector):
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
         Xm, Ym, Zm = mesh.long()
-        return self.project_onto(rho[...,Xm, Ym, Zm], radials, angulars, int(basis['l']))
+        return self.project_onto(rho[..., Xm, Ym, Zm], radials, angulars, int(basis['l']))
 
     def box_around(self, pos, radius, my_box):
         '''
@@ -358,7 +358,7 @@ class RadialProjector(BaseProjector):
         grid_weights = grid_weights[Xm]
         self.set_cell_parameters(grid_coords, grid_weights)
         basis = self.basis[self.species]
-        return self.project_onto(rho[...,Xm], radials, angulars, int(basis['l']))
+        return self.project_onto(rho[..., Xm], radials, angulars, int(basis['l']))
 
     def box_around(self, pos, radius, my_box=None):
         '''

@@ -177,7 +177,6 @@ class CustomSiesta(Siesta):
             species_number += 1
 
             symbol = spec['symbol']
-            atomic_number = atomic_numbers[symbol]
 
             if spec['pseudopotential'] is None:
                 pseudopotential = self.getpath(label, 'psf')

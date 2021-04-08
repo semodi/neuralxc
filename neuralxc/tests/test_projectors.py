@@ -66,10 +66,11 @@ def test_density_projector(projector_type):
             for spec in basis_rep:
                 assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 
+
 @pytest.mark.fast
 @pytest.mark.project
-@pytest.mark.parametrize('grid_type', ['','_radial'])
-@pytest.mark.parametrize('rad_type', ['ortho','gaussian'])
+@pytest.mark.parametrize('grid_type', ['', '_radial'])
+@pytest.mark.parametrize('rad_type', ['ortho', 'gaussian'])
 def test_jacobs_projector(rad_type, grid_type):
 
     projector_type = rad_type + grid_type
@@ -77,8 +78,7 @@ def test_jacobs_projector(rad_type, grid_type):
                           ]) / xc.constants.Bohr
 
     if rad_type == 'ortho':
-        basis_instructions = {'X': {'n': 2, 'l': 3, 'r_o': 1},  'projector_type': projector_type,
-            'grad' : 1}
+        basis_instructions = {'X': {'n': 2, 'l': 3, 'r_o': 1}, 'projector_type': projector_type, 'grad': 1}
     else:
         basis_instructions = {
             "application": "siesta",
@@ -99,29 +99,32 @@ def test_jacobs_projector(rad_type, grid_type):
         mf.grids.level = 5
         mf.kernel()
         rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
-        print('Rho shape',rho.shape)
-        print('Weights shape',mf.grids.weights.shape)
+        print('Rho shape', rho.shape)
+        print('Weights shape', mf.grids.weights.shape)
         density_projector = xc.projector.DensityProjector(grid_coords=mf.grids.coords,
-            grid_weights=mf.grids.weights,
-            basis_instructions=basis_instructions)
+                                                          grid_weights=mf.grids.weights,
+                                                          basis_instructions=basis_instructions)
     else:
         density_getter = xc.utils.SiestaDensityGetter(binary=True)
         rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
-        density_projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_instructions)
+        density_projector = xc.projector.DensityProjector(unitcell=unitcell,
+                                                          grid=grid,
+                                                          basis_instructions=basis_instructions)
 
     rho = np.stack([rho, rho])
 
     basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['X', 'X', 'X'])
     for key, val in basis_rep.items():
-        l = val.shape[-1]//2
-        assert np.allclose(val[...,:l],val[...,l:])
+        l = val.shape[-1] // 2
+        assert np.allclose(val[..., :l], val[..., l:])
 
     if rad_type == 'ortho':
-        symmetrize_instructions = {'symmetrizer_type':'trace','basis': basis_instructions}
-        sym =  xc.symmetrizer.Symmetrizer(symmetrize_instructions)
+        symmetrize_instructions = {'symmetrizer_type': 'trace', 'basis': basis_instructions}
+        sym = xc.symmetrizer.Symmetrizer(symmetrize_instructions)
         D = sym.get_symmetrized(basis_rep)['X']
-        l = D.shape[-1]//2
-        assert np.allclose(D[:,:l],D[:,l:])
+        l = D.shape[-1] // 2
+        assert np.allclose(D[:, :l], D[:, l:])
+
 
 @pytest.mark.fast
 @pytest.mark.radial

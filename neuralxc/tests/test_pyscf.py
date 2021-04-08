@@ -70,18 +70,17 @@ def test_pre():
 
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test')
 
-
-    pre = json.loads(open('pre_rad.json','r').read())
+    pre = json.loads(open('pre_rad.json', 'r').read())
     pre['preprocessor']['grad'] = 1
-    open('pre_rad.json','w').write(json.dumps(pre))
+    open('pre_rad.json', 'w').write(json.dumps(pre))
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test1')
 
-    pre = json.loads(open('pre_rad.json','r').read())
+    pre = json.loads(open('pre_rad.json', 'r').read())
     pre['preprocessor']['grad'] = 2
-    open('pre_rad.json','w').write(json.dumps(pre))
+    open('pre_rad.json', 'w').write(json.dumps(pre))
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test2')
 
-    with h5py.File('data.hdf5','r') as f:
+    with h5py.File('data.hdf5', 'r') as f:
         for hashkey in f['/test/test/density']:
             data0 = f['/test/test/density/' + hashkey][:]
         for hashkey in f['/test/test1/density']:
@@ -89,12 +88,13 @@ def test_pre():
         for hashkey in f['/test/test2/density']:
             data2 = f['/test/test2/density/' + hashkey][:]
 
-    assert data0.shape[-1]*2 == data1.shape[-1]
-    assert data0.shape[-1]*4 == data2.shape[-1]
+    assert data0.shape[-1] * 2 == data1.shape[-1]
+    assert data0.shape[-1] * 4 == data2.shape[-1]
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
-@pytest.mark.skipif(True, reason="too expensive")
+
+# @pytest.mark.skipif(True, reason="too expensive")
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_sc():

@@ -14,7 +14,6 @@ from neuralxc.datastructures.hdf5 import *
 from neuralxc.drivers.data import *
 from neuralxc.drivers.other import *
 from neuralxc.formatter import (SpeciesGrouper, make_nested_absolute)
-from neuralxc.ml import NetworkEstimator as NetworkWrapper
 from neuralxc.ml import NXCPipeline
 from neuralxc.ml.utils import *
 from neuralxc.preprocessor import driver
