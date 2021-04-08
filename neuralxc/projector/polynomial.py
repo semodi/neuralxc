@@ -49,10 +49,10 @@ class OrthoProjectorMixin():
         rho = rho.squeeze()
         rho = rho * self.V_cell.squeeze()
         print(rho.size())
-        if rho.ndim == 1:
-            coeff_array = contract('li,ni,i -> nl', angs, rads, rho)
+        if rho.ndim < 3:
+            coeff_array = contract('li,ni,...i -> ...nl', angs, rads, rho)
         else:
-            coeff_array = contract('lmijk,nijk,ijk -> nlm', angs, rads, rho)
+            coeff_array = contract('lmijk,nijk,...ijk -> ...nlm', angs, rads, rho)
 
         return coeff_array.view(-1)
 

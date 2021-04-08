@@ -135,14 +135,25 @@ class GaussianProjectorMixin():
             r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
+            print(rad.size())
+            print(self.V_cell.size())
+            print(rho.size())
             rad *= self.V_cell
             # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            coeff.append(contract('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
+            c = contract('...i,mi,ni -> nm...', rho, ang, rad)
+            if c.dim() == 2:
+                coeff.append(c.reshape(-1))
+            else:
+                coeff.append(c.reshape(-1,c.size()[-1]))
+
 
         coeff = torch.cat(coeff)
-
-        coeff_out = torch.mv(self.M[self.species], coeff)
-        return coeff_out
+        if coeff.dim() ==2:
+            coeff_out = torch.mm(self.M[self.species], coeff)
+            return coeff_out.permute(1,0).reshape(-1)
+        else:
+            coeff_out = torch.mv(self.M[self.species], coeff)
+            return coeff_out
 
     def init_padder(self, basis_instructions):
         basis_strings = self.basis_strings
@@ -253,7 +264,7 @@ class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
         box['mesh'] = my_box[:3]
         box['radial'] = my_box[3:]
         Xm, Ym, Zm = box['mesh'].long()
-        return self.project_onto(rho[Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
+        return self.project_onto(rho[...,Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
 
 
 class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
@@ -291,10 +302,11 @@ class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
         self.init_padder(basis_instructions)
 
     def forward_fast(self, rho, positions, grid_coords, grid_weights, radials, angulars, my_box):
-        self.set_cell_parameters(grid_coords, grid_weights)
         basis = self.basis[self.species]
         box = {}
         box['mesh'] = my_box[0]
         box['radial'] = my_box[1:]
         Xm = box['mesh'].long()
-        return self.project_onto(rho[Xm], radials, angulars, basis, self.basis_strings[self.species], box)
+        grid_weights = grid_weights[Xm]
+        self.set_cell_parameters(grid_coords, grid_weights)
+        return self.project_onto(rho[...,Xm], radials, angulars, basis, self.basis_strings[self.species], box)

@@ -66,6 +66,55 @@ def test_density_projector(projector_type):
             for spec in basis_rep:
                 assert np.allclose(basis_rep[spec], basis_rep_ref[spec])
 
+@pytest.mark.fast
+@pytest.mark.project
+@pytest.mark.parametrize('grid_type', ['','_radial'])
+@pytest.mark.parametrize('rad_type', ['ortho','gaussian'])
+def test_jacobs_projector(rad_type, grid_type):
+
+    projector_type = rad_type + grid_type
+    positions = np.array([[0.0, 0.0, 0.0], [-0.75846035, -0.59257417, 0.0], [0.75846035, -0.59257417, 0.0]
+                          ]) / xc.constants.Bohr
+
+    if rad_type == 'ortho':
+        basis_instructions = {'X': {'n': 2, 'l': 3, 'r_o': 1},  'projector_type': projector_type}
+    else:
+        basis_instructions = {
+            "application": "siesta",
+            "spec_agnostic": True,
+            "projector_type": projector_type,
+            "X": {
+                "basis": os.path.join(test_dir, "basis-test"),
+                "sigma": 2
+            }
+        }
+
+    if grid_type == '_radial':
+        from pyscf import dft, gto
+        mol = gto.M(atom='O  0  0  0; H  0 1 0 ; H 0 0 1', basis='6-31g*')
+        mf = dft.RKS(mol)
+        mf.xc = 'PBE'
+        mf.grids.level = 5
+        mf.kernel()
+        rho = pyscf.dft.numint.get_rho(mf._numint, mol, mf.make_rdm1(), mf.grids)
+        print('Rho shape',rho.shape)
+        print('Weights shape',mf.grids.weights.shape)
+        density_projector = xc.projector.DensityProjector(grid_coords=mf.grids.coords,
+            grid_weights=mf.grids.weights,
+            basis_instructions=basis_instructions)
+    else:
+        density_getter = xc.utils.SiestaDensityGetter(binary=True)
+        rho, unitcell, grid = density_getter.get_density(os.path.join(test_dir, 'h2o.RHO'))
+        density_projector = xc.projector.DensityProjector(unitcell=unitcell, grid=grid, basis_instructions=basis_instructions)
+
+    rho = np.stack([rho, 2*rho])
+
+    basis_rep = density_projector.get_basis_rep(rho, positions=positions, species=['X', 'X', 'X'])
+
+    for key, val in basis_rep.items():
+        l = val.shape[-1]//2
+        assert np.allclose(2*val[...,:l],val[...,l:])
+
 
 @pytest.mark.fast
 @pytest.mark.radial
@@ -133,7 +182,6 @@ def test_radial_gaussian():
                                               grid_coords=mf.grids.coords,
                                               grid_weights=mf.grids.weights)
     coeff_grid = projector.get_basis_rep(rho, np.array([[0, 0, 0], [0, 1, 0], [0, 0, 1]]) / Bohr, ['X', 'X', 'X'])
-
     assert np.allclose(np.linalg.norm(coeff_analytical['X']), np.linalg.norm(coeff_grid['X']))
 
 
