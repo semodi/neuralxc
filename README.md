@@ -5,6 +5,7 @@ NeuralXC
 [![codecov](https://codecov.io/gh/semodi/neuralxc/branch/master/graph/badge.svg)](https://codecov.io/gh/semodi/neuralxc/branch/master)
 [![DOI](https://zenodo.org/badge/175675755.svg)](https://zenodo.org/badge/latestdoi/175675755)
 [![Documentation Status](https://readthedocs.org/projects/neuralxc/badge/?version=latest)](https://neuralxc.readthedocs.io/en/latest/?badge=latest)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/semodi/neuralxc.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/semodi/neuralxc/context:python)
 
 <img src="https://github.com/semodi/neuralxc/blob/master/neuralxc.png" width="500" height="280" />
 
