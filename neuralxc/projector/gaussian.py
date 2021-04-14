@@ -135,9 +135,9 @@ class GaussianProjectorMixin():
             r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
-            rad *= self.V_cell
+            # rad *= self.V_cell
             # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            coeff.append(contract('i,mi,ni -> nm', rho, ang, rad).reshape(-1))
+            coeff.append(contract('i,mi,ni -> nm', rho, ang, rad*self.V_cell).reshape(-1))
 
         coeff = torch.cat(coeff)
 
