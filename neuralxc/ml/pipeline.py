@@ -269,3 +269,4 @@ def serialize_pipeline(model, outpath, override=False):
         torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
         torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
+        open(outpath + '/bas.json', 'w').write(json.dumps(model.basis_instructions))

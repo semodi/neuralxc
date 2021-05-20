@@ -110,7 +110,6 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             for key in list(self._attrs.keys()):
                 if len(key) < 4 and key != 'X':
                     self._attrs.pop(key)
-            print(self._attrs)
         if not isinstance(sys_species, list):
             raise ValueError('sys_species must be a list but is {}'.format(sys_species))
         self._sys_species = sys_species
@@ -161,7 +160,6 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             feat_dict = {}
 
             idx = 0
-            print(len(this_species))
             for spec in this_species:
                 if spec not in feat_dict:
                     feat_dict[spec] = []
@@ -174,7 +172,6 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
 
             for spec in feat_dict:
                 feat_dict[spec] = np.array(feat_dict[spec])
-                print(feat_dict[spec].shape)
                 feat_dict[spec] = np.array(feat_dict[spec]).swapaxes(0, 1)
             features.append(feat_dict)
             targets.append(y_sys)

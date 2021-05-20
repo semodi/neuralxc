@@ -50,7 +50,6 @@ class NetworkEstimator(BaseEstimator):
         }
 
     def build_network(self):
-        print('building network')
         self._network = EnergyNetwork(n_layers=self.n_layers, n_nodes=self.n_nodes, activation=self.activation)
         if not self.path is None:
             self._network.restore_model(self.path)
@@ -65,8 +64,6 @@ class NetworkEstimator(BaseEstimator):
 
         if not isinstance(y, np.ndarray) and not y:
             y = [np.zeros(len(list(x.values())[0])) for x in X]
-
-        # X = X[0]
 
         if not self._network:
             self.build_network()

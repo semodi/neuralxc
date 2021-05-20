@@ -212,12 +212,13 @@ if __name__ == '__main__':
 
     #================ Compile model ==========
 
-    jitcon = subparser.add_parser('compile', description='Converts model to TorchScript')
+    jitcon = subparser.add_parser('serialize', description='Converts model to TorchScript')
     jitcon.add_argument('in_path', action='store', help='Path to model')
     jitcon.add_argument('jit_path', action='store', help='Destination for TorchScript model')
     jitcon.add_argument('--as_radial', action=('store_true'), help='Save as model that works on radial grids?')
-    jitcon.set_defaults(func=compile)
-    # =======================================================
+    jitcon.set_defaults(func=serialize)
+
+    # ======================================================
     # =============== Preprocessor ========================
     # =======================================================
     pre = subparser.add_parser('pre', description='Preprocess electron density')

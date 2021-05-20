@@ -134,9 +134,6 @@ class GaussianProjectorMixin():
             # r_o_max = np.max(basis['r_o'])
             # filt = (box['radial'][0] <= r_o_max)
             # filt = (box['radial'][0] <= 1000000)
-            print(rad.size())
-            print(self.V_cell.size())
-            print(rho.size())
             rad *= self.V_cell
             # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
             c = contract('...i,mi,ni -> nm...', rho, ang, rad)

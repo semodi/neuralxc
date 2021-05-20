@@ -378,7 +378,7 @@ class RadialProjector(BaseProjector):
         pos = pos.view(-1)
 
         # Create box with max. distance = radius
-        Xm = torch.arange(len(self.grid_weights))
+        Xm = torch.arange(self.grid_weights.shape[0])
         X = (self.grid_coords - pos.view(-1, 3)).T
 
         R = torch.norm(X, dim=0)
