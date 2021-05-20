@@ -103,6 +103,9 @@ class PySCFProjector(metaclass=ProjectorRegistry):
         self.mol = mol
         self.auxmol = auxmol
         self.S_aux = self.auxmol.intor('int1e_ovlp')
+        if self.op == 'rij':
+            # print('Using coulomb operator')
+            self.S_aux = self.auxmol.intor('int2c2e', aosym='s1', comp=1)  # (P|Q)
         # self.Sinv = np.linalg.pinv(auxovlp)
 
     def get_basis_rep(self, dm, **kwargs):
@@ -137,6 +140,7 @@ class PySCFProjector(metaclass=ProjectorRegistry):
 
             dEdC.pop('X')
         dEdC = self.bp.unpad_basis(dEdC)
+        # dEdC = np.linalg.solve(self.S_aux, dEdC)
         # dEdC = self.Sinv.dot(dEdC)
         V = contract('ijk, k', self.eri3c, dEdC)
         return V

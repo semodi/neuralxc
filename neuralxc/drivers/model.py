@@ -109,7 +109,6 @@ def serialize(in_path, jit_path, as_radial):
                 model.basis_instructions = pyscf_to_gaussian_basis(model.basis_instructions)
 
             model.basis_instructions.update({'projector_type': projector_type})
-            print(model.basis_instructions)
     else:
         if projector_type[-len('_radial'):] == '_radial':
             projector_type = projector_type[:-len('_radial')]
