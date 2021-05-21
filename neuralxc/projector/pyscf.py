@@ -79,7 +79,11 @@ class PySCFProjector(metaclass=ProjectorRegistry):
 
     def initialize(self, mol, **kwargs):
         self.spec_agnostic = self.basis.get('spec_agnostic', False)
+        self.dfit = self.basis.get('dfit', False)
         self.op = self.basis.get('operator', 'delta').lower()
+        if self.dfit and self.op == 'delta':
+            self.op = 'rij'
+            print('Setting "operator" to rij (Coulomb) for density fitting')
         self.delta = self.basis.get('delta', False)
 
         if self.delta:
@@ -102,11 +106,8 @@ class PySCFProjector(metaclass=ProjectorRegistry):
         self.eri3c = get_eri3c(mol, auxmol, self.op)
         self.mol = mol
         self.auxmol = auxmol
-        self.S_aux = self.auxmol.intor('int1e_ovlp')
-        if self.op == 'rij':
-            # print('Using coulomb operator')
+        if self.dfit:
             self.S_aux = self.auxmol.intor('int2c2e', aosym='s1', comp=1)  # (P|Q)
-        # self.Sinv = np.linalg.pinv(auxovlp)
 
     def get_basis_rep(self, dm, **kwargs):
         """ Project density matrix dm onto set of basis functions and return
@@ -118,8 +119,8 @@ class PySCFProjector(metaclass=ProjectorRegistry):
             dm = dm - self.dm_init
         coeff = get_coeff(dm, self.eri3c)
 
-        # coeff = self.Sinv.dot(coeff)
-        # coeff = np.linalg.solve(self.S_aux, coeff)
+        if self.dfit:
+            coeff = np.linalg.solve(self.S_aux, coeff)
         coeff = self.bp.pad_basis(coeff)
         if self.spec_agnostic:
             self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
@@ -140,8 +141,8 @@ class PySCFProjector(metaclass=ProjectorRegistry):
 
             dEdC.pop('X')
         dEdC = self.bp.unpad_basis(dEdC)
-        # dEdC = np.linalg.solve(self.S_aux, dEdC)
-        # dEdC = self.Sinv.dot(dEdC)
+        if self.dfit:
+            dEdC = np.linalg.solve(self.S_aux, dEdC)
         V = contract('ijk, k', self.eri3c, dEdC)
         return V
 

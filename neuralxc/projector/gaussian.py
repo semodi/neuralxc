@@ -140,13 +140,12 @@ class GaussianProjectorMixin():
             if c.dim() == 2:
                 coeff.append(c.reshape(-1))
             else:
-                coeff.append(c.reshape(-1,c.size()[-1]))
-
+                coeff.append(c.reshape(-1, c.size()[-1]))
 
         coeff = torch.cat(coeff)
-        if coeff.dim() ==2:
+        if coeff.dim() == 2:
             coeff_out = torch.mm(self.M[self.species], coeff)
-            return coeff_out.permute(1,0).reshape(-1)
+            return coeff_out.permute(1, 0).reshape(-1)
         else:
             coeff_out = torch.mv(self.M[self.species], coeff)
             return coeff_out
@@ -260,7 +259,7 @@ class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
         box['mesh'] = my_box[:3]
         box['radial'] = my_box[3:]
         Xm, Ym, Zm = box['mesh'].long()
-        return self.project_onto(rho[...,Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
+        return self.project_onto(rho[..., Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
 
 
 class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
@@ -305,4 +304,4 @@ class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
         Xm = box['mesh'].long()
         grid_weights = grid_weights[Xm]
         self.set_cell_parameters(grid_coords, grid_weights)
-        return self.project_onto(rho[...,Xm], radials, angulars, basis, self.basis_strings[self.species], box)
+        return self.project_onto(rho[..., Xm], radials, angulars, basis, self.basis_strings[self.species], box)
