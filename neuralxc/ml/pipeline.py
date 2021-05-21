@@ -205,7 +205,6 @@ def serialize_projector(projector):
             projector_models[spec] = torch.jit.trace(projector,
                                                      (rho_c, pos_c, unitcell_c, grid_c, radials, angulars, box),
                                                      check_trace=False)
-            C = projector_models[spec](rho_c, pos_c, unitcell_c, grid_c, radials, angulars, box).unsqueeze(0)
 
     return basis_models, projector_models
 

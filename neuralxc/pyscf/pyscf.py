@@ -8,7 +8,6 @@ PySCF interoperability.
 # from sympy import N
 from glob import glob
 
-import pyscf
 from pylibnxc import get_nxc_adapter
 from pyscf import dft, gto
 from pyscf.dft import RKS
@@ -64,7 +63,7 @@ def veff_mod(mf, model):
     potential
     """
     def get_veff(mol=None, dm=None, dm_last=0, vhf_last=0, hermi=1):
-        veff = pyscf.dft.rks.get_veff(mf, mol, dm, dm_last, vhf_last, hermi)
+        veff = dft.rks.get_veff(mf, mol, dm, dm_last, vhf_last, hermi)
         vnxc = NPArrayWithTag(veff.shape)
         nxc = model.get_V(dm)
         vnxc[:, :] = nxc[1][:, :]

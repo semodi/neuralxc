@@ -5,6 +5,8 @@ import sys
 from abc import ABC, abstractmethod
 
 import dill as pickle
+import json
+import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -54,6 +56,42 @@ def test_radial_model():
 
     res = model.get_V(rho)[0]
     assert np.allclose(res, np.load(test_dir + '/rad_energy.npy'))
+
+
+@pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
+@pytest.mark.pyscf
+def test_pre():
+    os.chdir(test_dir)
+    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    cwd = os.getcwd()
+    os.chdir(test_dir + '/driver_data_tmp')
+
+    run_engine_driver('benzene_small.traj', 'pre_rad.json', workdir='workdir_engine')
+
+    pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test')
+
+    pre = json.loads(open('pre_rad.json', 'r').read())
+    pre['preprocessor']['grad'] = 1
+    open('pre_rad.json', 'w').write(json.dumps(pre))
+    pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test1')
+
+    pre = json.loads(open('pre_rad.json', 'r').read())
+    pre['preprocessor']['grad'] = 2
+    open('pre_rad.json', 'w').write(json.dumps(pre))
+    pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test2')
+
+    with h5py.File('data.hdf5', 'r') as f:
+        for hashkey in f['/test/test/density']:
+            data0 = f['/test/test/density/' + hashkey][:]
+        for hashkey in f['/test/test1/density']:
+            data1 = f['/test/test1/density/' + hashkey][:]
+        for hashkey in f['/test/test2/density']:
+            data2 = f['/test/test2/density/' + hashkey][:]
+
+    assert data0.shape[-1] * 2 == data1.shape[-1]
+    assert data0.shape[-1] * 4 == data2.shape[-1]
+    os.chdir(cwd)
+    shutil.rmtree(test_dir + '/driver_data_tmp')
 
 
 # @pytest.mark.skipif(True, reason="too expensive")

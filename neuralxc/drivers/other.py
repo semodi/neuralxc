@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import time
 
 import h5py
 import matplotlib.pyplot as plt
@@ -16,7 +15,7 @@ from neuralxc.preprocessor import driver
 from ..formatter import make_nested_absolute
 from .data import add_data_driver
 
-__all__ = ['plot_basis', 'run_engine_driver', 'fetch_default_driver', 'pre_driver']
+__all__ = ['plot_basis', 'run_engine_driver', 'fetch_default_driver', 'pre_driver', 'get_real_basis']
 os.environ['KMP_AFFINITY'] = 'none'
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'

@@ -15,8 +15,6 @@ except ModuleNotFoundError:
     compute_KS = None
 import os
 
-import ase.calculators as ase_calculators
-import ase.calculators.cp2k
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.units import Hartree
 

@@ -9,7 +9,7 @@
         "estimator__max_steps": 201,
         "estimator__valid_size": 0,
         "estimator__batch_size": 0,
-        "estimator__activation": "sigmoid",
+        "estimator__activation": "sigmoid"
     },
     "cv": 2
 }
