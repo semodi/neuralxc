@@ -202,13 +202,16 @@ class EnergyNetwork(torch.nn.Module):
         if not hasattr(self, 'species_nets'):
             species_nets = {}
             for spec in X:
-                species_nets[spec] = torch.nn.Sequential(
-                    *([torch.nn.Linear(X[spec].shape[-1], self.n_nodes)] +\
-                    (self.n_layers-1)* [self.activation,torch.nn.Linear(self.n_nodes, self.n_nodes)] +\
-                    [self.activation, torch.nn.Linear(self.n_nodes,1)])
-                )
+                if self.n_layers < 1:
+                    species_nets[spec] = torch.nn.Linear(X[spec].shape[-1], 1)
+                else:
+                    species_nets[spec] = torch.nn.Sequential(
+                        *([torch.nn.Linear(X[spec].shape[-1], self.n_nodes)] +\
+                        (self.n_layers-1)* [self.activation,torch.nn.Linear(self.n_nodes, self.n_nodes)] +\
+                        [self.activation, torch.nn.Linear(self.n_nodes,1)])
+                    )
             self.species_nets = torch.nn.ModuleDict(species_nets)
-
+            print(self.species_nets)
         if train_valid_split < 1.0:
             indices = np.arange(len(y))
             np.random.shuffle(indices)
