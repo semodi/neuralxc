@@ -6,6 +6,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from ase.io import read
+import torch
 
 import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
@@ -25,22 +26,26 @@ def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
     basis_instructions = json.loads(open(basis, 'r').read())
+    print(basis_instructions['preprocessor'])
     projector = xc.projector.DensityProjector(unitcell=np.eye(3),
                                               grid=np.ones(3),
                                               basis_instructions=basis_instructions['preprocessor'])
 
+    print(projector)
     for spec in projector.basis:
         if not len(spec) == 1: continue
         basis = projector.basis[spec]
         if isinstance(basis, list):
-            r = np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500)
+            r = torch.from_numpy(np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500))
         else:
-            r = np.linspace(0, np.max(basis['r_o']), 500)
+            r = torch.from_numpy(np.linspace(0, np.max(basis['r_o']), 500))
         W = projector.get_W(basis)
         radials = projector.radials(r, basis, W=W)
+        print(len(radials))
         for l, rad in enumerate(radials):
             if not isinstance(rad, list):
                 rad = [rad]
+            print(len(rad))
             for ir, rl in enumerate(rad):
                 if ir == 0:
                     plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
