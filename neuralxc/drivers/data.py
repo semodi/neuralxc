@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from neuralxc.datastructures.hdf5 import *
 from neuralxc.formatter import make_nested_absolute
 from neuralxc.ml.utils import *
-
+from neuralxc.utils import ConfigFile
 # from .other import *
 __all__ = ['add_data_driver', 'merge_data_driver', 'split_data_driver', 'delete_data_driver', 'sample_driver']
 
@@ -85,7 +85,7 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
 def merge_data_driver(file, base, ref, out, optE0=False, pre=''):
 
     if pre:
-        pre = json.loads(open(pre, 'r').read())
+        pre = ConfigFile(pre)
         basis_key = basis_to_hash(pre['basis'])
     else:
         basis_key = None
@@ -169,7 +169,7 @@ def delete_data_driver(hdf5, group):
 def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     """ Given a dataset, perform sampling in feature space"""
 
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
+    pre = make_nested_absolute(ConfigFile(preprocessor))
 
     datafile = h5py.File(hdf5[0], 'r')
     basis = pre['preprocessor']

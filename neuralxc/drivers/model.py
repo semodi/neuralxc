@@ -18,6 +18,7 @@ from neuralxc.ml import NXCPipeline
 from neuralxc.ml.utils import *
 from neuralxc.preprocessor import driver
 from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.utils import ConfigFile
 
 __all__ = ['serialize', 'sc_driver', 'fit_driver', 'eval_driver']
 os.environ['KMP_AFFINITY'] = 'none'
@@ -135,7 +136,7 @@ def sc_driver(xyz,
               keep_itdata=False):
 
     xyz = os.path.abspath(xyz)
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
+    pre = make_nested_absolute(ConfigFile(preprocessor))
     engine_kwargs = pre.get('engine_kwargs', {})
     if sets:
         sets = os.path.abspath(sets)
@@ -311,7 +312,7 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
     if sets != '':
         hdf5 = parse_sets_input(sets)
 
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
+    pre = make_nested_absolute(ConfigFile(preprocessor))
     basis_key = basis_to_hash(pre['preprocessor'])
     if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
         and pre['preprocessor'].get('spec_agnostic',False):

@@ -42,7 +42,8 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='', **kw
     pos = atoms.positions
     spec = atoms.get_chemical_symbols()
     mol_input = [[s, p] for s, p in zip(spec, pos)]
-    mol = gto.M(atom=mol_input, basis=basis, **kwargs)
+    # mol = gto.M(atom=mol_input, basis=basis, **kwargs)
+    mol = gto.M(atom=mol_input, basis=basis)
     # mol.verbose= 4
     if nxc:
         model_paths = glob(nxc + '/*')

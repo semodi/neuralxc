@@ -24,20 +24,36 @@ def parse_basis(basis_instructions):
     basis_strings = {}
     for species in basis_instructions:
         if len(species) < 3:
-            if os.path.isfile(basis_instructions[species]['basis']):
-                basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
-                bas = gtobasis.parse(basis_strings[species])
+            # if os.path.isfile(basis_instructions[species]['basis']):
+            if 'basis' in basis_instructions:
+                if 'file' in basis_instructions['basis']:
+                    basis_strings[species] = open(basis_instructions['basis']['file'], 'r').read()
+                    bas = gtobasis.parse(basis_strings[species])
+                elif 'name' in basis_instructions['basis']:
+                    basis_strings[species] = basis_instructions['basis']['name']
+                    bas = basis_strings[species]
+                else:
+                    basis_strings[species] = basis_instructions['basis']
+                    bas = basis_strings[species]
             else:
-                basis_strings[species] = basis_instructions[species]['basis']
-                bas = basis_strings[species]
+                if os.path.isfile(basis_instructions[species]['basis']):
+                    basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
+                    bas = gtobasis.parse(basis_strings[species])
+                else:
+                    basis_strings[species] = basis_instructions[species]['basis']
+                    bas = basis_strings[species]
 
             spec = 'O' if species == 'X' else species
             try:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
             except RuntimeError:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
-            sigma = basis_instructions[species].get('sigma', 2.0)
-            gamma = basis_instructions[species].get('gamma', 1.0)
+            if 'basis' in basis_instructions:
+                sigma = basis_instructions['basis'].get('sigma', 2.0)
+                gamma = basis_instructions['basis'].get('gamma', 1.0)
+            else:
+                sigma = basis_instructions[species].get('sigma', 2.0)
+                gamma = basis_instructions[species].get('gamma', 1.0)
             basis = {}
             for bi in range(mol.atom_nshells(0)):
                 l = mol.bas_angular(bi)

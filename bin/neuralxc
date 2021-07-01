@@ -36,7 +36,7 @@ if __name__ == '__main__':
     adddat.add_argument('--traj', metavar='traj', type=str, default='', help='Path to .xyz/.traj file')
     adddat.add_argument('--density', metavar='density', type=str, default='', help='Path to basis representation file')
     adddat.add_argument('--override', action=('store_true'), help='If exists, override? (Default: False)')
-    addda   t.add_argument('--zero',
+    adddat.add_argument('--zero',
                         metavar='zero',
                         type=float,
                         default=None,

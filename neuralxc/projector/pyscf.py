@@ -94,12 +94,10 @@ class PySCFProjector(metaclass=ProjectorRegistry):
             basis = {}
             for atom_idx, _ in enumerate(mol.atom_charges()):
                 sym = mol.atom_pure_symbol(atom_idx)
-                if os.path.isfile(self.basis['basis']):
-                    basis[sym] = gto.basis.parse(open(self.basis['basis'], 'r').read())
-                else:
-                    basis[sym] = gto.basis.load(self.basis['basis'], 'O')
+                print(self.basis['basis']['file'])
+                basis[sym] = gto.basis.parse(open(self.basis['basis']['file'], 'r').read())
         else:
-            basis = self.basis['basis']
+            basis = self.basis['basis']['name']
 
         auxmol = gto.M(atom=mol.atom, basis=basis)
         self.bp = BasisPadder(auxmol)

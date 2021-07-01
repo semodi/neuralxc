@@ -16,6 +16,7 @@ import neuralxc as xc
 from neuralxc.constants import Bohr, Hartree
 from neuralxc.drivers import *
 from neuralxc.engines import Engine
+from neuralxc.utils import ConfigFile
 
 try:
     import pyscf
@@ -61,6 +62,10 @@ def test_radial_model():
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_pre():
+    try:
+        shutil.rmtree(test_dir + '/driver_data_tmp')
+    except:
+        pass
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
@@ -69,15 +74,14 @@ def test_pre():
     run_engine_driver('benzene_small.traj', 'pre_rad.json', workdir='workdir_engine')
 
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test')
-
-    pre = json.loads(open('pre_rad.json', 'r').read())
+    pre = ConfigFile('pre_rad.json')
     pre['preprocessor']['grad'] = 1
-    open('pre_rad.json', 'w').write(json.dumps(pre))
+    open('pre_rad.json', 'w').write(json.dumps(pre.__dict__))
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test1')
 
-    pre = json.loads(open('pre_rad.json', 'r').read())
+    pre = ConfigFile('pre_rad.json')
     pre['preprocessor']['grad'] = 2
-    open('pre_rad.json', 'w').write(json.dumps(pre))
+    open('pre_rad.json', 'w').write(json.dumps(pre.__dict__))
     pre_driver('benzene_small.traj', 'workdir_engine', 'pre_rad.json', 'data.hdf5/test/test2')
 
     with h5py.File('data.hdf5', 'r') as f:
@@ -103,8 +107,7 @@ def test_sc():
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
 
-    fetch_default_driver(kind='pre', hint='./pre_hint.json')
-    sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=1, hyperopt=True)
+    sc_driver('benzene_small.traj', 'pre_sc.json', 'hyper.json', maxit=1, hyperopt=True)
     # sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=1, hyperopt=False, model0='sc/model_it2')
     os.chdir(test_dir + '/driver_data_tmp')
 

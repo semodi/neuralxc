@@ -14,6 +14,7 @@ from neuralxc.ml.pipeline import NXCPipeline
 from neuralxc.ml.transformer import (GroupedStandardScaler, GroupedVarianceThreshold)
 from neuralxc.preprocessor import Preprocessor
 from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.utils import ConfigFile
 
 from ..formatter import atomic_shape, expand
 
@@ -267,7 +268,7 @@ def get_default_pipeline(basis, species, symmetrizer_type='trace', pca_threshold
 
 def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
     if isinstance(preprocessor, str):
-        pre = json.loads(open(preprocessor, 'r').read())
+        pre = ConfigFile(preprocessor)
     else:
         pre = preprocessor
     inp = json.loads(open(inputfile, 'r').read())

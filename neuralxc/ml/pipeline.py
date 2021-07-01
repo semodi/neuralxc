@@ -168,7 +168,7 @@ def serialize_energy(model, C, outpath, override):
 
     for spec in C:
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(model.basis_instructions))
+        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))
 
 
 def serialize_projector(projector):
@@ -269,4 +269,4 @@ def serialize_pipeline(model, outpath, override=False):
         torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
         torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(model.basis_instructions))
+        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))
