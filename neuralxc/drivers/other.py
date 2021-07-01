@@ -27,7 +27,6 @@ def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
     basis_instructions = ConfigFile(basis)
-    print(basis_instructions['preprocessor'])
     projector = xc.projector.DensityProjector(unitcell=np.eye(3),
                                               grid=np.ones(3),
                                               basis_instructions=basis_instructions['preprocessor'])
@@ -63,7 +62,6 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     from ..pyscf import BasisPadder
     real_basis = {}
     is_file = os.path.isfile(basis)
-    # if spec_agnostic: atoms = atoms[0:1]
     if is_file:
         parsed_basis = gto.basis.parse(open(basis, 'r').read())
     if spec_agnostic:
@@ -195,11 +193,12 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
 
     for basis_instr in basis_grid:
         preprocessor.basis_instructions = basis_instr
-        print('BI', basis_instr)
-
         if basis_instr.get('projector', 'ortho') == 'gaussian':
             if isinstance(basis_instr['basis'], dict):
-                bas = basis_instr['basis'].get('path',basis_instr['basis']['name'])
+                try:
+                    bas = basis_instr['basis']['file']
+                except KeyError:
+                    bas = basis_instr['basis']['name']
             else:
                 bas = basis_instr['basis']
             real_basis = get_real_basis(atoms,

@@ -118,17 +118,8 @@ class GaussianProjectorMixin():
         box['radial'] = torch.stack(box['radial'])
         for ib, basis in enumerate(basis_instructions):
             l = basis['l']
-            # r_o_max = np.max(basis['r_o'])
-            # filt = (box['radial'][0] <= r_o_max)
             filt = (box['radial'][0] <= 1000000)
             box_rad = box['radial'][:, filt]
-            # box_m = box['mesh'][:, filt]
-            # ang = torch.zeros([2 * l + 1, filt.size()[0]], dtype=torch.double)
-            # rad = torch.zeros([len(basis['r_o']), filt.size()[0]], dtype=torch.double)
-            # ang[:,filt] = torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])) # shape (m, x, y, z)
-            # rad[:,filt] = torch.stack(self.radials(box_rad[0], [basis])[0]) # shape (n, x, y, z)
-            # rads.append(rad)
-            # angs.append(ang)
             angs.append(torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])))  # shape (m, x, y, z)
             rads.append(torch.stack(self.radials(box_rad[0], [basis])[0]))  # shape (n, x, y, z)
 
@@ -140,19 +131,13 @@ class GaussianProjectorMixin():
         ang_cnt = 0
         coeff = []
         for basis in basis_instructions:
-            # print(basis)
             l = basis['l']
             len_rad = len(basis['r_o'])
             rad = rads[rad_cnt:rad_cnt + len_rad]
             ang = angs[ang_cnt:ang_cnt + (2 * l + 1)]
             rad_cnt += len_rad
             ang_cnt += 2 * l + 1
-            # r_o_max = np.max(basis['r_o'])
-            # filt = (box['radial'][0] <= r_o_max)
-            # filt = (box['radial'][0] <= 1000000)
-            rad *= self.V_cell
-            # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            c = contract('...i,mi,ni -> nm...', rho, ang, rad)
+            c = contract('...i,mi,ni -> nm...', rho, ang, rad * self.V_cell)
             if c.dim() == 2:
                 coeff.append(c.reshape(-1))
             else:

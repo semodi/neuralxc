@@ -98,21 +98,20 @@ def test_pre():
     shutil.rmtree(test_dir + '/driver_data_tmp')
 
 
-# @pytest.mark.skipif(True, reason="too expensive")
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
-def test_sc():
+@pytest.mark.parametrize('projector', ['ga_ana','ga_rad','or_rad', 'ga_ana_f','ga_rad_f'])
+def test_sc(projector):
     os.chdir(test_dir)
     shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
     cwd = os.getcwd()
     os.chdir(test_dir + '/driver_data_tmp')
-
-    sc_driver('benzene_small.traj', 'pre_sc.json', 'hyper.json', maxit=1, hyperopt=True)
-    # sc_driver('benzene_small.traj', 'pre.json', 'hyper.json', maxit=1, hyperopt=False, model0='sc/model_it2')
+    sc_driver('water.traj', 'pre_sc_{}.json'.format(projector),
+        'hyper.json', maxit=1, hyperopt=True)
     os.chdir(test_dir + '/driver_data_tmp')
 
-    engine = Engine('pyscf', nxc='testing/nxc.jit', basis='sto3g')
-    engine.compute(read('benzene_small.traj', '0'))
+    # engine = Engine('pyscf', nxc='testing/nxc.jit', basis='sto3g')
+    # engine.compute(read('testing.traj', '0'))
 
     os.chdir(cwd)
     shutil.rmtree(test_dir + '/driver_data_tmp')
@@ -127,7 +126,6 @@ def test_pyscf_radial():
     serialize('model', 'benzene.pyscf.jit', as_radial=False)
     engine = Engine('pyscf', nxc='benzene.pyscf.jit')
     atoms = engine.compute(read('benzene_small.traj', '0'))
-
     serialize('model', 'benzene.pyscf_radial.jit', as_radial=True)
     engine = Engine('pyscf', nxc='benzene.pyscf_radial.jit')
     atoms_rad = engine.compute(read('benzene_small.traj', '0'))

@@ -124,7 +124,7 @@ class PySCFProjector(metaclass=ProjectorRegistry):
             self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
             coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis=0)
             coeff = {'X': coeff_agn}
-
+        print(self.spec_agnostic)
         return coeff
 
     def get_V(self, dEdC, **kwargs):

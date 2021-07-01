@@ -1,0 +1,11 @@
+{"preprocessor": {
+        "projector": "gaussian",
+        "grid": "radial",
+        "basis": {
+            "name": "sto3g",
+	    "sigma": 2
+        }
+    }
+,
+"n_workers": 1,
+"engine": {"application":"pyscf","xc": "PBE", "basis": "sto3g"}}

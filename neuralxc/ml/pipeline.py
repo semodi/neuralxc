@@ -221,7 +221,10 @@ def serialize_pipeline(model, outpath, override=False):
         if len(spec) < 3:
             species.append(spec)
 
-    model.symmetrize_instructions.update({'basis': model.basis_instructions})
+    try:
+        model.symmetrize_instructions.update({'basis': model.basis_instructions})
+    except AttributeError:
+        model.symmetrize_instructions = {'basis': model.basis_instructions}
     model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
     try:
         projector = DensityProjector(basis_instructions=basis_instructions, unitcell=unitcell_c, grid=grid_c)
@@ -231,7 +234,12 @@ def serialize_pipeline(model, outpath, override=False):
             projector = DensityProjector(basis_instructions=basis_instructions,
                                          grid_coords=unitcell_c,
                                          grid_weights=grid_c)
-            model.symmetrize_instructions.update(projector.symmetrize_instructions)
+
+            try:
+                model.symmetrize_instructions.update(projector.symmetrize_instructions)
+            except AttributeError:
+                model.symmetrize_instructions.update({'basis': model.basis_instructions})
+                
             model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
         except TypeError:
             C = {}

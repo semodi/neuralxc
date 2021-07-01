@@ -2,6 +2,7 @@ from collections.abc import MutableMapping, Mapping
 
 import hashlib
 import json
+import os
 from copy import deepcopy
 
 
@@ -88,9 +89,20 @@ def fix_basis(config):
                 basis['basis'] = pre['basis']
                 agnostic = False
             elif 'file' in pre['basis']:
-                basis['X'] = {}
+                basis['X'] = pre.get('X',{})
                 basis['X'].update(pre['basis'])
-                basis['X']['basis'] = basis['X'].pop('file')
+                abspath = os.path.abspath(basis['X'].pop('file'))
+                try:
+                    open(abspath,'r')
+                except FileNotFoundError:
+                    try:
+                        abspath ='/'.join(abspath.split('/')[:-1]) + '/../' + abspath.split('/')[-1]
+                        open(abspath,'r')
+                    except FileNotFoundError:
+                        raise FileNotFoundError('Basis file not found')
+
+                basis['X']['basis'] = abspath
+                pre['basis']['file'] = abspath
                 agnostic = True
 
     config._basis.update(basis)
@@ -101,31 +113,31 @@ def fix_basis(config):
         application = 'pyscf_rad'
     pre["application"] = application
 
-class BasisInstructions(MutableMapping):
-
-    def __init__(self, preprocessor, realbasis):
-        self.hash = hashlib.md5(json.dumps(preprocessor).encode()).hexdigest()
-        self.__dict__.update(preprocessor)
-        self.__dict__.update(realbasis)
-        self.species = [key for key in realbasis if len(key) < 3]
-
-    def __setitem__(self, key, item):
-        self.__dict__[key] = item
-
-    def __delitem__(self, key):
-        del self.__dict__[key]
-
-    def __getitem__(self, k):
-        return self.__dict__[k]
-
-    def __iter__(self):
-        return iter(self.__dict__)
-
-    def __len__(self):
-        return len(self.__dict__)
-
-    def update(self, d):
-        self.__dict__.update(d)
+# class BasisInstructions(MutableMapping):
+#
+#     def __init__(self, preprocessor, realbasis):
+#         self.hash = hashlib.md5(json.dumps(preprocessor).encode()).hexdigest()
+#         self.__dict__.update(preprocessor)
+#         self.__dict__.update(realbasis)
+#         self.species = [key for key in realbasis if len(key) < 3]
+#
+#     def __setitem__(self, key, item):
+#         self.__dict__[key] = item
+#
+#     def __delitem__(self, key):
+#         del self.__dict__[key]
+#
+#     def __getitem__(self, k):
+#         return self.__dict__[k]
+#
+#     def __iter__(self):
+#         return iter(self.__dict__)
+#
+#     def __len__(self):
+#         return len(self.__dict__)
+#
+#     def update(self, d):
+#         self.__dict__.update(d)
 
 class ConfigFile(MutableMapping):
 
@@ -164,6 +176,7 @@ class ConfigFile(MutableMapping):
         fix_basis(self)
         self._complete = True
         self.preprocessor.update(self._basis)
+        print('dict', self.__dict__)
 
     @property
     def _dict(self):

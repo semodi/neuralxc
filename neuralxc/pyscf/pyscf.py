@@ -8,7 +8,7 @@ PySCF interoperability.
 # from sympy import N
 from glob import glob
 
-from pylibnxc import get_nxc_adapter
+from pylibnxc.pyscf import RKS as RKSrad
 from pyscf import dft, gto
 from pyscf.dft import RKS
 from pyscf.lib.numpy_helper import NPArrayWithTag
@@ -48,12 +48,13 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='', **kw
     if nxc:
         model_paths = glob(nxc + '/*')
         if any(['projector' in path for path in model_paths]):
-            mf = get_nxc_adapter('pyscf', nxc)  # Model that uses projector on radial grid
+            mf = RKSrad(mol, nxc=nxc, nxc_kind='atomic')  # Model that uses projector on radial grid
         else:
             mf = RKS(mol, nxc=nxc)  # Model that uses overlap integrals and density matrix
     else:
         mf = dft.RKS(mol)
-    mf.set(chkfile=path)
+    # mf.set(chkfile=path)
+    mf.chkfile=path
     mf.xc = xc
     mf.kernel()
     return mf, mol

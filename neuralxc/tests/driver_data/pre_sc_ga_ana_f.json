@@ -1,0 +1,10 @@
+{"preprocessor": {
+        "projector": "gaussian",
+        "grid": "analytical",
+        "basis": {
+            "file": "basis-test"
+        }
+    }
+,
+"n_workers": 1,
+"engine": {"application":"pyscf","xc": "PBE", "basis": "sto3g"}}

@@ -1,0 +1,12 @@
+{"preprocessor": {
+        "projector": "ortho",
+        "grid": "radial",
+        "basis": {
+            "n": 3,
+	    "l": 4,
+	    "r_o": 2.0
+        }
+    }
+,
+"n_workers": 1,
+"engine": {"application":"pyscf","xc": "PBE", "basis": "sto3g"}}
