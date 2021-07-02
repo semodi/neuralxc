@@ -47,6 +47,7 @@ default_config_siesta = {
 }
 
 defaults = {'pyscf' : default_config_pyscf,
+            'pyscf_rad': default_config_pyscf,
             'siesta': default_config_siesta}
 
 

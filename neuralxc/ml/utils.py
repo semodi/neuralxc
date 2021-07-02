@@ -1,4 +1,5 @@
 import h5py
+import json
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.cluster import KMeans
