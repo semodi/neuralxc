@@ -1,6 +1,3 @@
-import hashlib
-import json
-
 import numpy as np
 from ase.io import read
 

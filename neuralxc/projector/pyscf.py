@@ -6,8 +6,6 @@ no grid operations are necessary.
 BasisPadder translates between NeuralXC and PySCF internal basis set orderings.
 """
 
-import os
-
 import numpy as np
 from opt_einsum import contract
 from pyscf import gto

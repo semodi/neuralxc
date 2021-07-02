@@ -3,7 +3,6 @@ neuralxc.py
 Implementation of a machine learned density functional
 Interfaces to pyblibnxc classes. Here for compatibility reasons
 """
-import json
 import os
 from glob import glob
 
