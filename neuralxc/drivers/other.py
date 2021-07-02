@@ -31,7 +31,6 @@ def plot_basis(basis):
                                               grid=np.ones(3),
                                               basis_instructions=basis_instructions['preprocessor'])
 
-    print(projector)
     for spec in projector.basis:
         if not len(spec) == 1: continue
         basis = projector.basis[spec]
@@ -41,11 +40,9 @@ def plot_basis(basis):
             r = torch.from_numpy(np.linspace(0, np.max(basis['r_o']), 500))
         W = projector.get_W(basis)
         radials = projector.radials(r, basis, W=W)
-        print(len(radials))
         for l, rad in enumerate(radials):
             if not isinstance(rad, list):
                 rad = [rad]
-            print(len(rad))
             for ir, rl in enumerate(rad):
                 if ir == 0:
                     plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
@@ -188,7 +185,6 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     except FileExistsError:
         delete_workdir = False
 
-    print('======Projecting onto basis sets======')
     basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
 
     for basis_instr in basis_grid:

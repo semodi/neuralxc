@@ -116,7 +116,6 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
         basis = self._attrs['basis']
         results = []
         grad_mult = {0: 1, 1: 2, 2: 4}[basis.get('grad', 0)]
-        print(grad_mult)
 
         for idx, key, data in expand(C):
             results.append({})

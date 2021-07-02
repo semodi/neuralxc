@@ -29,6 +29,9 @@ modules, **Projector**, **Symmetrizer**, and **ML**, each of which can be indivi
 
    installation.rst
    quickstart.rst
+   filetypes.rst
+   selfconsistent.rst
+   CLI.rst
    projector.rst
    symmetrizer.rst
    input.rst

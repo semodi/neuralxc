@@ -157,6 +157,8 @@ class ConfigFile(MutableMapping):
             default_content = deepcopy(defaults[content['application']])
         elif 'application' in content.get('engine',{}):
             default_content = deepcopy(defaults[content['engine']['application']])
+        elif 'application' in content.get('preprocessor',{}):
+            default_content = deepcopy(defaults[content['preprocessor']['application']])
         else:
             print("Warning: No application found in input. Defaulting to PySCF")
             default_content = deepcopy(defaults['pyscf'])
@@ -176,7 +178,6 @@ class ConfigFile(MutableMapping):
         fix_basis(self)
         self._complete = True
         self.preprocessor.update(self._basis)
-        print('dict', self.__dict__)
 
     @property
     def _dict(self):

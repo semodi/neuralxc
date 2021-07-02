@@ -1,0 +1,14 @@
+{
+ "hyperparameters": {
+     "var_selector__threshold": 1e-10,
+     "estimator__n_nodes": 4,
+     "estimator__n_layers": 0,
+     "estimator__b": [0, 0.1, 0.001],
+     "estimator__alpha": 0.001,
+     "estimator__max_steps": 20001,
+     "estimator__valid_size": 0,
+     "estimator__batch_size": 0,
+     "estimator__activation": "GeLU"
+ },
+    "cv": 4
+}

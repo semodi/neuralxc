@@ -116,9 +116,11 @@ class NetworkEstimator(BaseEstimator):
         self.path = path
 
 
-def train_net(net, dataloader, dataloader_val=None, max_steps=10000, check_point_every=10, lr=1e-3, weight_decay=1e-7):
+def train_net(net, dataloader, dataloader_val=None, max_steps=10000, n_checkpoints=20, lr=1e-3, weight_decay=1e-7):
     # net.train()
 
+    check_point_every = max_steps//n_checkpoints
+    
     loss_fn = torch.nn.MSELoss()
 
     optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)

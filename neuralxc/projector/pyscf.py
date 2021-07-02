@@ -94,7 +94,6 @@ class PySCFProjector(metaclass=ProjectorRegistry):
             basis = {}
             for atom_idx, _ in enumerate(mol.atom_charges()):
                 sym = mol.atom_pure_symbol(atom_idx)
-                print(self.basis['basis']['file'])
                 basis[sym] = gto.basis.parse(open(self.basis['basis']['file'], 'r').read())
         else:
             basis = self.basis['basis']['name']
@@ -124,7 +123,6 @@ class PySCFProjector(metaclass=ProjectorRegistry):
             self.spec_partition = {sym: len(coeff[sym]) for sym in coeff}
             coeff_agn = np.concatenate([coeff[sym] for sym in coeff], axis=0)
             coeff = {'X': coeff_agn}
-        print(self.spec_agnostic)
         return coeff
 
     def get_V(self, dEdC, **kwargs):

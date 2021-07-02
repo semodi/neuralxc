@@ -14,7 +14,7 @@
         "application": "siesta",
         "spec_agnostic": false
     },
-    "engine_kwargs": {
+    "engine": {
         "pseudoloc": ".",
         "fdf_path": "sgdml.fdf",
         "xc": "PBE",

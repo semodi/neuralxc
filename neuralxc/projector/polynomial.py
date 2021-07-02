@@ -48,7 +48,6 @@ class OrthoProjectorMixin():
     def project_onto(self, rho, rads, angs, n_l):
         rho = rho.squeeze()
         rho = rho * self.V_cell.squeeze()
-        print(rho.size())
         if rho.ndim < 3:
             coeff_array = contract('li,ni,...i -> ...nl', angs, rads, rho)
         else:
