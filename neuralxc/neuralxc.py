@@ -11,6 +11,7 @@ from pylibnxc import AtomicFunc
 from pylibnxc.adapters import Hartree
 
 from neuralxc.projector import DensityProjector
+from neuralxc.utils import ConfigFile
 
 
 class PySCFNXC(AtomicFunc):
@@ -18,7 +19,11 @@ class PySCFNXC(AtomicFunc):
         model_paths = glob(path + '/*')
         for mp in model_paths:
             if 'bas.json' == os.path.basename(mp):
-                self.basis = json.loads(open(mp, 'r').read())
+                mp  = json.loads(open(mp,'r').read())
+
+                self.basis = ConfigFile({'preprocessor' : mp,
+                'engine':{'application': 'pyscf'}})['preprocessor']
+
         super().__init__(path)
 
     def initialize(self, mol):

@@ -6,11 +6,13 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from ase.io import read
+import torch
 
 import neuralxc as xc
 from neuralxc.datastructures.hdf5 import *
 from neuralxc.ml.utils import *
 from neuralxc.preprocessor import driver
+from neuralxc.utils import ConfigFile
 
 from ..formatter import make_nested_absolute
 from .data import add_data_driver
@@ -24,7 +26,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '10'
 def plot_basis(basis):
     """ Plots a set of basis functions specified in .json file"""
 
-    basis_instructions = json.loads(open(basis, 'r').read())
+    basis_instructions = ConfigFile(basis)
     projector = xc.projector.DensityProjector(unitcell=np.eye(3),
                                               grid=np.ones(3),
                                               basis_instructions=basis_instructions['preprocessor'])
@@ -33,9 +35,9 @@ def plot_basis(basis):
         if not len(spec) == 1: continue
         basis = projector.basis[spec]
         if isinstance(basis, list):
-            r = np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500)
+            r = torch.from_numpy(np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500))
         else:
-            r = np.linspace(0, np.max(basis['r_o']), 500)
+            r = torch.from_numpy(np.linspace(0, np.max(basis['r_o']), 500))
         W = projector.get_W(basis)
         radials = projector.radials(r, basis, W=W)
         for l, rad in enumerate(radials):
@@ -57,7 +59,6 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     from ..pyscf import BasisPadder
     real_basis = {}
     is_file = os.path.isfile(basis)
-    # if spec_agnostic: atoms = atoms[0:1]
     if is_file:
         parsed_basis = gto.basis.parse(open(basis, 'r').read())
     if spec_agnostic:
@@ -93,17 +94,17 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
 
 def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
 
-    pre = make_nested_absolute(json.load(open(preprocessor, 'r')))
+    pre = make_nested_absolute(ConfigFile(preprocessor))
     try:
         os.mkdir(workdir)
     except FileExistsError:
         pass
 
     driver(read(xyz, ':'),
-           pre['preprocessor'].get('application', 'siesta'),
+           pre['engine'].pop('application', 'siesta'),
            workdir=workdir,
            nworkers=pre.get('n_workers', 1),
-           kwargs=pre.get('engine_kwargs', {}))
+           kwargs=pre.get('engine', {}))
     # shutil.move(workdir + '/results.traj', './results.traj')
     shutil.copy(workdir + '/results.traj', './results.traj')
     if workdir == '.tmp/':
@@ -163,8 +164,8 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     calculations
     """
     preprocessor_path = preprocessor
-
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
+    pre = ConfigFile(preprocessor)
+    pre = make_nested_absolute(pre)
 
     atoms = read(xyz, ':')
 
@@ -184,21 +185,25 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
     except FileExistsError:
         delete_workdir = False
 
-    print('======Projecting onto basis sets======')
     basis_grid = get_basis_grid(pre)['preprocessor__basis_instructions']
 
     for basis_instr in basis_grid:
         preprocessor.basis_instructions = basis_instr
-        print('BI', basis_instr)
-
-        if basis_instr.get('application', 'siesta') == 'pyscf':
+        if basis_instr.get('projector', 'ortho') == 'gaussian':
+            if isinstance(basis_instr['basis'], dict):
+                try:
+                    bas = basis_instr['basis']['file']
+                except KeyError:
+                    bas = basis_instr['basis']['name']
+            else:
+                bas = basis_instr['basis']
             real_basis = get_real_basis(atoms,
-                                        basis_instr['basis'],
+                                        bas,
                                         spec_agnostic=basis_instr.get('spec_agnostic', False))
             for key in real_basis:
                 basis_instr[key] = real_basis[key]
             pre.update({'preprocessor': basis_instr})
-            open(preprocessor_path, 'w').write(json.dumps(pre))
+            open(preprocessor_path, 'w').write(json.dumps(pre.__dict__))
 
         filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
         data = preprocessor.fit_transform(None)

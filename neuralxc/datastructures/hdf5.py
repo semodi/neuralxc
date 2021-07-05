@@ -1,10 +1,8 @@
-import hashlib
-import json
-
 import numpy as np
 from ase.io import read
 
 import neuralxc.ml.utils
+from neuralxc.utils import ConfigFile
 
 __all__ = ['add_data', 'merge_sets', 'basis_to_hash', 'add_species', 'add_energy', 'add_forces', 'add_density']
 
@@ -184,4 +182,8 @@ def basis_to_hash(basis):
     hash: str
         Encoding of the basis set
     """
-    return hashlib.md5(json.dumps(basis).encode()).hexdigest()
+    try:
+        return basis.get_hash()
+    except AttributeError:
+        return ConfigFile({"preprocessor":basis}).get_hash()
+    # return hashlib.md5(json.dumps(basis).encode()).hexdigest()

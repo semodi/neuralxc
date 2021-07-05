@@ -18,6 +18,7 @@ from neuralxc.ml import NXCPipeline
 from neuralxc.ml.utils import *
 from neuralxc.preprocessor import driver
 from neuralxc.symmetrizer import symmetrizer_factory
+from neuralxc.utils import ConfigFile
 
 __all__ = ['serialize', 'sc_driver', 'fit_driver', 'eval_driver']
 os.environ['KMP_AFFINITY'] = 'none'
@@ -135,8 +136,8 @@ def sc_driver(xyz,
               keep_itdata=False):
 
     xyz = os.path.abspath(xyz)
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
-    engine_kwargs = pre.get('engine_kwargs', {})
+    pre = make_nested_absolute(ConfigFile(preprocessor))
+    engine_kwargs = pre.get('engine', {})
     if sets:
         sets = os.path.abspath(sets)
 
@@ -157,7 +158,7 @@ def sc_driver(xyz,
         model0 = os.path.abspath(model0)
 
         engine_kwargs = {'nxc': model0}
-        engine_kwargs.update(pre.get('engine_kwargs', {}))
+        engine_kwargs.update(pre.get('engine', {}))
 
     # If not nozero, automatically aligns energies between reference and
     # baseline data by removing mean deviation
@@ -170,7 +171,9 @@ def sc_driver(xyz,
     # Initial self-consistent calculation either with model0 or baseline method only
     # if not neuralxc model provided. Hyperparameter optimization done in first fit
     # and are kept for subsequent iterations.
-    print('====== Iteration 0 ======')
+    print('\n====== Iteration 0 ======')
+    print('\nRunning SCF calculations ...')
+    print('-----------------------------\n')
     mkdir('sc')
     shcopy(preprocessor, 'sc/pre.json')
     shcopy(hyper, 'sc/hyper.json')
@@ -190,6 +193,8 @@ def sc_driver(xyz,
            workdir='workdir',
            nworkers=pre.get('n_workers', 1),
            kwargs=engine_kwargs)
+    print('\nProjecting onto basis ...')
+    print('-----------------------------\n')
     pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
     add_data_driver(hdf5='data.hdf5',
                     system='system',
@@ -199,11 +204,15 @@ def sc_driver(xyz,
                     override=True,
                     zero=E0)
     add_data_driver(hdf5='data.hdf5', system='system', method='ref', add=['energy'], traj=xyz, override=True, zero=E0)
+    print('\nBaseline accuracy')
+    print('-----------------------------\n')
     statistics_sc = \
     eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
             'system/ref'])
 
     open('statistics_sc', 'w').write(json.dumps(statistics_sc))
+    print('\nFitting initial ML model ...')
+    print('-----------------------------\n')
     statistics_fit = fit_driver(preprocessor='pre.json',
                                 hyper='hyper.json',
                                 model=model0_orig,
@@ -220,7 +229,7 @@ def sc_driver(xyz,
         else:
             iteration = 0
 
-        print('====== Iteration {} ======'.format(it_label))
+        print('\n\n====== Iteration {} ======'.format(it_label))
         open('sets.inp', 'w').write('data.hdf5 \n *system/it{} \t system/ref'.format(iteration))
 
         if sets:
@@ -232,14 +241,18 @@ def sc_driver(xyz,
                   'radial' in pre['preprocessor'].get('projector_type', 'ortho'))
 
         engine_kwargs = {'nxc': '../../model_it{}.jit'.format(it_label), 'skip_calculated': False}
-        engine_kwargs.update(pre.get('engine_kwargs', {}))
+        engine_kwargs.update(pre.get('engine', {}))
 
+        print('\nRunning SCF calculations ...')
+        print('-----------------------------\n')
         driver(read(xyz, ':'),
                pre['preprocessor'].get('application', 'siesta'),
                workdir='workdir',
                nworkers=pre.get('n_workers', 1),
                kwargs=engine_kwargs)
 
+        print('\nProjecting onto basis...')
+        print('-----------------------------\n')
         pre_driver(xyz, 'workdir', preprocessor='pre.json', dest='data.hdf5/system/it{}'.format(iteration))
 
         add_data_driver(hdf5='data.hdf5',
@@ -249,17 +262,29 @@ def sc_driver(xyz,
                         traj='workdir/results.traj',
                         override=True,
                         zero=E0)
+        print('\nResults')
+        print('-----------------------------\n')
+
         statistics_sc = \
         eval_driver(hdf5=['data.hdf5','system/it{}'.format(iteration),
-                'system/ref'])
+                'system/ref'], printout=False)
 
         open('statistics_sc', 'a').write('\n' + json.dumps(statistics_sc))
         open('model_it{}/statistics_sc'.format(it_label), 'w').write('\n' + json.dumps(statistics_sc))
+        results_df = pd.DataFrame([json.loads(line) for line in open('statistics_sc','r')])
+        results_df.index.name = 'Iteration'
+        print(results_df.to_markdown())
+        print('')
+
         statistics_fit = fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp')
         open('statistics_fit', 'a').write('\n' + json.dumps(statistics_fit))
 
+        if abs(statistics_fit['mae'] - statistics_sc['mae']) <= tol:
+            print('=============== Self consistent training converged ============')
+            break
+
     os.chdir('..')
-    print('====== Testing ======')
+    print('====== Testing ======\n')
     testfile = ''
     if os.path.isfile('testing.xyz'):
         testfile = '../testing.xyz'
@@ -276,7 +301,7 @@ def sc_driver(xyz,
         os.chdir('testing')
         mkdir('workdir')
         engine_kwargs = {'nxc': '../../nxc.jit'}
-        engine_kwargs.update(pre.get('engine_kwargs', {}))
+        engine_kwargs.update(pre.get('engine', {}))
         driver(read(testfile, ':'),
                pre['preprocessor'].get('application', 'siesta'),
                workdir='workdir',
@@ -297,6 +322,9 @@ def sc_driver(xyz,
                         override=True,
                         zero=E0)
 
+        print('\nTest results...')
+        print('-----------------------------\n')
+
         statistics_test = eval_driver(hdf5=['data.hdf5', 'system/testing/nxc', 'system/testing/ref'])
         open('statistics_test', 'w').write(json.dumps(statistics_test))
         os.chdir('..')
@@ -311,13 +339,12 @@ def fit_driver(preprocessor, hyper, hdf5=None, sets='', sample='', cutoff=0.0, m
     if sets != '':
         hdf5 = parse_sets_input(sets)
 
-    pre = make_nested_absolute(json.loads(open(preprocessor, 'r').read()))
+    pre = make_nested_absolute(ConfigFile(preprocessor))
     basis_key = basis_to_hash(pre['preprocessor'])
     if 'gaussian' in pre['preprocessor'].get('projector_type','ortho')\
         and pre['preprocessor'].get('spec_agnostic',False):
         pre['preprocessor'].update(get_real_basis(None, pre['preprocessor']['X']['basis'], True))
 
-    print(pre['preprocessor'])
 
     # A * in hdf5 (if sets != '') indicates that the predictions of a pretrained
     # model should be subtracted from the stored baseline energies
@@ -397,7 +424,8 @@ def eval_driver(hdf5,
                 sample='',
                 invert_sample=False,
                 keep_mean=False,
-                hashkey=''):
+                hashkey='',
+                printout=True):
     """ Evaluate fitted NXCPipeline on dataset and report statistics
     """
 
@@ -473,7 +501,7 @@ def eval_driver(hdf5,
         'mae': np.mean(dev0).round(5),
         'max': np.max(dev0).round(5)
     })
-    pprint(results)
+    if printout: pprint(results)
     if plot:
         if model == '':
             plt.figure(figsize=(10, 8))

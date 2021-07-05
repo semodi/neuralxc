@@ -1,9 +1,10 @@
 {"preprocessor": {
-        "projector": "gaussian",
+        "projector": "ortho",
         "grid": "radial",
         "basis": {
-            "name": "sto3g",
-            "sigma": 2
+            "n": 3,
+	    "l": 4,
+	    "r_o": 2.0
         }
     }
 ,

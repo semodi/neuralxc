@@ -24,20 +24,36 @@ def parse_basis(basis_instructions):
     basis_strings = {}
     for species in basis_instructions:
         if len(species) < 3:
-            if os.path.isfile(basis_instructions[species]['basis']):
-                basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
-                bas = gtobasis.parse(basis_strings[species])
+            # if os.path.isfile(basis_instructions[species]['basis']):
+            if 'basis' in basis_instructions:
+                if 'file' in basis_instructions['basis']:
+                    basis_strings[species] = open(basis_instructions['basis']['file'], 'r').read()
+                    bas = gtobasis.parse(basis_strings[species])
+                elif 'name' in basis_instructions['basis']:
+                    basis_strings[species] = basis_instructions['basis']['name']
+                    bas = basis_strings[species]
+                else:
+                    basis_strings[species] = basis_instructions['basis']
+                    bas = basis_strings[species]
             else:
-                basis_strings[species] = basis_instructions[species]['basis']
-                bas = basis_strings[species]
+                if os.path.isfile(basis_instructions[species]['basis']):
+                    basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
+                    bas = gtobasis.parse(basis_strings[species])
+                else:
+                    basis_strings[species] = basis_instructions[species]['basis']
+                    bas = basis_strings[species]
 
             spec = 'O' if species == 'X' else species
             try:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
             except RuntimeError:
                 mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
-            sigma = basis_instructions[species].get('sigma', 2.0)
-            gamma = basis_instructions[species].get('gamma', 1.0)
+            if 'basis' in basis_instructions:
+                sigma = basis_instructions['basis'].get('sigma', 2.0)
+                gamma = basis_instructions['basis'].get('gamma', 1.0)
+            else:
+                sigma = basis_instructions[species].get('sigma', 2.0)
+                gamma = basis_instructions[species].get('gamma', 1.0)
             basis = {}
             for bi in range(mol.atom_nshells(0)):
                 l = mol.bas_angular(bi)
@@ -102,17 +118,8 @@ class GaussianProjectorMixin():
         box['radial'] = torch.stack(box['radial'])
         for ib, basis in enumerate(basis_instructions):
             l = basis['l']
-            # r_o_max = np.max(basis['r_o'])
-            # filt = (box['radial'][0] <= r_o_max)
             filt = (box['radial'][0] <= 1000000)
             box_rad = box['radial'][:, filt]
-            # box_m = box['mesh'][:, filt]
-            # ang = torch.zeros([2 * l + 1, filt.size()[0]], dtype=torch.double)
-            # rad = torch.zeros([len(basis['r_o']), filt.size()[0]], dtype=torch.double)
-            # ang[:,filt] = torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])) # shape (m, x, y, z)
-            # rad[:,filt] = torch.stack(self.radials(box_rad[0], [basis])[0]) # shape (n, x, y, z)
-            # rads.append(rad)
-            # angs.append(ang)
             angs.append(torch.stack(self.angulars_real(l, box_rad[1], box_rad[2])))  # shape (m, x, y, z)
             rads.append(torch.stack(self.radials(box_rad[0], [basis])[0]))  # shape (n, x, y, z)
 
@@ -124,19 +131,13 @@ class GaussianProjectorMixin():
         ang_cnt = 0
         coeff = []
         for basis in basis_instructions:
-            # print(basis)
             l = basis['l']
             len_rad = len(basis['r_o'])
             rad = rads[rad_cnt:rad_cnt + len_rad]
             ang = angs[ang_cnt:ang_cnt + (2 * l + 1)]
             rad_cnt += len_rad
             ang_cnt += 2 * l + 1
-            # r_o_max = np.max(basis['r_o'])
-            # filt = (box['radial'][0] <= r_o_max)
-            # filt = (box['radial'][0] <= 1000000)
-            rad *= self.V_cell
-            # coeff.append(contract('i,mi,ni -> nm', rho[filt], ang[:,filt], rad[:,filt]).reshape(-1))
-            c = contract('...i,mi,ni -> nm...', rho, ang, rad)
+            c = contract('...i,mi,ni -> nm...', rho, ang, rad * self.V_cell)
             if c.dim() == 2:
                 coeff.append(c.reshape(-1))
             else:

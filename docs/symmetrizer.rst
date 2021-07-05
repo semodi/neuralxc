@@ -2,6 +2,13 @@
 Symmetrizer
 ===============
 
+In order for the energy (the model output) to be invariant with respect to global rotations NeuralXC symmetrizes the descriptors :math:`c_{nlm}``.
+Two symmetrizers are currently supported by NeuralXC and can be set with the keyword
+
+``symmetrizer_type``
+    - ``trace``  :math:`d_{nl} = \sum_m c_{nlm}^2`
+    - ``mixed_trace`` :math:`d_{nn'l} = \sum_m c_{nlm}c_{n'lm}``
+
 All Symmetrizer classes are derived from BaseSymmetrizer
 
 .. autoclass:: neuralxc.symmetrizer.symmetrizer.BaseSymmetrizer
@@ -18,19 +25,3 @@ are implemented by default:
 
 .. autoclass:: neuralxc.symmetrizer.symmetrizer.MixedTraceSymmetrizer
    :members: _symmetrize_function
-
-If
-
-.. math::
-  C_{nlm}
-is the density projection with principal quantum number n, angular momentum l,
-and angular momentum projection m then trace symmetrizers create a rotationally
-invariant feature by taking the trace of the outer product over m of C with itself:
-
-.. math::
-  D_{nl} = \text{Tr}_{mm'}[C \otimes_{m} C]
-
-`MixedTraceSymmetrizer` generalizes this approach by mixing radial channels obtaining
-
-.. math::
-  D_{nn'l}

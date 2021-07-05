@@ -168,7 +168,7 @@ def serialize_energy(model, C, outpath, override):
 
     for spec in C:
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(model.basis_instructions))
+        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))
 
 
 def serialize_projector(projector):
@@ -221,7 +221,10 @@ def serialize_pipeline(model, outpath, override=False):
         if len(spec) < 3:
             species.append(spec)
 
-    model.symmetrize_instructions.update({'basis': model.basis_instructions})
+    try:
+        model.symmetrize_instructions.update({'basis': model.basis_instructions})
+    except AttributeError:
+        model.symmetrize_instructions = {'basis': model.basis_instructions}
     model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
     try:
         projector = DensityProjector(basis_instructions=basis_instructions, unitcell=unitcell_c, grid=grid_c)
@@ -231,7 +234,12 @@ def serialize_pipeline(model, outpath, override=False):
             projector = DensityProjector(basis_instructions=basis_instructions,
                                          grid_coords=unitcell_c,
                                          grid_weights=grid_c)
-            model.symmetrize_instructions.update(projector.symmetrize_instructions)
+
+            try:
+                model.symmetrize_instructions.update(projector.symmetrize_instructions)
+            except AttributeError:
+                model.symmetrize_instructions.update({'basis': model.basis_instructions})
+                
             model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
         except TypeError:
             C = {}
@@ -269,4 +277,4 @@ def serialize_pipeline(model, outpath, override=False):
         torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
         torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
         torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(model.basis_instructions))
+        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))

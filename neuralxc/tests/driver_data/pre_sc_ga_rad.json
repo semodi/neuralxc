@@ -3,7 +3,7 @@
         "grid": "radial",
         "basis": {
             "name": "sto3g",
-            "sigma": 2
+	    "sigma": 2
         }
     }
 ,

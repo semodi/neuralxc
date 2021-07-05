@@ -37,9 +37,11 @@ class BaseEngine(metaclass=EngineRegistry):
 
 def Engine(app, **kwargs):
 
+    if app == 'pyscf_rad':
+        app = 'pyscf'
     registry = BaseEngine.get_registry()
     if not app in registry:
-        raise Exception('Egnine: {} not registered'.format(app))
+        raise Exception('Engine: {} not registered'.format(app))
 
     return registry[app](**kwargs)
 

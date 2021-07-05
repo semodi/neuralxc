@@ -1,9 +1,8 @@
 {"preprocessor": {
         "projector": "gaussian",
-        "grid": "radial",
+        "grid": "analytical",
         "basis": {
-            "name": "sto3g",
-            "sigma": 2
+            "name": "sto3g"
         }
     }
 ,

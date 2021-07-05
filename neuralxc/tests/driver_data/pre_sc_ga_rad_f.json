@@ -2,8 +2,8 @@
         "projector": "gaussian",
         "grid": "radial",
         "basis": {
-            "name": "sto3g",
-            "sigma": 2
+            "file": "basis-test",
+	    "sigma": 2
         }
     }
 ,

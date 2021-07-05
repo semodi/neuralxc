@@ -1,0 +1,16 @@
+{
+  "preprocessor":
+  {
+       "basis": {
+	       "file": "quickstart-basis"
+       },
+       "projector": "gaussian",
+       "grid": "analytical",
+       "extension": "chkpt"
+  },
+  "n_workers" : 1,
+  "engine": {"xc": "PBE",
+             "application": "pyscf",
+             "basis" : "def2-TZVP"}
+
+}

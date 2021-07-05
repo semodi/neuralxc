@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
+from collections import Mapping
 
 
 class Formatter(TransformerMixin, BaseEstimator):
@@ -266,12 +267,15 @@ def system_shape(X, n):
 
 def make_nested_absolute(df_cont):
     def make_absolute(val):
-        if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
-            val = os.path.abspath(val)
+        try:
+            if (os.path.isfile(val) or os.path.isdir(val)) and not isinstance(val, int):
+                val = os.path.abspath(val)
+        except TypeError:
+            return val
         return val
 
     for key in df_cont:
-        if isinstance(df_cont[key], dict):
+        if isinstance(df_cont[key], Mapping):
             df_cont[key] = make_nested_absolute(df_cont[key])
         else:
             df_cont[key] = make_absolute(df_cont[key])
