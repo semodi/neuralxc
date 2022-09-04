@@ -31,7 +31,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         self.num_workers = num_workers
 
     def fit(self, X=None, y=None, **kwargs):
-        self.client = kwargs.get('client', None)
+        self.client = kwargs.get('client')
         return self
 
     def transform(self, X=None, y=None):
@@ -42,20 +42,21 @@ class Preprocessor(TransformerMixin, BaseEstimator):
 
         unique_systems = np.array([''.join(self.get_chemical_symbols(a)) for a in self.atoms])
         unique_systems = np.unique(unique_systems, axis=0)
-        if spec_agn:
-            self.species_string = unique_systems[0][0] * max([len(s) for s in unique_systems])
-        else:
-            self.species_string = ''.join([s for s in unique_systems])
-        # === Padding ===
+        self.species_string = (
+            unique_systems[0][0] * max(len(s) for s in unique_systems)
+            if spec_agn
+            else ''.join(list(unique_systems))
+        )
 
-        #Find padded width of data
-        width = {}
-        for dat, atoms in zip(self.data, self.atoms):
-            width[''.join(self.get_chemical_symbols(atoms))] = len(dat)
+        width = {
+            ''.join(self.get_chemical_symbols(atoms)): len(dat)
+            for dat, atoms in zip(self.data, self.atoms)
+        }
+
         #Sanity check
         assert len(unique_systems) == len(width)
         if spec_agn:
-            paddedwidth = max([width[key] for key in width])
+            paddedwidth = max(width[key] for key in width)
         else:
             paddedwidth = sum([width[key] for key in width])
 
@@ -75,7 +76,7 @@ class Preprocessor(TransformerMixin, BaseEstimator):
             padded_data[lidx, paddedoffset[syskey]:paddedoffset[syskey] + len(dat)] = dat
 
         data = padded_data
-        if isinstance(X, list) or isinstance(X, np.ndarray):
+        if isinstance(X, (list, np.ndarray)):
             data = data[X]
         return data
 
@@ -102,18 +103,22 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         atoms = self.atoms
         extension = self.basis_instructions.get('extension', 'RHOXC')
         if extension[0] != '.':
-            extension = '.' + extension
+            extension = f'.{extension}'
 
         jobs = []
         for i, system in enumerate(atoms):
-            filename = ''
-            for file in os.listdir(pjoin(self.src_path, str(i))):
-                if file.endswith(extension):
-                    filename = file
-                    break
+            filename = next(
+                (
+                    file
+                    for file in os.listdir(pjoin(self.src_path, str(i)))
+                    if file.endswith(extension)
+                ),
+                '',
+            )
+
             if filename == '':
                 raise Exception('Density file not found in ' +\
-                    pjoin(self.src_path,str(i)))
+                        pjoin(self.src_path,str(i)))
 
             jobs.append([
                 pjoin(self.src_path, str(i), filename),
@@ -123,11 +128,11 @@ class Preprocessor(TransformerMixin, BaseEstimator):
         # results = np.array([j.compute(num_workers = self.num_workers) for j in jobs])
         futures = client.map(transform_one, *[[j[i] for j in jobs] for i in range(3)],
                              len(jobs) * [self.basis_instructions])
-        if self.num_workers == 1:
-            results = list(futures)
-        else:
-            results = [f.result() for f in futures]
-        return results
+        return (
+            list(futures)
+            if self.num_workers == 1
+            else [f.result() for f in futures]
+        )
 
     def score(self, *args, **kwargs):
         return 0

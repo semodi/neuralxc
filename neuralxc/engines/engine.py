@@ -40,8 +40,8 @@ def Engine(app, **kwargs):
     if app == 'pyscf_rad':
         app = 'pyscf'
     registry = BaseEngine.get_registry()
-    if not app in registry:
-        raise Exception('Engine: {} not registered'.format(app))
+    if app not in registry:
+        raise Exception(f'Engine: {app} not registered')
 
     return registry[app](**kwargs)
 
@@ -111,7 +111,7 @@ class SiestaEngine(ASECalcEngine):
 
         # Environment variables for ase
         os.environ['SIESTA_PP_PATH'] = kwargs.pop('pseudoloc', '.')
-        if not 'SIESTA_COMMAND' in os.environ:
-            os.environ['SIESTA_COMMAND'] = exec_prepend + ' siesta < ./%s > ./%s'
+        if 'SIESTA_COMMAND' not in os.environ:
+            os.environ['SIESTA_COMMAND'] = f'{exec_prepend} siesta < ./%s > ./%s'
 
         self.calc = CustomSiesta(fdf_path, **kwargs)

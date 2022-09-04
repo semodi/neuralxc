@@ -30,32 +30,32 @@ class Timer():
 
     def start(self, name, threadsafe=True):
 
-        if not (self.threaded and not threadsafe):
+        if not self.threaded or threadsafe:
             if name in self.cnt_dict:
                 self.cnt_dict[name] += 1
             else:
                 self.cnt_dict[name] = 1
 
-            if not name in self.start_dict:
+            if name not in self.start_dict:
                 self.start_dict[name] = time.time()
 
     def stop(self, name, threadsafe=True):
 
-        if not (self.threaded and not threadsafe):
-            if name in self.start_dict:
-                dt = time.time() - self.start_dict[name]
-                if name in self.accum_dict:
-                    self.accum_dict[name] += time.time() - self.start_dict[name]
-                    self.max_dict[name] = max(self.max_dict[name], dt)
-                    self.min_dict[name] = min(self.min_dict[name], dt)
-                else:
-                    self.accum_dict[name] = time.time() - self.start_dict[name]
-                    self.max_dict[name] = dt
-                    self.min_dict[name] = dt
+        if (self.threaded and not threadsafe):
+            return
+        if name not in self.start_dict:
+            raise ValueError(f'Timer with name {name} was never started')
+        dt = time.time() - self.start_dict[name]
+        if name in self.accum_dict:
+            self.accum_dict[name] += time.time() - self.start_dict[name]
+            self.max_dict[name] = max(self.max_dict[name], dt)
+            self.min_dict[name] = min(self.min_dict[name], dt)
+        else:
+            self.accum_dict[name] = time.time() - self.start_dict[name]
+            self.max_dict[name] = dt
+            self.min_dict[name] = dt
 
-                self.start_dict.pop(name)
-            else:
-                raise ValueError('Timer with name {} was never started'.format(name))
+        self.start_dict.pop(name)
 
     def create_report(self, path=None):
         # keys = list(self.start_dict.keys())
@@ -75,7 +75,4 @@ class Timer():
             print(report)
 
 
-if config.UseTimer:
-    timer = Timer()
-else:
-    timer = DummyTimer()
+timer = Timer() if config.UseTimer else DummyTimer()

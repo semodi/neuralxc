@@ -57,7 +57,7 @@ def find_projector_type(config):
     if pre["grid"] == "radial":
         ptype += "_radial"
     elif pre["grid"] == "analytical":
-        if not config["engine"]["application"] == "pyscf":
+        if config["engine"]["application"] != "pyscf":
             raise ValueError("Analytical projection only supported if application is PySCF")
         ptype = 'pyscf'
     elif pre["grid"] == "euclidean":
@@ -76,12 +76,12 @@ def fix_basis(config):
     if 'ortho' in ptype:
         if not isinstance(pre['basis'], dict):
             raise ValueError('Dict expected for "basis"')
-        if any([isinstance(val, dict) for val in pre['basis'].values()]):
-            basis.update(pre['basis'])
+        if any(isinstance(val, dict) for val in pre['basis'].values()):
+            basis |= pre['basis']
         else:
             basis['X'] =  pre['basis']
             agnostic = True
-    elif 'pyscf' == ptype or 'gaussian' in ptype:
+    elif ptype == 'pyscf' or 'gaussian' in ptype:
         if isinstance(pre['basis'], str): #Short-hand notation for PySCF basis sets
             basis['basis'] = {'name': pre['basis']}
             agnostic = False

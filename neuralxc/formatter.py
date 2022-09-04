@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-from collections import Mapping
+from collections.abc import Mapping
 
 
 class Formatter(TransformerMixin, BaseEstimator):
@@ -17,9 +17,7 @@ class Formatter(TransformerMixin, BaseEstimator):
         """ Providing C in dictionary format, build set of rules for transformation
         """
 
-        self._rule = {}
-        for idx, key, data in expand(C):
-            self._rule[key] = [s for s in data[0]]
+        self._rule = {key: list(data[0]) for idx, key, data in expand(C)}
 
     def transform(self, C):
         """ Transforms from a dictionary format ({n,l,m} : value)
@@ -30,15 +28,12 @@ class Formatter(TransformerMixin, BaseEstimator):
 
         for idx, key, data in expand(C):
             data = data[0]
-            if not key in transformed[idx]: transformed[idx][key] = []
+            if key not in transformed[idx]: transformed[idx][key] = []
             for d in data:
                 transformed[idx][key].append(np.array([d[s] for s in d]))
 
             transformed[idx][key] = np.array(transformed[idx][key])
-        if not isinstance(C, list):
-            return transformed[0]
-        else:
-            return transformed
+        return transformed if isinstance(C, list) else transformed[0]
 
     def inverse_transform(self, C):
         """ Transforms from an ordered np.ndarray format to a dictionary
@@ -48,23 +43,23 @@ class Formatter(TransformerMixin, BaseEstimator):
 
         for idx, key, data in expand(C):
             data = data[0]
-            if not key in transformed[idx]: transformed[idx][key] = []
+            if key not in transformed[idx]: transformed[idx][key] = []
 
             if not isinstance(self._rule, dict):
                 basis = self._basis[key]
                 rule = [
-                    '{},{},{}'.format(n, l, m) for n in range(0, basis['n']) for l in range(0, basis['l'])
+                    f'{n},{l},{m}'
+                    for n in range(basis['n'])
+                    for l in range(basis['l'])
                     for m in range(-l, l + 1)
                 ]
+
             else:
                 rule = self._rule[key]
             for d in data:
                 transformed[idx][key].append(dict(zip(rule, d.tolist())))
 
-        if not isinstance(C, list):
-            return transformed[0]
-        else:
-            return transformed
+        return transformed if isinstance(C, list) else transformed[0]
 
 
 def fix_species(species, spec_agnostic=False):
@@ -78,11 +73,10 @@ def fix_species(species, spec_agnostic=False):
             if spec_agnostic:
                 if spec.upper() == spec:
                     fixed[-1].append('X')
+            elif spec.upper() == spec:
+                fixed[-1].append(spec)
             else:
-                if spec.upper() == spec:
-                    fixed[-1].append(spec)
-                else:
-                    fixed[-1][-1] = fixed[-1][-1] + spec
+                fixed[-1][-1] = fixed[-1][-1] + spec
     return fixed
 
 
@@ -112,7 +106,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
                 if len(key) < 4 and key != 'X':
                     self._attrs.pop(key)
         if not isinstance(sys_species, list):
-            raise ValueError('sys_species must be a list but is {}'.format(sys_species))
+            raise ValueError(f'sys_species must be a list but is {sys_species}')
         self._sys_species = sys_species
         self._spec_agnostic = spec_agnostic
 
@@ -148,10 +142,11 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         features = []
         targets = []
 
-        if not n_sys == len(sys_species):
+        if n_sys != len(sys_species):
             raise ValueError(
-                'Number of systems in X and len(sys_species) incompatible: n_sys: {}, len(sys_species): {}'.format(
-                    n_sys, len(sys_species)))
+                f'Number of systems in X and len(sys_species) incompatible: n_sys: {n_sys}, len(sys_species): {len(sys_species)}'
+            )
+
 
         for this_sys, _ in enumerate(sys_species):
             this_species = sys_species[this_sys]
@@ -165,7 +160,10 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
                 if spec not in feat_dict:
                     feat_dict[spec] = []
 
-                vec_len = self._attrs[spec]['n'] * sum([2 * l + 1 for l in range(self._attrs[spec]['l'])])
+                vec_len = self._attrs[spec]['n'] * sum(
+                    2 * l + 1 for l in range(self._attrs[spec]['l'])
+                )
+
                 x_atm = X_sys[:, idx:idx + vec_len]
                 # print(x_atm.shape)
                 feat_dict[spec].append(x_atm)
@@ -196,7 +194,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
         sys_species = fix_species(self._sys_species, self._spec_agnostic)
         total_length = np.sum([len(tar) for tar in targets])
         max_vec_len = np.max([np.sum([feat[spec].shape[1]*feat[spec].shape[2] for spec in feat])\
-                       for feat in features])
+                           for feat in features])
 
         X = np.zeros([total_length, max_vec_len + 1])
         y = np.zeros(total_length)
@@ -209,7 +207,7 @@ class SpeciesGrouper(BaseEstimator, TransformerMixin):
             this_species = sys_species[sysidx]
             this_len = len(tar)
             X[sys_loc:sys_loc + this_len, 0] = sysidx
-            unique_species = np.unique([char for char in this_species])
+            unique_species = np.unique(list(this_species))
             spec_loc = {spec: 0 for spec in unique_species}
             idx = 1
 

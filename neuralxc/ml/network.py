@@ -51,7 +51,7 @@ class NetworkEstimator(BaseEstimator):
 
     def build_network(self):
         self._network = EnergyNetwork(n_layers=self.n_layers, n_nodes=self.n_nodes, activation=self.activation)
-        if not self.path is None:
+        if self.path is not None:
             self._network.restore_model(self.path)
 
     def fit(self, X, y=None, *args, **kwargs):
@@ -86,8 +86,7 @@ class NetworkEstimator(BaseEstimator):
         if not isinstance(X, list):
             X = [X]
 
-        predictions = self._network.predict(X[0])
-        return predictions
+        return self._network.predict(X[0])
 
     def score(self, X, y=None, metric='mae'):
 
@@ -102,14 +101,11 @@ class NetworkEstimator(BaseEstimator):
         else:
             raise Exception('Metric unknown or not implemented')
 
-        scores = []
         if not isinstance(X, list):
             X = [X]
             y = [y]
 
-        for X_, y_ in zip(X, y):
-            scores.append(metric_function(self.predict(X_) - y_))
-
+        scores = [metric_function(self.predict(X_) - y_) for X_, y_ in zip(X, y)]
         return -np.mean(scores)
 
     def load_network(self, path):
@@ -120,7 +116,7 @@ def train_net(net, dataloader, dataloader_val=None, max_steps=10000, n_checkpoin
     # net.train()
 
     check_point_every = max_steps//n_checkpoints
-    
+
     loss_fn = torch.nn.MSELoss()
 
     optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
@@ -134,7 +130,6 @@ def train_net(net, dataloader, dataloader_val=None, max_steps=10000, n_checkpoin
 
     max_epochs = max_steps
     for epoch in range(max_epochs):
-        logs = {}
         epoch_loss = 0
         for data in dataloader:
             rho, energy = data
@@ -145,9 +140,9 @@ def train_net(net, dataloader, dataloader_val=None, max_steps=10000, n_checkpoin
             optimizer.step()
 
             epoch_loss += loss.item()
-        logs['log loss'] = np.sqrt(epoch_loss / len(dataloader))
+        logs = {'log loss': np.sqrt(epoch_loss / len(dataloader))}
         for i, param_group in enumerate(optimizer.param_groups):
-            logs['lr_{}'.format(i)] = float(param_group['lr'])
+            logs[f'lr_{i}'] = float(param_group['lr'])
 
         if logs['lr_0'] <= MIN_RATE:
             return net
@@ -164,8 +159,13 @@ def train_net(net, dataloader, dataloader_val=None, max_steps=10000, n_checkpoin
                 logs['val loss'] = np.sqrt(val_loss / len(dataloader_val))
             else:
                 logs['val loss'] = 0
-            print('Epoch {} ||'.format(epoch), ' Training loss : {:.6f}'.format(logs['log loss']),
-                  ' Validation loss : {:.6f}'.format(logs['val loss']), ' Learning rate: {}'.format(logs['lr_0']))
+            print(
+                f'Epoch {epoch} ||',
+                ' Training loss : {:.6f}'.format(logs['log loss']),
+                ' Validation loss : {:.6f}'.format(logs['val loss']),
+                f" Learning rate: {logs['lr_0']}",
+            )
+
     return net
 
 
@@ -176,10 +176,7 @@ class Dataset(object):
 
     def __getitem__(self, index):
 
-        rho = {}
-        for species in self.rho:
-            rho[species] = self.rho[species][index]
-
+        rho = {species: self.rho[species][index] for species in self.rho}
         energy = self.energies[index]
 
         return (rho, energy)
@@ -202,16 +199,23 @@ class EnergyNetwork(torch.nn.Module):
     def train(self, X, y, step_size=0.01, max_steps=50001, b_=0, verbose=True, train_valid_split=0.8, batch_size=0):
 
         if not hasattr(self, 'species_nets'):
-            species_nets = {}
-            for spec in X:
-                if self.n_layers < 1:
-                    species_nets[spec] = torch.nn.Linear(X[spec].shape[-1], 1)
-                else:
-                    species_nets[spec] = torch.nn.Sequential(
-                        *([torch.nn.Linear(X[spec].shape[-1], self.n_nodes)] +\
-                        (self.n_layers-1)* [self.activation,torch.nn.Linear(self.n_nodes, self.n_nodes)] +\
-                        [self.activation, torch.nn.Linear(self.n_nodes,1)])
+            species_nets = {
+                spec: torch.nn.Linear(X[spec].shape[-1], 1)
+                if self.n_layers < 1
+                else torch.nn.Sequential(
+                    *(
+                        [torch.nn.Linear(X[spec].shape[-1], self.n_nodes)]
+                        + (self.n_layers - 1)
+                        * [
+                            self.activation,
+                            torch.nn.Linear(self.n_nodes, self.n_nodes),
+                        ]
+                        + [self.activation, torch.nn.Linear(self.n_nodes, 1)]
                     )
+                )
+                for spec in X
+            }
+
             self.species_nets = torch.nn.ModuleDict(species_nets)
             print(self.species_nets)
         if train_valid_split < 1.0:
@@ -248,11 +252,10 @@ class EnergyNetwork(torch.nn.Module):
         return [result.detach().numpy()]
 
     def forward(self, input):
-        output = 0
-        for spec in input:
-            output += torch.sum(self.species_nets[spec](input[spec]), dim=-2)
-
-        return output
+        return sum(
+            torch.sum(self.species_nets[spec](input[spec]), dim=-2)
+            for spec in input
+        )
 
 
 Energy_Network = EnergyNetwork  # Needed to unpickle old models

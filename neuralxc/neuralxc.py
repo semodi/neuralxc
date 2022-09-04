@@ -16,9 +16,9 @@ from neuralxc.utils import ConfigFile
 
 class PySCFNXC(AtomicFunc):
     def __init__(self, path):
-        model_paths = glob(path + '/*')
+        model_paths = glob(f'{path}/*')
         for mp in model_paths:
-            if 'bas.json' == os.path.basename(mp):
+            if os.path.basename(mp) == 'bas.json':
                 mp  = json.loads(open(mp,'r').read())
 
                 self.basis = ConfigFile({'preprocessor' : mp,

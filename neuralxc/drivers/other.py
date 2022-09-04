@@ -32,7 +32,7 @@ def plot_basis(basis):
                                               basis_instructions=basis_instructions['preprocessor'])
 
     for spec in projector.basis:
-        if not len(spec) == 1: continue
+        if len(spec) != 1: continue
         basis = projector.basis[spec]
         if isinstance(basis, list):
             r = torch.from_numpy(np.linspace(0, np.max([np.max(b_) for b in basis for b_ in b['r_o']]), 500))
@@ -45,9 +45,9 @@ def plot_basis(basis):
                 rad = [rad]
             for ir, rl in enumerate(rad):
                 if ir == 0:
-                    plt.plot(r, rl, label='l = {}'.format(l), color='C{}'.format(l))
+                    plt.plot(r, rl, label=f'l = {l}', color=f'C{l}')
                 else:
-                    plt.plot(r, rl, color='C{}'.format(l))
+                    plt.plot(r, rl, color=f'C{l}')
         # plt.ylim(0,1)
         plt.legend()
         plt.show()
@@ -79,9 +79,8 @@ def get_real_basis(atoms, basis, spec_agnostic=False):
     bp = BasisPadder(auxmol)
     padded_basis = bp.get_basis_json()
     for sym in padded_basis:
-        if sym in real_basis:
-            if real_basis[sym] != padded_basis[sym]:
-                raise Exception('Different basis sets across systems currently not supported')
+        if sym in real_basis and real_basis[sym] != padded_basis[sym]:
+            raise Exception('Different basis sets across systems currently not supported')
 
         real_basis[sym] = padded_basis[sym]
 
@@ -106,7 +105,7 @@ def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
            nworkers=pre.get('n_workers', 1),
            kwargs=pre.get('engine', {}))
     # shutil.move(workdir + '/results.traj', './results.traj')
-    shutil.copy(workdir + '/results.traj', './results.traj')
+    shutil.copy(f'{workdir}/results.traj', './results.traj')
     if workdir == '.tmp/':
         shutil.rmtree(workdir)
 
@@ -114,11 +113,7 @@ def run_engine_driver(xyz, preprocessor, workdir='.tmp/'):
 def fetch_default_driver(kind, hint='', out=''):
 
     from collections import abc
-    if hint:
-        hint_cont = json.load(open(hint, 'r'))
-    else:
-        hint_cont = {}
-
+    hint_cont = json.load(open(hint, 'r')) if hint else {}
     def nested_dict_iter(nested):
         for key, value in nested.items():
             if isinstance(value, abc.Mapping):
@@ -139,7 +134,10 @@ def fetch_default_driver(kind, hint='', out=''):
                 app = value
         df_cont = json.load(open(os.path.dirname(__file__) + '/../data/pre_{}.json'.format(app), 'r'))
     else:
-        df_cont = json.load(open(os.path.dirname(__file__) + '/../data/hyper.json', 'r'))
+        df_cont = json.load(
+            open(f'{os.path.dirname(__file__)}/../data/hyper.json', 'r')
+        )
+
 
     if hint:
         for key1 in df_cont:
@@ -154,7 +152,7 @@ def fetch_default_driver(kind, hint='', out=''):
                     df_cont[key1] = found
 
     if out == '':
-        out = kind + '.json'
+        out = f'{kind}.json'
 
     open(out, 'w').write(json.dumps(df_cont, indent=4))
 
@@ -205,7 +203,7 @@ def pre_driver(xyz, srcdir, preprocessor, dest='.tmp/'):
             pre.update({'preprocessor': basis_instr})
             open(preprocessor_path, 'w').write(json.dumps(pre.__dict__))
 
-        filename = os.path.join(workdir, basis_to_hash(basis_instr) + '.npy')
+        filename = os.path.join(workdir, f'{basis_to_hash(basis_instr)}.npy')
         data = preprocessor.fit_transform(None)
         np.save(filename, data)
         if 'hdf5' in dest:

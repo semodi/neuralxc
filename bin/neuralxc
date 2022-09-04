@@ -44,7 +44,7 @@ if __name__ == '__main__':
     adddat.set_defaults(func=add_data_driver)
 
     def inspectdat_driver(args):
-        subprocess.Popen('h5dump -n ' + args.hdf5, shell=True)
+        subprocess.Popen(f'h5dump -n {args.hdf5}', shell=True)
 
     #================ Inspect data ================
     inspectdat = datsub.add_parser('inspect', description='Inspect data in hdf5 file')

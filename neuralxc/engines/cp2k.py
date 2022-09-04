@@ -19,7 +19,7 @@ class CustomCP2K(CP2K):
         self.nxc = self.nxc["path"]
         self.input_path = kwargs.pop("input_path", "")
         inp = ''
-        if not 'command' in kwargs:
+        if 'command' not in kwargs:
             kwargs['command'] = 'env OMP_NUM_THREADS=1 cp2k_shell.sdbg'
         if self.input_path:
             with open(self.input_path, 'r') as inp_file:
@@ -34,11 +34,11 @@ class CustomCP2K(CP2K):
             nxc = self.nxc
             nxc_addto = self.nxc_addto
 
-            pattern = re.compile("LIBXC.*?{}.*?END LIBXC".format(nxc_addto), re.MULTILINE | re.S)
+            pattern = re.compile(f"LIBXC.*?{nxc_addto}.*?END LIBXC", re.MULTILINE | re.S)
 
             pattern0 = pattern.findall(input)[0]
 
-            pattern1 = pattern0.replace('{}\n'.format(nxc_addto), '{}\n \t\tNXC {}\n'.format(nxc_addto, nxc))
+            pattern1 = pattern0.replace(f'{nxc_addto}\n', f'{nxc_addto}\n \t\tNXC {nxc}\n')
 
             input = input.replace(pattern0, pattern1)
         return input

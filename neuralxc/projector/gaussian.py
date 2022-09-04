@@ -35,19 +35,18 @@ def parse_basis(basis_instructions):
                 else:
                     basis_strings[species] = basis_instructions['basis']
                     bas = basis_strings[species]
+            elif os.path.isfile(basis_instructions[species]['basis']):
+                basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
+                bas = gtobasis.parse(basis_strings[species])
             else:
-                if os.path.isfile(basis_instructions[species]['basis']):
-                    basis_strings[species] = open(basis_instructions[species]['basis'], 'r').read()
-                    bas = gtobasis.parse(basis_strings[species])
-                else:
-                    basis_strings[species] = basis_instructions[species]['basis']
-                    bas = basis_strings[species]
+                basis_strings[species] = basis_instructions[species]['basis']
+                bas = basis_strings[species]
 
             spec = 'O' if species == 'X' else species
             try:
-                mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
+                mol = gto.M(atom=f'{spec} 0 0 0', basis={spec: bas})
             except RuntimeError:
-                mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
+                mol = gto.M(atom=f'{spec} 0 0 0', basis={spec: bas}, spin=1)
             if 'basis' in basis_instructions:
                 sigma = basis_instructions['basis'].get('sigma', 2.0)
                 gamma = basis_instructions['basis'].get('gamma', 1.0)
@@ -116,7 +115,7 @@ class GaussianProjectorMixin():
         rads = []
 
         box['radial'] = torch.stack(box['radial'])
-        for ib, basis in enumerate(basis_instructions):
+        for basis in basis_instructions:
             l = basis['l']
             filt = (box['radial'][0] <= 1000000)
             box_rad = box['radial'][:, filt]
@@ -163,9 +162,9 @@ class GaussianProjectorMixin():
                     bas = basis_strings[species]
                 spec = 'O' if species == 'X' else species
                 try:
-                    mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas})
+                    mol = gto.M(atom=f'{spec} 0 0 0', basis={spec: bas})
                 except RuntimeError:
-                    mol = gto.M(atom='{} 0 0 0'.format(spec), basis={spec: bas}, spin=1)
+                    mol = gto.M(atom=f'{spec} 0 0 0', basis={spec: bas}, spin=1)
                 bp = BasisPadder(mol)
                 il = bp.indexing_l[spec][0]
                 ir = bp.indexing_r[spec][0]
@@ -191,9 +190,11 @@ class GaussianProjectorMixin():
         result = []
         if isinstance(basis, list):
             for b in basis:
-                res = []
-                for ib, alpha in enumerate(b['alpha']):
-                    res.append(cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l'], b['gamma'][ib]))
+                res = [
+                    cls.g(r, b['r_o'][ib], b['alpha'][ib], b['l'], b['gamma'][ib])
+                    for ib, alpha in enumerate(b['alpha'])
+                ]
+
                 result.append(res)
         elif isinstance(basis, dict):
             result.append([cls.g(r, basis['r_o'], basis['alpha'], basis['l'], basis['gamma'])])
@@ -222,8 +223,8 @@ class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
         	Instructions that define basis
         """
         full_basis, basis_strings = parse_basis(basis_instructions)
-        basis = {key: val for key, val in basis_instructions.items()}
-        basis.update(full_basis)
+        basis = dict(basis_instructions.items())
+        basis |= full_basis
         self.basis_strings = basis_strings
         EuclideanProjector.__init__(self, unitcell, grid, basis, **kwargs)
         self.init_padder(basis_instructions)
@@ -256,9 +257,7 @@ class GaussianEuclideanProjector(EuclideanProjector, GaussianProjectorMixin):
         """
         self.set_cell_parameters(unitcell, grid)
         basis = self.basis[self.species]
-        box = {}
-        box['mesh'] = my_box[:3]
-        box['radial'] = my_box[3:]
+        box = {'mesh': my_box[:3], 'radial': my_box[3:]}
         Xm, Ym, Zm = box['mesh'].long()
         return self.project_onto(rho[..., Xm, Ym, Zm], radials, angulars, basis, self.basis_strings[self.species], box)
 
@@ -288,8 +287,8 @@ class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
         self.grid_weights = torch.from_numpy(grid_weights)
         self.V_cell = self.grid_weights
         full_basis, basis_strings = parse_basis(basis_instructions)
-        basis = {key: val for key, val in basis_instructions.items()}
-        basis.update(full_basis)
+        basis = dict(basis_instructions.items())
+        basis |= full_basis
         self.basis_strings = basis_strings
         self.basis = basis
         self.all_angs = {}
@@ -299,9 +298,7 @@ class GaussianRadialProjector(RadialProjector, GaussianProjectorMixin):
 
     def forward_fast(self, rho, positions, grid_coords, grid_weights, radials, angulars, my_box):
         basis = self.basis[self.species]
-        box = {}
-        box['mesh'] = my_box[0]
-        box['radial'] = my_box[1:]
+        box = {'mesh': my_box[0], 'radial': my_box[1:]}
         Xm = box['mesh'].long()
         grid_weights = grid_weights[Xm]
         self.set_cell_parameters(grid_coords, grid_weights)

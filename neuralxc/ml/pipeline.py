@@ -88,12 +88,8 @@ class NXCPipeline(Pipeline):
         if os.path.isdir(path):
             if not override:
                 raise Exception('Model already exists, set override = True')
-            else:
-                shutil.rmtree(path)
-                os.mkdir(path)
-        else:
-            os.mkdir(path)
-
+            shutil.rmtree(path)
+        os.mkdir(path)
         pickle.dump([self.steps, self.basis_instructions, self.symmetrize_instructions],
                     open(os.path.join(path, 'pipeline.pckl'), 'wb'))
 
@@ -124,7 +120,7 @@ class E_predictor(TorchModule):
         self.model = torch.nn.Sequential(*steps)
 
     def forward(self, *args):
-        C = {spec: c for spec, c in zip(self.species, args)}
+        C = dict(zip(self.species, args))
         return self.model(C)
 
 
@@ -160,15 +156,16 @@ def serialize_energy(model, C, outpath, override):
     try:
         os.mkdir(outpath)
     except FileExistsError:
-        if override:
-            shutil.rmtree(outpath)
-            os.mkdir(outpath)
-        else:
+        if not override:
             raise Exception('Model exists, set override = True to save at this location')
 
+        shutil.rmtree(outpath)
+        os.mkdir(outpath)
     for spec in C:
-        torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))
+        torch.jit.save(e_models[spec], f'{outpath}/xc_{spec}')
+        open(f'{outpath}/bas.json', 'w').write(
+            json.dumps(dict(model.basis_instructions))
+        )
 
 
 def serialize_projector(projector):
@@ -182,11 +179,7 @@ def serialize_projector(projector):
     else:
         rho_c = np.ones(shape=grid_c)
 
-    species = []
-    for spec in projector.basis:
-        if len(spec) < 3:
-            species.append(spec)
-
+    species = [spec for spec in projector.basis if len(spec) < 3]
     unitcell_c = torch.from_numpy(unitcell_c).double()
     grid_c = torch.from_numpy(grid_c).double()
     pos_c = torch.from_numpy(pos_c).double()
@@ -216,11 +209,7 @@ def serialize_pipeline(model, outpath, override=False):
     my_box = np.array([[0, 9]] * 3)
     pos_c = np.array([[0, 0, 0]])
     basis_instructions = model.basis_instructions
-    species = []
-    for spec in basis_instructions:
-        if len(spec) < 3:
-            species.append(spec)
-
+    species = [spec for spec in basis_instructions if len(spec) < 3]
     try:
         model.symmetrize_instructions.update({'basis': model.basis_instructions})
     except AttributeError:
@@ -236,10 +225,10 @@ def serialize_pipeline(model, outpath, override=False):
                                          grid_weights=grid_c)
 
             try:
-                model.symmetrize_instructions.update(projector.symmetrize_instructions)
+                model.symmetrize_instructions |= projector.symmetrize_instructions
             except AttributeError:
-                model.symmetrize_instructions.update({'basis': model.basis_instructions})
-                
+                model.symmetrize_instructions['basis'] = model.basis_instructions
+
             model.symmetrizer = Symmetrizer(model.symmetrize_instructions)
         except TypeError:
             C = {}
@@ -267,14 +256,15 @@ def serialize_pipeline(model, outpath, override=False):
     try:
         os.mkdir(outpath)
     except FileExistsError:
-        if override:
-            shutil.rmtree(outpath)
-            os.mkdir(outpath)
-        else:
+        if not override:
             raise Exception('Model exists, set override = True to save at this location')
 
+        shutil.rmtree(outpath)
+        os.mkdir(outpath)
     for spec in species:
-        torch.jit.save(basis_models[spec], outpath + '/basis_' + spec)
-        torch.jit.save(projector_models[spec], outpath + '/projector_' + spec)
-        torch.jit.save(e_models[spec], outpath + '/xc_' + spec)
-        open(outpath + '/bas.json', 'w').write(json.dumps(dict(model.basis_instructions)))
+        torch.jit.save(basis_models[spec], f'{outpath}/basis_{spec}')
+        torch.jit.save(projector_models[spec], f'{outpath}/projector_{spec}')
+        torch.jit.save(e_models[spec], f'{outpath}/xc_{spec}')
+        open(f'{outpath}/bas.json', 'w').write(
+            json.dumps(dict(model.basis_instructions))
+        )

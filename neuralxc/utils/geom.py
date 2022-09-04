@@ -9,7 +9,7 @@ def associated_legendre_polynomial(l, m, x, pmm, pll):
     if m > 0:
         somx2 = torch.sqrt((1 - x) * (1 + x))
         fact = 1.0
-        for i in range(1, m + 1):
+        for _ in range(1, m + 1):
             pmm = pmm * (-fact) * somx2
             fact += 2.0
     if l == m:
