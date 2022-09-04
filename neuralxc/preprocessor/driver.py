@@ -46,12 +46,12 @@ def mbe_driver(atoms, app, workdir, kwargs, nworkers):
 
     results = calculate_distributed(atoms, app, workdir, kwargs, nworkers)
     species = [a.get_chemical_symbols() for a in atoms]
-    n_mol = int(len(species[0]) / n_block)
+    n_mol = len(species[0]) // n_block
     for s in species:
-        n_mol_new = int(len(s) / n_block)
-        if not n_mol == n_mol_new:
+        n_mol_new = len(s) // n_block
+        if n_mol != n_mol_new:
             raise Exception('Every snapshot in trajectory must contain same number of molecules')
-        if not s == [s for s in building_block] * int(len(s) / n_block):
+        if s != list(building_block) * (len(s) // n_block):
             print(s)
             raise Exception('Trajectory file must contain atoms in the oder OHHOHH...')
 
@@ -67,14 +67,19 @@ def mbe_driver(atoms, app, workdir, kwargs, nworkers):
                   cell=a.get_cell()) for a in atoms for comb in itertools.combinations(range(n_mol), n)
         ]
         try:
-            os.mkdir(mbe_root + '/mbe_{}'.format(n))
+            os.mkdir(mbe_root + f'/mbe_{n}')
         except FileExistsError:
             pass
-        lower_results.append(calculate_distributed(new_atoms, app, mbe_root + '/mbe_{}'.format(n), kwargs, nworkers))
+        lower_results.append(
+            calculate_distributed(
+                new_atoms, app, mbe_root + f'/mbe_{n}', kwargs, nworkers
+            )
+        )
+
 
     etot = np.array([a.get_potential_energy() for a in results])
     for i, lr in enumerate(lower_results[::-1]):
-        write(mbe_root + '/mbe_{}/results.traj'.format(n_mol - (i + 1)), lr)
+        write(mbe_root + f'/mbe_{n_mol - (i + 1)}/results.traj', lr)
         epart = np.array([((-1)**(i + 1)) * a.get_potential_energy() for a in lr]).reshape(len(etot), -1)
         epart = np.sum(epart, axis=-1)
         etot += epart
@@ -90,7 +95,7 @@ def calculate_distributed(atoms, app, workdir, kwargs, n_workers=-1):
 
     cwd = os.getcwd()
     if n_workers > 1:
-        print('Calculating {} systems on'.format(len(atoms)))
+        print(f'Calculating {len(atoms)} systems on')
         cluster = LocalCluster(n_workers=n_workers, threads_per_worker=1)
         print(cluster)
         client = Client(cluster)

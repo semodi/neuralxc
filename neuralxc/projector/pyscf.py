@@ -30,7 +30,7 @@ def get_eri3c(mol, auxmol, op):
     elif op == 'delta':
         eri3c = pmol.intor('int3c1e_sph', shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas))
     else:
-        raise ValueError('Operator {} not implemented'.format(op))
+        raise ValueError(f'Operator {op} not implemented')
 
     return eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
 
@@ -137,8 +137,7 @@ class PySCFProjector(metaclass=ProjectorRegistry):
         dEdC = self.bp.unpad_basis(dEdC)
         if self.dfit:
             dEdC = np.linalg.solve(self.S_aux, dEdC)
-        V = contract('ijk, k', self.eri3c, dEdC)
-        return V
+        return contract('ijk, k', self.eri3c, dEdC)
 
 
 class BasisPadder():
@@ -155,15 +154,15 @@ class BasisPadder():
         # Find maximum angular momentum and n for each species
         for atom_idx, _ in enumerate(mol.atom_charges()):
             sym = mol.atom_pure_symbol(atom_idx)
-            if not sym in sym_cnt:
+            if sym not in sym_cnt:
                 sym_cnt[sym] = 0
                 sym_idx[sym] = []
             sym_idx[sym].append(atom_idx)
             sym_cnt[sym] += 1
 
-        for ao_idx, label in enumerate(mol.ao_labels(fmt=False)):
+        for label in mol.ao_labels(fmt=False):
             sym = label[1]
-            if not sym in max_l:
+            if sym not in max_l:
                 max_l[sym] = 0
                 max_n[sym] = 0
 
@@ -176,16 +175,24 @@ class BasisPadder():
         indexing_left = {sym: [] for sym in max_n}
         indexing_right = {sym: [] for sym in max_n}
         labels = mol.ao_labels()
-        for sym in max_n:
+        for sym, value in max_n.items():
             for idx in sym_idx[sym]:
                 indexing_left[sym].append([])
                 indexing_right[sym].append([])
-                for n in range(1, max_n[sym] + 1):
+                for n in range(1, value + 1):
                     for l in range(max_l[sym] + 1):
-                        if any(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab for lab in labels]):
+                        if any(
+                            f'{idx} {sym} {n}{l_dict_inv[l]}' in lab
+                            for lab in labels
+                        ):
                             indexing_left[sym][-1] += [True] * (2 * l + 1)
-                            sidx = np.where(['{} {} {}{}'.format(idx, sym, n, l_dict_inv[l]) in lab
-                                             for lab in labels])[0][0]
+                            sidx = np.where(
+                                [
+                                    f'{idx} {sym} {n}{l_dict_inv[l]}' in lab
+                                    for lab in labels
+                                ]
+                            )[0][0]
+
                             indexing_right[sym][-1] += np.arange(sidx, sidx + (2 * l + 1)).astype(int).tolist()
                         else:
                             indexing_left[sym][-1] += [False] * (2 * l + 1)
@@ -198,10 +205,11 @@ class BasisPadder():
 
     def get_basis_json(self):
 
-        basis = {}
+        basis = {
+            sym: {'n': self.max_n[sym], 'l': self.max_l[sym] + 1}
+            for sym in self.sym_cnt
+        }
 
-        for sym in self.sym_cnt:
-            basis[sym] = {'n': self.max_n[sym], 'l': self.max_l[sym] + 1}
 
         if 'O' in basis:
             basis['X'] = {'n': self.max_n['O'], 'l': self.max_l['O'] + 1}

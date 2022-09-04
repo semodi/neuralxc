@@ -59,7 +59,7 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
                     add_species(file, system, traj)
                     forces = [a.get_forces()\
                      for a in read(traj,':')]
-                    max_na = max([len(f) for f in forces])
+                    max_na = max(len(f) for f in forces)
                     forces_padded = np.zeros([len(forces), max_na, 3])
                     for idx, f in enumerate(forces):
                         forces_padded[idx, :len(f)] = f
@@ -75,7 +75,7 @@ def add_data_driver(hdf5, system, method, add, traj='', density='', override=Fal
             else:
                 raise Exception('Option {} not recognized'.format(which))
 
-        if density and not 'density' in add:
+        if density and 'density' not in add:
             add.append('density')
         for observable in add:
             obs(observable, zero)
@@ -97,11 +97,11 @@ def merge_data_driver(file, base, ref, out, optE0=False, pre=''):
         print('Warning: E0 is not being optimzed for merged dataset. Might produce' +\
         'unexpected behavior')
 
-    merge_sets(datafile, base, basis_key, new_name=out + '/base', E0=E0)
+    merge_sets(datafile, base, basis_key, new_name=f'{out}/base', E0=E0)
     for key in E0:
         E0[key] = 0
 
-    merge_sets(datafile, ref, None, new_name=out + '/ref', E0=E0)
+    merge_sets(datafile, ref, None, new_name=f'{out}/ref', E0=E0)
 
 
 def split_data_driver(hdf5, group, label, slice=':', comp=''):
@@ -114,15 +114,15 @@ def split_data_driver(hdf5, group, label, slice=':', comp=''):
     ijk = bi_slice(i, j, k)
 
     root = group
-    if not root[0] == '/': root = '/' + root
+    if root[0] != '/':
+        root = f'/{root}'
 
     def collect_all_sets(file, path):
         sets = {}
         if isinstance(file[path], h5py._hl.dataset.Dataset):
             return {path: file[path]}
-        else:
-            for key in file[path]:
-                sets.update(collect_all_sets(file, path + '/' + key))
+        for key in file[path]:
+            sets.update(collect_all_sets(file, f'{path}/{key}'))
         return sets
 
     all_sets = collect_all_sets(file, root)
@@ -136,10 +136,10 @@ def split_data_driver(hdf5, group, label, slice=':', comp=''):
         elif new_len != length:
             raise Exception('Datasets contained in group dont have consistent lengths')
         idx = path.find(group) + len(group)
-        new_path = path[:idx] + '/' + label + path[idx:]
+        new_path = f'{path[:idx]}/{label}{path[idx:]}'
         if comp != '':
             idx = path.find(group) + len(group)
-            comp_path = path[:idx] + '/' + comp + path[idx:]
+            comp_path = f'{path[:idx]}/{comp}{path[idx:]}'
             comp_sets[comp_path] = all_sets[path][:].tolist()
             del comp_sets[comp_path][ijk]
         split_sets[new_path] = all_sets[path][ijk]
@@ -161,7 +161,8 @@ def delete_data_driver(hdf5, group):
     """ Deletes data in hdf5 file"""
     file = h5py.File(hdf5, 'r+')
     root = group
-    if not root[0] == '/': root = '/' + root
+    if root[0] != '/':
+        root = f'/{root}'
     del file[root]
 
 
@@ -175,7 +176,7 @@ def sample_driver(preprocessor, size, hdf5, dest='sample.npy', cutoff=0.0):
     basis_key = basis_to_hash(basis)
     data = load_sets(datafile, hdf5[1], hdf5[1], basis_key, cutoff)
     symmetrizer_instructions = {'symmetrizer_type': pre.get('symmetrizer_type', 'trace')}
-    symmetrizer_instructions.update({'basis': basis})
+    symmetrizer_instructions['basis'] = basis
     species = [''.join(find_attr_in_tree(datafile, hdf5[1], 'species'))]
 
     sampler_pipeline = get_default_pipeline(basis,

@@ -89,10 +89,7 @@ class PySCFDensityGetter(BaseDensityGetter):
                     core += 1
             results['mo_occ'][:core] = 0
 
-        if return_dict:
-            return {'rho': res[0], 'mol': res[1], 'mf': res[2]}
-        else:
-            return res
+        return {'rho': res[0], 'mol': res[1], 'mf': res[2]} if return_dict else res
 
 
 class PySCFRadDensityGetter(BaseDensityGetter):
@@ -175,7 +172,7 @@ class SiestaDensityGetter(BaseDensityGetter):
         else:
             raise Exception('get_data_bin cannot handle non-cubic unitcells or spin')
 
-        block = '<' + 'I{}fI'.format(a) * a * a
+        block = '<' + f'I{a}fI' * a * a
         content = np.array(struct.unpack(block, bin_file.read(struct.calcsize(block))))
 
         rho = content.reshape(a + 2, a, a, order='F')[1:-1, :, :]
@@ -206,7 +203,7 @@ class SiestaDensityGetter(BaseDensityGetter):
         with open(file_path, 'r') as rhofile:
 
             # unit cell (in Bohr)
-            for i in range(0, 3):
+            for i in range(3):
                 unitcell[i, :] = rhofile.readline().split()
 
             grid[:] = rhofile.readline().split()
@@ -242,10 +239,7 @@ class SiestaDensityGetter(BaseDensityGetter):
                 if f == 'siesta:': continue
                 forces.append(float(f))
         forces = np.array(forces).reshape(-1, 3)
-        if n_atoms == -1:
-            return forces
-        else:
-            return forces[:n_atoms]
+        return forces if n_atoms == -1 else forces[:n_atoms]
 
 
 def density_getter_factory(application, *args, **kwargs):
@@ -265,7 +259,7 @@ def density_getter_factory(application, *args, **kwargs):
 
     registry = BaseDensityGetter.get_registry()
 
-    if not application in registry:
-        raise Exception('DensityGetter: {} not registered'.format(application))
+    if application not in registry:
+        raise Exception(f'DensityGetter: {application} not registered')
 
     return registry[application](*args, **kwargs)

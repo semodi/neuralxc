@@ -80,10 +80,7 @@ class OrthoProjectorMixin():
     @staticmethod
     def orthogonalize(func, r, basis, W):
         r_o = basis['r_o']
-        rad = []
-        for k in torch.arange(0, W.size()[0]):
-            rad.append(func(r, basis, (k + 1).double()))
-
+        rad = [func(r, basis, (k + 1).double()) for k in torch.arange(0, W.size()[0])]
         result = contract('ij,j...->i...', W, torch.stack(rad))
         result[:, r > r_o] = 0
         return result

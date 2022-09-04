@@ -16,7 +16,7 @@ from neuralxc.drivers import *
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
 if 'driver_data_tmp' in os.listdir(test_dir):
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 def shcopytree(src, dest):
@@ -31,25 +31,25 @@ def shcopytree(src, dest):
 @pytest.mark.driver_fit
 def test_fit():
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
     # Fit model
     fit_driver(preprocessor='pre.json', hyper='hyper.json', sets='sets.inp', hyperopt=True)
     # Continue training
     fit_driver(preprocessor='pre.json', hyper='hyper.json', model='best_model', sets='sets.inp')
 
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 @pytest.mark.driver
 @pytest.mark.driver_fit
 def test_eval():
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
     eval_driver(hdf5=['data.hdf5', 'system/it1', 'system/ref'])
 
     eval_driver(model='model_old', hdf5=['data.hdf5', 'system/it0', 'system/ref'])
@@ -57,7 +57,7 @@ def test_eval():
     eval_driver(model='model_old', hdf5=['data.hdf5', 'system/it0', 'system/ref'], predict=True, dest='prediction')
 
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 @pytest.mark.driver
@@ -65,9 +65,9 @@ def test_eval():
 def test_data():
 
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
 
     add_data_driver(hdf5='data.hdf5',
                     system='system',
@@ -91,16 +91,16 @@ def test_data():
 
     sample_driver(preprocessor='pre.json', size=5, dest='sample.npy', hdf5=['data.hdf5', 'system/it0'])
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 def test_serialize():
 
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
 
     serialize('model', 'model.jit', False)
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
