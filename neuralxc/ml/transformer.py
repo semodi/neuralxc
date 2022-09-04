@@ -154,6 +154,7 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
         TorchModule.__init__(self)
         self._before_fit = identity  # lambdas can't be pickled
         self._initargs = []
+        self.threshold = threshold
         self._initkwargs = {}
         super().__init__()
 
