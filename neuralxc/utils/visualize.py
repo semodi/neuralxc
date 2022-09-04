@@ -57,7 +57,4 @@ def _plane_cut(data, plane, height, grid, rmax=0, return_mesh=False):
 
     indeces = [A, B]
     indeces.insert(plane, height)
-    if not return_mesh:
-        return data[indeces[0], indeces[1], indeces[2]]
-    else:
-        return A, B
+    return (A, B) if return_mesh else data[indeces[0], indeces[1], indeces[2]]

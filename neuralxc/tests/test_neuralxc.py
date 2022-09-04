@@ -81,7 +81,7 @@ def test_formatter():
                            os.path.join(test_dir, 'var09.pckl')]])
 def test_grouped_transformers(transformer, filepath):
 
-    for use_torch in [False, True] if torch_found else [False]:
+    for _ in [False, True] if torch_found else [False]:
         with open(os.path.join(test_dir, 'transformer_in.pckl'), 'rb') as file:
             C = pickle.load(file)
 

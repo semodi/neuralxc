@@ -26,7 +26,7 @@ def RKS(mol, nxc='', **kwargs):
     that uses a NeuralXC potential
     """
     mf = dft.RKS(mol, **kwargs)
-    if not nxc is '':
+    if nxc is not '':
         model = neuralxc.PySCFNXC(nxc)
         model.initialize(mol)
         mf.get_veff = veff_mod(mf, model)
@@ -44,8 +44,8 @@ def compute_KS(atoms, path='pyscf.chkpt', basis='ccpvdz', xc='PBE', nxc='', **kw
     mol = gto.M(atom=mol_input, basis=basis)
     # mol.verbose= 4
     if nxc:
-        model_paths = glob(nxc + '/*')
-        if any(['projector' in path for path in model_paths]):
+        model_paths = glob(f'{nxc}/*')
+        if any('projector' in path for path in model_paths):
             mf = RKSrad(mol, nxc=nxc, nxc_kind='atomic')  # Model that uses projector on radial grid
         else:
             mf = RKS(mol, nxc=nxc)  # Model that uses overlap integrals and density matrix

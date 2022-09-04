@@ -28,23 +28,24 @@ class CustomSiesta(Siesta):
     def write_input(self, atoms, properties=None, system_changes=None):
         super().write_input(atoms, properties, system_changes)
 
-        filename = os.path.join(self.directory, self.label + '.fdf')
+        filename = os.path.join(self.directory, f'{self.label}.fdf')
         # add custom fdf
         if self.fdf_path:
             with open(self.fdf_path, 'r') as custom_fdf:
                 all_custom_keys = [list(entry.keys())[0]\
-                 for _, entry in next_fdf_entry(custom_fdf)]
+                     for _, entry in next_fdf_entry(custom_fdf)]
 
-            filename_tmp = os.path.join(self.directory, self.label + '.tmp')
+            filename_tmp = os.path.join(self.directory, f'{self.label}.tmp')
             with open(filename_tmp, 'w') as tmp_file:
                 with open(self.fdf_path, 'r') as custom_fdf:
                     tmp_file.write(custom_fdf.read())
 
                 with open(filename, 'r') as ase_fdf:
                     for is_block, entry in next_fdf_entry(ase_fdf):
-                        if not list(entry.keys())[0] in all_custom_keys:
-                            if 'pao' in list(entry.keys())[0] \
-                            and any(['pao' in key for key in all_custom_keys]):
+                        if list(entry.keys())[0] not in all_custom_keys:
+                            if 'pao' in list(entry.keys())[0] and any(
+                                'pao' in key for key in all_custom_keys
+                            ):
                                 continue
                             if is_block:
                                 tmp_file.write('%block ')
@@ -53,17 +54,15 @@ class CustomSiesta(Siesta):
                                 tmp_file.write(list(entry.values())[0])
                                 tmp_file.write('%endblock ')
                                 tmp_file.write(list(entry.keys())[0])
-                                tmp_file.write('\n')
                             else:
                                 tmp_file.write(' '.join(list(entry.items())[0]))
-                                tmp_file.write('\n')
-
+                            tmp_file.write('\n')
             with open(filename_tmp, 'r') as tmp_file:
                 with open(filename, 'w') as ase_fdf:
                     ase_fdf.write(tmp_file.read())
         if self.nxc:
             with open(filename, 'a') as ase_fdf:
-                ase_fdf.write('NeuralXC {} \n'.format(self.nxc))
+                ase_fdf.write(f'NeuralXC {self.nxc} \n')
 
     def _write_species(self, f, atoms):
         """Write input related the different species.
@@ -74,7 +73,7 @@ class CustomSiesta(Siesta):
         """
         species, species_numbers = self.species(atoms)
 
-        if not self['pseudo_path'] is None:
+        if self['pseudo_path'] is not None:
             pseudo_path = self['pseudo_path']
         elif 'SIESTA_PP_PATH' in os.environ:
             pseudo_path = os.environ['SIESTA_PP_PATH']
@@ -96,7 +95,7 @@ class CustomSiesta(Siesta):
 
             if spec['pseudopotential'] is None:
                 label = symbol
-                pseudopotential = label + '.psf'
+                pseudopotential = f'{label}.psf'
             else:
                 pseudopotential = spec['pseudopotential']
 
@@ -122,14 +121,14 @@ class CustomSiesta(Siesta):
                 symlink_pseudos = self['symlink_pseudos']
 
                 if symlink_pseudos is None:
-                    symlink_pseudos = not os.name == 'nt'
+                    symlink_pseudos = os.name != 'nt'
 
                 if symlink_pseudos:
                     os.symlink(pseudopotential, pseudo_targetpath)
                 else:
                     shutil.copy(pseudopotential, pseudo_targetpath)
 
-            if not spec['excess_charge'] is None:
+            if spec['excess_charge'] is not None:
                 atomic_number += 200
                 n_atoms = sum(np.array(species_numbers) == species_number)
 
@@ -142,14 +141,14 @@ class CustomSiesta(Siesta):
                 os.system(cmd)
 
                 pseudo_head += '-Fraction-%.5f' % fraction
-                synth_pseudo = pseudo_head + '.psf'
-                synth_block_filename = pseudo_head + '.synth'
+                synth_pseudo = f'{pseudo_head}.psf'
+                synth_block_filename = f'{pseudo_head}.synth'
                 os.remove(name)
                 shutil.copyfile(synth_pseudo, name)
                 synth_block = read_vca_synth_block(synth_block_filename, species_number=species_number)
                 synth_blocks.append(synth_block)
 
-            if len(synth_blocks) > 0:
+            if synth_blocks:
                 f.write(format_fdf('SyntheticAtoms', list(synth_blocks)))
 
             label = '.'.join(np.array(name.split('.'))[:-1])
@@ -158,7 +157,7 @@ class CustomSiesta(Siesta):
             if isinstance(spec['basis_set'], PAOBasisBlock):
                 pao_basis.append(spec['basis_set'].script(label))
             else:
-                basis_sizes.append(("    " + label, spec['basis_set']))
+                basis_sizes.append((f"    {label}", spec['basis_set']))
         f.write((format_fdf('ChemicalSpecieslabel', chemical_labels)))
         f.write('\n')
         f.write((format_fdf('PAO.Basis', pao_basis)))
@@ -208,7 +207,7 @@ class CustomSiesta(Siesta):
         if fname is None:
             fname = self.prefix
         if ext is not None:
-            fname = '{}.{}'.format(fname, ext)
+            fname = f'{fname}.{ext}'
         return os.path.join(self.directory, fname)
 
 
@@ -217,8 +216,7 @@ def next_fdf_entry(file):
     inside_block = False
     block_content = ''
     block_name = ''
-    line = file.readline()
-    while (line):
+    while line := file.readline():
         if len(line.strip()) > 0:
             if line.strip()[0] == '%':
                 if not inside_block:
@@ -234,5 +232,3 @@ def next_fdf_entry(file):
                 yield False, {line.split()[0].lower(): ' '.join(line.split()[1:])}
             else:
                 block_content += line
-
-        line = file.readline()

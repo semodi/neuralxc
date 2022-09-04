@@ -96,8 +96,8 @@ def test_stress():
     forces = V_comp[1][1][:-3]
 
     stress_diag = []
+    dx = 0.0001
     for ij in range(3):
-        dx = 0.0001
         energies = []
         for ix in [-1, 1]:
             unitcell = np.array(unitcell_true)

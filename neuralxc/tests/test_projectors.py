@@ -78,11 +78,7 @@ def test_jacobs_projector(rad_type, grid_type):
     positions = np.array([[0.0, 0.0, 0.0], [-0.75846035, -0.59257417, 0.0], [0.75846035, -0.59257417, 0.0]
                           ]) / xc.constants.Bohr
 
-    if grid_type == 'euclidean':
-        application = 'siesta'
-    else:
-        application = 'pyscf'
-
+    application = 'siesta' if grid_type == 'euclidean' else 'pyscf'
     if rad_type == 'ortho':
         basis_instructions = {'basis': {'n': 2, 'l': 3, 'r_o': 1}, 'projector': rad_type,
             'grid': grid_type, 'grad': 1}

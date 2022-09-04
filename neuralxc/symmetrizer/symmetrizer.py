@@ -23,10 +23,7 @@ def convert_torch_wrapper(func):
             X = torch.from_numpy(X)
             made_tensor = True
         Y = func(X, *args, **kwargs)
-        if made_tensor:
-            return Y.detach().numpy()
-        else:
-            return Y
+        return Y.detach().numpy() if made_tensor else Y
 
     return wrapped_func
 
@@ -45,14 +42,14 @@ def Symmetrizer(symmetrize_instructions):
 
     sym_ins = symmetrize_instructions
     registry = BaseSymmetrizer.get_registry()
-    if not 'symmetrizer_type' in sym_ins:
+    if 'symmetrizer_type' not in sym_ins:
         raise Exception('symmetrize_instructions must contain symmetrizer_type key')
 
     symtype = sym_ins['symmetrizer_type']
 
     print('Using symmetrizer ', symtype)
-    if not symtype in registry:
-        raise Exception('Symmetrizer: {} not registered'.format(symtype))
+    if symtype not in registry:
+        raise Exception(f'Symmetrizer: {symtype} not registered')
 
     return registry[symtype](sym_ins)
 
@@ -77,7 +74,7 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
         return BaseSymmetrizer.get_symmetrized(self, C)
 
     @abstractmethod
-    def _symmetrize_function(c, n_l, n, *args):
+    def _symmetrize_function(self, n_l, n, *args):
         pass
 
     def get_params(self, *args, **kwargs):
@@ -92,11 +89,10 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
             self._attrs.update({'basis': X['basis_instructions']})
             X = X['data']
 
-        if isinstance(X, tuple):
-            symmetrized = self.get_symmetrized(X[0])
-            return symmetrized, X[1]
-        else:
+        if not isinstance(X, tuple):
             return self.get_symmetrized(X)
+        symmetrized = self.get_symmetrized(X[0])
+        return symmetrized, X[1]
 
     def get_symmetrized(self, C):
         """
@@ -122,10 +118,7 @@ class BaseSymmetrizer(TorchModule, BaseEstimator, TransformerMixin, metaclass=Sy
             results[idx][key] = self._symmetrize_function(*data, basis[key]['l'], basis[key]['n'] * grad_mult,
                                                           self._cgs)
 
-        if not isinstance(C, list):
-            return results[0]
-        else:
-            return results
+        return results if isinstance(C, list) else results[0]
 
 
 class TraceSymmetrizer(BaseSymmetrizer):
@@ -167,7 +160,7 @@ class TraceSymmetrizer(BaseSymmetrizer):
         traces = []
         idx = 0
 
-        for n_ in range(0, n):
+        for _ in range(n):
             for l in range(n_l):
                 traces.append(torch.norm(c[:, idx:idx + (2 * l + 1)], dim=1)**2)
                 idx += 2 * l + 1
@@ -215,12 +208,12 @@ class MixedTraceSymmetrizer(BaseSymmetrizer):
         c = c.view(len(c), n, -1)
         traces = []
 
-        for n1 in range(0, n):
+        for n1 in range(n):
             for n2 in range(n1, n):
                 idx = 0
                 for l in range(n_l):
                     traces.append(torch.sum(c[:,n1,idx:idx+(2*l+1)]*\
-                                           c[:,n2,idx:idx+(2*l+1)],
+                                               c[:,n2,idx:idx+(2*l+1)],
                                             dim = -1))
                     idx += 2 * l + 1
 

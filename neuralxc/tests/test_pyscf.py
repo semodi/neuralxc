@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 test_dir = os.path.dirname(os.path.abspath(__file__))
 
 if 'driver_data_tmp' in os.listdir(test_dir):
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 def shcopytree(src, dest):
@@ -56,20 +56,20 @@ def test_radial_model():
                      species=['O', 'H', 'H'])
 
     res = model.get_V(rho)[0]
-    assert np.allclose(res, np.load(test_dir + '/rad_energy.npy'))
+    assert np.allclose(res, np.load(f'{test_dir}/rad_energy.npy'))
 
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
 @pytest.mark.pyscf
 def test_pre():
     try:
-        shutil.rmtree(test_dir + '/driver_data_tmp')
+        shutil.rmtree(f'{test_dir}/driver_data_tmp')
     except:
         pass
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
 
     run_engine_driver('benzene_small.traj', 'pre_rad.json', workdir='workdir_engine')
 
@@ -86,16 +86,16 @@ def test_pre():
 
     with h5py.File('data.hdf5', 'r') as f:
         for hashkey in f['/test/test/density']:
-            data0 = f['/test/test/density/' + hashkey][:]
+            data0 = f[f'/test/test/density/{hashkey}'][:]
         for hashkey in f['/test/test1/density']:
-            data1 = f['/test/test1/density/' + hashkey][:]
+            data1 = f[f'/test/test1/density/{hashkey}'][:]
         for hashkey in f['/test/test2/density']:
-            data2 = f['/test/test2/density/' + hashkey][:]
+            data2 = f[f'/test/test2/density/{hashkey}'][:]
 
     assert data0.shape[-1] * 2 == data1.shape[-1]
     assert data0.shape[-1] * 4 == data2.shape[-1]
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 @pytest.mark.skipif(not pyscf_found, reason='requires pyscf')
@@ -103,25 +103,31 @@ def test_pre():
 @pytest.mark.parametrize('projector', ['ga_ana','ga_rad','or_rad', 'ga_ana_f','ga_rad_f'])
 def test_sc(projector):
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
-    sc_driver('water.traj', 'pre_sc_{}.json'.format(projector),
-        'hyper.json', maxit=1, hyperopt=True)
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
+    sc_driver(
+        'water.traj',
+        f'pre_sc_{projector}.json',
+        'hyper.json',
+        maxit=1,
+        hyperopt=True,
+    )
+
+    os.chdir(f'{test_dir}/driver_data_tmp')
 
     # engine = Engine('pyscf', nxc='testing/nxc.jit', basis='sto3g')
     # engine.compute(read('testing.traj', '0'))
 
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 def test_pyscf_radial():
     os.chdir(test_dir)
-    shcopytree(test_dir + '/driver_data', test_dir + '/driver_data_tmp')
+    shcopytree(f'{test_dir}/driver_data', f'{test_dir}/driver_data_tmp')
     cwd = os.getcwd()
-    os.chdir(test_dir + '/driver_data_tmp')
+    os.chdir(f'{test_dir}/driver_data_tmp')
 
     serialize('model', 'benzene.pyscf.jit', as_radial=False)
     engine = Engine('pyscf', nxc='benzene.pyscf.jit')
@@ -133,8 +139,7 @@ def test_pyscf_radial():
     assert np.allclose(atoms_rad.get_potential_energy(), atoms.get_potential_energy())
 
     os.chdir(cwd)
-    shutil.rmtree(test_dir + '/driver_data_tmp')
-    pass
+    shutil.rmtree(f'{test_dir}/driver_data_tmp')
 
 
 if __name__ == '__main__':

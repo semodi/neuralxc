@@ -30,11 +30,11 @@ def E_from_atoms(traj):
     energies = {}
     for atoms in traj:
         spec = ''.join(atoms.get_chemical_symbols())
-        if not spec in energies:
+        if spec not in energies:
             energies[spec] = []
         energies[spec].append(atoms.get_potential_energy())
 
-    allspecies = np.unique([s for s in ''.join([key for key in energies])])
+    allspecies = np.unique(list(''.join(list(energies))))
 
     X = np.zeros([len(energies), len(allspecies)])
     y = np.zeros(len(energies))
@@ -45,7 +45,7 @@ def E_from_atoms(traj):
     lr = LinearRegression(fit_intercept=False)
     lr.fit(X, y)
     offsets = lr.predict(X)
-    offsets = {key: offset for key, offset in zip(energies, offsets)}
+    offsets = dict(zip(energies, offsets))
 
     energies = []
     for atoms in traj:
@@ -136,8 +136,7 @@ def load_sets(datafile, baseline, reference, basis_key='', percentile_cutoff=0):
 
     X = np.concatenate(Xs, axis=0)
     y = np.concatenate(ys, axis=0)
-    data = np.concatenate([X, y.reshape(-1, 1)], axis=1)
-    return data
+    return np.concatenate([X, y.reshape(-1, 1)], axis=1)
 
 
 def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E0=None):
@@ -168,9 +167,9 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
         If None tries to find this value as an attribute inside datafile
     """
     no_energy = False
-    if baseline + '/energy' in datafile:
-        data_base = datafile[baseline + '/energy']
-        data_ref = datafile[reference + '/energy']
+    if f'{baseline}/energy' in datafile:
+        data_base = datafile[f'{baseline}/energy']
+        data_ref = datafile[f'{reference}/energy']
     else:
         data_base = np.array([0])
         data_ref = np.array([0])
@@ -196,7 +195,7 @@ def load_data(datafile, baseline, reference, basis_key, percentile_cutoff=0.0, E
     if basis_key == '':
         data_base = np.zeros([len(tar), 0])
     else:
-        data_base = datafile[baseline + '/density/' + basis_key][:, :]
+        data_base = datafile[f'{baseline}/density/{basis_key}'][:, :]
     if no_energy:
         tar = np.zeros(len(data_base))
 
@@ -218,12 +217,12 @@ def match_hyperparameter(hp, parameters):
     corresponding full name in parameters
     """
 
-    matches = []
-    for par in parameters:
-        if hp == par:
-            matches.append(par)
+    matches = [par for par in parameters if hp == par]
     if len(matches) != 1:
-        raise ValueError('{} matches found for hyperparameter {}. Must be exactly 1'.format(len(matches), hp))
+        raise ValueError(
+            f'{len(matches)} matches found for hyperparameter {hp}. Must be exactly 1'
+        )
+
     return matches[0]
 
 
@@ -233,7 +232,7 @@ def to_full_hyperparameters(hp, parameters):
     """
     full = {}
     for name in hp:
-        new_key = 'ml__' + match_hyperparameter(name, parameters)
+        new_key = f'ml__{match_hyperparameter(name, parameters)}'
         full[new_key] = hp[name]
         if not isinstance(full[new_key], list):
             full[new_key] = [full[new_key]]
@@ -253,9 +252,13 @@ def get_default_pipeline(basis, species, symmetrizer_type='trace', pca_threshold
 
     estimator = NetworkWrapper(4, 1, 0, alpha=0.001, max_steps=4001, test_size=0.0, valid_size=0, random_seed=None)
 
-    pipeline_list = [('spec_group', spec_group), ('symmetrizer', symmetrizer), ('var_selector', var_selector)]
+    pipeline_list = [
+        ('spec_group', spec_group),
+        ('symmetrizer', symmetrizer),
+        ('var_selector', var_selector),
+        ('scaler', GroupedStandardScaler()),
+    ]
 
-    pipeline_list.append(('scaler', GroupedStandardScaler()))
 
     pipeline_list.append(('estimator', estimator))
 
@@ -278,15 +281,16 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
         if not isinstance(hdf5[1], list):
             hdf5[1] = [hdf5[1]]
 
-        all_species = []
-        for set in hdf5[1]:
-            all_species.append(''.join(find_attr_in_tree(datafile, set, 'species')))
+        all_species = [
+            ''.join(find_attr_in_tree(datafile, set, 'species'))
+            for set in hdf5[1]
+        ]
 
     if pre:
         basis = pre['preprocessor']
     else:
         basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in ''.join(all_species)}
-        basis.update({'extension': 'RHOXC'})
+        basis['extension'] = 'RHOXC'
 
     pipeline = get_default_pipeline(basis,
                                     all_species,
@@ -305,8 +309,15 @@ def get_grid_cv(hdf5, preprocessor, inputfile, spec_agnostic=False):
     verbose = inp.get('verbose', 1)
 
     pipe = Pipeline([('ml', pipeline)])
-    grid_cv = GridSearchCV(pipe, hyper, cv=cv, n_jobs=n_jobs, refit=True, verbose=verbose, return_train_score=True)
-    return grid_cv
+    return GridSearchCV(
+        pipe,
+        hyper,
+        cv=cv,
+        n_jobs=n_jobs,
+        refit=True,
+        verbose=verbose,
+        return_train_score=True,
+    )
 
 
 def get_basis_grid(preprocessor):
@@ -331,10 +342,7 @@ def get_basis_grid(preprocessor):
             if isinstance(value, abc.Mapping):
                 select_dict[key] = nested_dict_build(value, i)
             else:
-                if isinstance(value, list):
-                    select_dict[key] = value[i]
-                else:
-                    select_dict[key] = value
+                select_dict[key] = value[i] if isinstance(value, list) else value
         return select_dict
 
     max_len = 0
@@ -359,13 +367,14 @@ def get_preprocessor(pre, atoms, src_path):
     species = ''.join(atoms[0].get_chemical_symbols())
     for a in atoms:
         species2 = ''.join(a.get_chemical_symbols())
-        if not species2 == species:
+        if species2 != species:
             print('Warning (in get_preprocessor): Dataset not homogeneous')
 
     basis = {spec: {'n': 1, 'l': 1, 'r_o': 1} for spec in species}
-    basis.update(pre['preprocessor'])
-    preprocessor = Preprocessor(basis, src_path, atoms, num_workers=pre.get('n_workers', 1))
-    return preprocessor
+    basis |= pre['preprocessor']
+    return Preprocessor(
+        basis, src_path, atoms, num_workers=pre.get('n_workers', 1)
+    )
 
 
 class SampleSelector(BaseEstimator):
@@ -415,7 +424,7 @@ class SampleSelector(BaseEstimator):
         for center, label in zip(centers, np.unique(labels)):  # Loop over clusters
             _, idx = nbrs.kneighbors(center.reshape(1, -1))
             choice = idx[0]
-            if not choice in picked:
+            if choice not in picked:
                 sampled.append(indices[choice])
 
         return sampled

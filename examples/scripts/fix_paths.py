@@ -2,11 +2,7 @@ import json
 import os
 import sys
 
-if len(sys.argv) > 1:
-    path = sys.argv[1]
-else:
-    path = 'basis_sgdml_benzene.json'
-
+path = sys.argv[1] if len(sys.argv) > 1 else 'basis_sgdml_benzene.json'
 print('FILEPATH', path)
 
 basis = json.load(open(path, 'r'))

@@ -29,8 +29,8 @@ def DensityProjector(**kwargs):
         projector_type = 'pyscf'
 
     registry = BaseProjector.get_registry()
-    if not projector_type in registry:
-        raise Exception('Projector: {} not registered'.format(projector_type))
+    if projector_type not in registry:
+        raise Exception(f'Projector: {projector_type} not registered')
 
     return registry[projector_type](**kwargs)
 
@@ -106,7 +106,7 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
         #     rho = rho.permute(1,0)
 
         for pos, spec in zip(positions, species):
-            if not spec in basis_rep:
+            if spec not in basis_rep:
                 basis_rep[spec] = []
 
             self.species = spec
@@ -138,10 +138,7 @@ class BaseProjector(TorchModule, metaclass=ProjectorRegistry):
         float or np.ndarray
             Value of angular function at provided point(s)
         """
-        res = []
-        for m in range(-l, l + 1):
-            res.append(geom.SH(l, m, theta, phi))
-        return res
+        return [geom.SH(l, m, theta, phi) for m in range(-l, l + 1)]
 
 
 class EuclideanProjector(BaseProjector):
@@ -165,10 +162,11 @@ class EuclideanProjector(BaseProjector):
         super().__init__()
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
-        W = {}
-        for species in basis_instructions:
-            if len(species) < 3:
-                W[species] = self.get_W(basis_instructions[species])
+        W = {
+            species: self.get_W(basis_instructions[species])
+            for species in basis_instructions
+            if len(species) < 3
+        }
 
         a = np.linalg.norm(unitcell, axis=1) / grid[:3]
         self.unitcell = torch.from_numpy(unitcell)
@@ -300,11 +298,7 @@ class EuclideanProjector(BaseProjector):
 
         Rm = torch.stack([Xm, Ym, Zm]).double()
 
-        if scaled:
-            R = contract('ij,jklm -> iklm', U, Rm)
-            return R
-        else:
-            return Rm
+        return contract('ij,jklm -> iklm', U, Rm) if scaled else Rm
 
 
 class RadialProjector(BaseProjector):
@@ -330,10 +324,11 @@ class RadialProjector(BaseProjector):
         BaseProjector.__init__(self)
         self.basis = basis_instructions
         # Initialize the matrix used to orthonormalize radial basis
-        W = {}
-        for species in basis_instructions:
-            if len(species) < 3:
-                W[species] = self.get_W(basis_instructions[species])
+        W = {
+            species: self.get_W(basis_instructions[species])
+            for species in basis_instructions
+            if len(species) < 3
+        }
 
         self.grid_coords = torch.from_numpy(grid_coords)
         self.grid_weights = torch.from_numpy(grid_weights)
@@ -344,7 +339,7 @@ class RadialProjector(BaseProjector):
             if len(species) < 3:
                 W[species] = self.get_W(basis_instructions[species])
 
-        self.my_box = torch.Tensor([[0, 1] for i in range(3)])
+        self.my_box = torch.Tensor([[0, 1] for _ in range(3)])
         self.unitcell = self.grid_coords
         self.grid = self.grid_weights
 

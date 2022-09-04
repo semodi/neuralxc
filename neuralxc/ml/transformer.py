@@ -24,10 +24,7 @@ def convert_torch_wrapper(func):
             X = torch.from_numpy(X)
             made_tensor = True
         Y = func(X, *args, **kwargs)
-        if made_tensor:
-            return Y.detach().numpy()
-        else:
-            return Y
+        return Y.detach().numpy() if made_tensor else Y
 
     return wrapped_func
 
@@ -69,53 +66,46 @@ class GroupedTransformer(ABC):
         results = []
         for x in X:
             if isinstance(x, dict):
-                results_dict = {}
-                for spec in x:
-                    results_dict[spec] = self._spec_dict[spec].transform(x[spec])
+                results_dict = {spec: self._spec_dict[spec].transform(x[spec]) for spec in x}
                 results.append(results_dict)
             else:
                 results.append(system_shape(self.torch_transform(atomic_shape(x)), x.shape[-2]))
 
         if made_list:
             results = results[0]
-        if was_tuple:
-            return results, y
-        else:
-            return results
+        return (results, y) if was_tuple else results
 
     def fit(self, X, y=None):
         if self.is_fit:
             return self
+        self.is_fit = True
+        if isinstance(X, tuple):
+            X = X[0]
+
+        if isinstance(X, list):
+            super_X = {}
+            for x in X:
+                for spec in x:
+                    if spec not in super_X:
+                        super_X[spec] = []
+                    super_X[spec].append(atomic_shape(x[spec]))
+            for spec in super_X:
+                super_X[spec] = np.concatenate(super_X[spec])
         else:
-            self.is_fit = True
-            if isinstance(X, tuple):
-                X = X[0]
+            super_X = X
 
-            if isinstance(X, list):
-                super_X = {}
-                for x in X:
-                    for spec in x:
-                        if not spec in super_X:
-                            super_X[spec] = []
-                        super_X[spec].append(atomic_shape(x[spec]))
-                for spec in super_X:
-                    super_X[spec] = np.concatenate(super_X[spec])
-            else:
-                super_X = X
-
-            if isinstance(super_X, dict):
-                self._spec_dict = {}
-                for spec in super_X:
-                    self._spec_dict[spec] =\
-                     type(self)(*self._initargs,
-                      **self.get_kwargs())
-                    self._spec_dict[spec].__dict__.update(self.get_params())
-                    # Due to padding some rows might be zero, exclude those during fit:
-                    mask = ~np.all(atomic_shape(super_X[spec]) == 0, axis=-1)
-                    self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])[mask]))
-                return self
-            else:
-                return super().fit(atomic_shape(super_X))
+        if not isinstance(super_X, dict):
+            return super().fit(atomic_shape(super_X))
+        self._spec_dict = {}
+        for spec in super_X:
+            self._spec_dict[spec] =\
+                 type(self)(*self._initargs,
+              **self.get_kwargs())
+            self._spec_dict[spec].__dict__.update(self.get_params())
+            # Due to padding some rows might be zero, exclude those during fit:
+            mask = ~np.all(atomic_shape(super_X[spec]) == 0, axis=-1)
+            self._spec_dict[spec].fit(self._before_fit(atomic_shape(super_X[spec])[mask]))
+        return self
 
     def fit_transform(self, X, y=None, **fit_params):
         return self.fit(X).transform(X)
@@ -150,7 +140,7 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModul
 
     def torch_transform(self, X):
         X_shape = X.size()
-        if not len(X_shape) == 2:
+        if len(X_shape) != 2:
             X = X.view(-1, X_shape[-1])
         support = torch.from_numpy(self.get_support()).bool()
         return X[:, support]
@@ -172,7 +162,7 @@ class GroupedStandardScaler(GroupedTransformer, StandardScaler, TorchModule):
 
     def torch_transform(self, X):
         X_shape = X.size()
-        if not len(X_shape) == 2:
+        if len(X_shape) != 2:
             X = X.view(-1, X_shape[-1])
         X = (X - torch.from_numpy(self.mean_)) / torch.sqrt(torch.from_numpy(self.var_))
         return X
