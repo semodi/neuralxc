@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-from collections import Mapping
+from collections.abc import Mapping
 
 
 class Formatter(TransformerMixin, BaseEstimator):
