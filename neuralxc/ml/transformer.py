@@ -126,11 +126,11 @@ class GroupedVarianceThreshold(GroupedTransformer, VarianceThreshold, TorchModul
         TorchModule.__init__(self)
         self._before_fit = identity  # lambdas can't be pickled
         self._initargs = []
-        self.treshold = threshold
+        self.threshold = threshold
         super().__init__(**self.get_kwargs())
 
     def get_kwargs(self):
-        return dict(threshold=self.treshold)
+        return dict(threshold=self.threshold)
 
     def transform(self, X, y=None, **fit_params):
         return GroupedTransformer.transform(self, X, y, **fit_params)
